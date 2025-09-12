@@ -1,0 +1,934 @@
+<?php
+session_start();
+include '../partials/navigation.php'; // database connection
+include '../partials/header.php';
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management System</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="https://github.com/kensofabel/B2-IMS/blob/main/Inventory%20Management%20System-20250829T034006Z-1-001/Inventory%20Management%20System/Gemini_Generated_Image_lup4cylup4cylup4__1_-removebg-preview.png?raw=true">
+</head>
+<body>
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Dashboard Section -->
+                <section id="dashboard-section" class="section active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-boxes"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="total-products">0</h3>
+                                <p>Total Products</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-shopping-cart"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="total-sales">0</h3>
+                                <p>Total Sales</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="low-stock">0</h3>
+                                <p>Low Stock Items</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="total-revenue">$0.00</h3>
+                                <p>Total Revenue</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-activities">
+                        <h2>Recent Activities</h2>
+                        <div id="activities-list" class="activities-list">
+                            <!-- Activities will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Inventory Section -->
+                <section id="inventory-section" class="section">
+                    <div class="section-header">
+                        <h2>Inventory Management</h2>
+                        <div class="search-box">
+                            <input type="text" id="search-inventory" placeholder="Search products...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="inventory-table-container">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Category</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                                <!-- Inventory data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Add Product Section -->
+                <section id="add-product-section" class="section">
+                    <div class="section-header">
+                        <h2>Add New Product</h2>
+                    </div>
+                    <form id="add-product-form" class="product-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="product-name">Product Name</label>
+                                <input type="text" id="product-name" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-category">Category</label>
+                                <select id="product-category" name="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                                    <option value="Dairy & Eggs">Dairy & Eggs</option>
+                                    <option value="Meat & Poultry">Meat & Poultry</option>
+                                    <option value="Bakery">Bakery</option>
+                                    <option value="Beverages">Beverages</option>
+                                    <option value="Snacks">Snacks</option>
+                                    <option value="Frozen Foods">Frozen Foods</option>
+                                    <option value="Household">Household</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="product-price">Price ($)</label>
+                                <input type="number" id="product-price" name="price" step="0.01" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-stock">Initial Stock</label>
+                                <input type="number" id="product-stock" name="stock" min="0" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="product-description">Description (Optional)</label>
+                            <textarea id="product-description" name="description" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="submit-btn">Add Product</button>
+                    </form>
+                </section>
+
+                <!-- Sales Section -->
+                <section id="sales-section" class="section">
+                    <div class="section-header">
+                        <h2>Sales History</h2>
+                    </div>
+                    <div class="sales-table-container">
+                        <table class="sales-table">
+                            <thead>
+                                <tr>
+                                    <th>Transaction ID</th>
+                                    <th>Date & Time</th>
+                                    <th>Products</th>
+                                    <th>Total Amount</th>
+                                    <th>Payment Method</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sales-table-body">
+                                <!-- Sales data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+               
+
+                <!-- Sales Report Section -->
+                <section id="sales-report-section" class="section">
+                    <div class="section-header">
+                        <h2>Sales Report</h2>
+                        <div class="report-filters">
+                            <input type="date" id="report-start-date">
+                            <input type="date" id="report-end-date">
+                            <button class="btn btn-primary" onclick="generateSalesReport()">
+                                <i class="fas fa-chart-line"></i> Generate Report
+                            </button>
+                        </div>
+                    </div>
+                    <div class="report-summary">
+                        <div class="summary-card">
+                            <h3 id="total-sales-count">0</h3>
+                            <p>Total Transactions</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="total-sales-revenue">$0.00</h3>
+                            <p>Total Revenue</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="average-sale">$0.00</h3>
+                            <p>Average Sale</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="top-product">N/A</h3>
+                            <p>Top Selling Product</p>
+                        </div>
+                    </div>
+                    <div class="sales-report-table-container">
+                        <table class="sales-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Transaction ID</th>
+                                    <th>Date & Time</th>
+                                    <th>Products</th>
+                                    <th>Quantity</th>
+                                    <th>Total Amount</th>
+                                    <th>Payment Method</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sales-report-table-body">
+                                <!-- Sales report data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Inventory Reports Section -->
+                <section id="inventory-reports-section" class="section">
+                    <div class="section-header">
+                        <h2>Inventory Reports</h2>
+                    </div>
+                    <div class="report-summary">
+                        <div class="summary-card">
+                            <h3 id="total-inventory-value">$0.00</h3>
+                            <p>Total Inventory Value</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="total-inventory-items">0</h3>
+                            <p>Total Items</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="low-stock-count">0</h3>
+                            <p>Low Stock Items</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="out-of-stock-count">0</h3>
+                            <p>Out of Stock Items</p>
+                        </div>
+                    </div>
+                    <div class="report-content">
+                        <div class="inventory-report-table-container">
+                            <table class="inventory-report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Stock</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-report-table-body">
+                                    <!-- Inventory report data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Payment Reports Section -->
+                <section id="payment-reports-section" class="section">
+                    <div class="section-header">
+                        <h2>Payment Reports</h2>
+                        <div class="report-filters">
+                            <input type="date" id="payment-report-start-date">
+                            <input type="date" id="payment-report-end-date">
+                            <button class="btn btn-primary" onclick="generatePaymentReport()">
+                                <i class="fas fa-chart-line"></i> Generate Report
+                            </button>
+                        </div>
+                    </div>
+                    <div class="report-summary">
+                        <div class="summary-card">
+                            <h3 id="total-payment-transactions">0</h3>
+                            <p>Total Transactions</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="total-payment-revenue">$0.00</h3>
+                            <p>Total Revenue</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="cash-payments">0</h3>
+                            <p>Cash Payments</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="card-payments">0</h3>
+                            <p>Card Payments</p>
+                        </div>
+                    </div>
+                    <div class="payment-report-table-container">
+                        <table class="payment-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Transaction ID</th>
+                                    <th>Date & Time</th>
+                                    <th>Payment Method</th>
+                                    <th>Amount</th>
+                                    <th>Products</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payment-report-table-body">
+                                <!-- Payment report data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Employee Section -->
+                <section id="employee-section" class="section">
+                    <div class="section-header">
+                        <h2>Employee Management</h2>
+                    </div>
+                    <div class="employee-content">
+                        <p>Employee management content will be displayed here.</p>
+                        <!-- Add employee management specific content -->
+                        <div class="employee-actions">
+                            <button class="btn btn-edit" onclick="addEmployee()">
+                                <i class="fas fa-user-plus"></i> Add Employee
+                            </button>
+                            <button class="btn btn-edit" onclick="manageEmployees()">
+                                <i class="fas fa-users"></i> Manage Employees
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Access Rights Section -->
+                <section id="access-rights-section" class="section">
+                    <div class="section-header">
+                        <h2>Access Rights Management</h2>
+                    </div>
+                    <div class="access-rights-content">
+                        <p>Access rights management content will be displayed here.</p>
+                        <!-- Add access rights management specific content -->
+                        <div class="access-rights-actions">
+                            <button class="btn btn-edit" onclick="manageRoles()">
+                                <i class="fas fa-user-shield"></i> Manage Roles
+                            </button>
+                            <button class="btn btn-edit" onclick="setPermissions()">
+                                <i class="fas fa-key"></i> Set Permissions
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Audit Logs Section -->
+                <section id="audit-logs-section" class="section">
+                    <div class="section-header">
+                        <h2>Audit Logs</h2>
+                        <div class="search-box">
+                            <input type="text" id="search-audit-logs" placeholder="Search audit logs...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="audit-logs-content">
+                        <div class="audit-logs-filters">
+                            <select id="audit-log-filter">
+                                <option value="all">All Activities</option>
+                                <option value="login">Login/Logout</option>
+                                <option value="product">Product Changes</option>
+                                <option value="sales">Sales Transactions</option>
+                                <option value="inventory">Inventory Updates</option>
+                            </select>
+                            <input type="date" id="audit-log-date-from">
+                            <input type="date" id="audit-log-date-to">
+                            <button class="btn btn-primary" onclick="filterAuditLogs()">
+                                <i class="fas fa-filter"></i> Filter
+                            </button>
+                            <button class="btn btn-secondary" onclick="exportAuditLogs()">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
+                        <div class="audit-logs-table-container">
+                            <table class="audit-logs-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>Action</th>
+                                        <th>Details</th>
+                                        <th>IP Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-logs-table-body">
+                                    <!-- Audit logs will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Settings Section -->
+                <section id="settings-section" class="section">
+                    <div class="section-header">
+                        <h2>Settings</h2>
+                    </div>
+                    <div class="settings-content">
+                        <div class="settings-tabs">
+                            <button class="tab-btn active" onclick="showSettingsTab('general')">General</button>
+                            <button class="tab-btn" onclick="showSettingsTab('inventory')">Inventory</button>
+                            <button class="tab-btn" onclick="showSettingsTab('advanced')">Advanced</button>
+                        </div>
+
+                        <div id="general-tab" class="settings-tab active">
+                            <div class="settings-overview">
+                                <div class="settings-header">
+                                    <div class="settings-title-section">
+                                        <h3><i class="fas fa-cog"></i> General Settings</h3>
+                                        <p class="settings-description">Configure your business information, preferences, and system settings</p>
+                                    </div>
+                                    <div class="settings-actions">
+                                        <div class="settings-search">
+                                            <input type="text" id="settings-search" placeholder="Search settings..." oninput="filterSettings(this.value)">
+                                            <i class="fas fa-search"></i>
+                                        </div>
+                                        <div class="quick-actions">
+                                            <button class="quick-action-btn" onclick="expandAllCards()" title="Expand All">
+                                                <i class="fas fa-expand-arrows-alt"></i>
+                                            </button>
+                                            <button class="quick-action-btn" onclick="collapseAllCards()" title="Collapse All">
+                                                <i class="fas fa-compress-arrows-alt"></i>
+                                            </button>
+                                            <button class="quick-action-btn" onclick="showSettingsHelp()" title="Help">
+                                                <i class="fas fa-question-circle"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="settings-status">
+                                    <div class="status-indicators">
+                                        <span class="status-indicator" id="settings-status">
+                                            <i class="fas fa-circle"></i> Settings loaded
+                                        </span>
+                                        <span class="completion-indicator" id="settings-completion">
+                                            <i class="fas fa-chart-pie"></i> <span id="completion-percent">0%</span> Complete
+                                        </span>
+                                    </div>
+                                    <div class="auto-save-toggle">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="auto-save-toggle" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <span class="toggle-label">Auto-save</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Settings Summary Card -->
+                            <div class="settings-summary-card">
+                                <div class="summary-header">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <h4>Settings Overview</h4>
+                                </div>
+                                <div class="summary-content">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Business Info</span>
+                                        <div class="summary-progress">
+                                            <div class="progress-bar" id="business-progress" style="width: 0%"></div>
+                                        </div>
+                                        <span class="summary-value" id="business-complete">0/4</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Financial</span>
+                                        <div class="summary-progress">
+                                            <div class="progress-bar" id="financial-progress" style="width: 0%"></div>
+                                        </div>
+                                        <span class="summary-value" id="financial-complete">0/3</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">System</span>
+                                        <div class="summary-progress">
+                                            <div class="progress-bar" id="system-progress" style="width: 0%"></div>
+                                        </div>
+                                        <span class="summary-value" id="system-complete">0/4</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Notifications</span>
+                                        <div class="summary-progress">
+                                            <div class="progress-bar" id="notification-progress" style="width: 0%"></div>
+                                        </div>
+                                        <span class="summary-value" id="notification-complete">0/3</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-cards-grid">
+                                <!-- Business Information Card -->
+                                <div class="settings-card" data-tooltip="Configure your business details and contact information">
+                                    <div class="card-header">
+                                        <i class="fas fa-building"></i>
+                                        <h4>Business Information</h4>
+                                        <div class="card-actions">
+                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                                <i class="fas fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="business-name" data-tooltip="Your business name as it appears on receipts and reports">
+                                                    <i class="fas fa-store"></i> Business Name
+                                                </label>
+                                                <input type="text" id="business-name" name="businessName" placeholder="Enter your business name" maxlength="100">
+                                                <div class="field-feedback"></div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="store-address" data-tooltip="Complete address for your store location">
+                                                    <i class="fas fa-map-marker-alt"></i> Store Address
+                                                </label>
+                                                <input type="text" id="store-address" name="storeAddress" placeholder="Enter store address" maxlength="200">
+                                                <div class="field-feedback"></div>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="store-phone" data-tooltip="Primary contact phone number">
+                                                    <i class="fas fa-phone"></i> Phone Number
+                                                </label>
+                                                <input type="tel" id="store-phone" name="storePhone" placeholder="(555) 123-4567" pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}">
+                                                <div class="field-feedback"></div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="store-email" data-tooltip="Business email address for communications">
+                                                    <i class="fas fa-envelope"></i> Email Address
+                                                </label>
+                                                <input type="email" id="store-email" name="storeEmail" placeholder="contact@yourstore.com">
+                                                <div class="field-feedback"></div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="store-hours" data-tooltip="Operating hours for your store">
+                                                <i class="fas fa-clock"></i> Store Hours
+                                            </label>
+                                            <textarea id="store-hours" name="storeHours" rows="3" placeholder="Mon-Fri: 9AM-6PM&#10;Sat: 10AM-4PM&#10;Sun: Closed" maxlength="500"></textarea>
+                                            <div class="field-feedback"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Financial Settings Card -->
+                                <div class="settings-card" data-tooltip="Configure pricing, taxes, and payment options">
+                                    <div class="card-header">
+                                        <i class="fas fa-dollar-sign"></i>
+                                        <h4>Financial Settings</h4>
+                                        <div class="card-actions">
+                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                                <i class="fas fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="currency-symbol" data-tooltip="Currency symbol for your region">
+                                                    <i class="fas fa-coins"></i> Currency Symbol
+                                                </label>
+                                                <input type="text" id="currency-symbol" name="currencySymbol" maxlength="3" placeholder="$" value="$">
+                                                <div class="field-feedback"></div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tax-rate" data-tooltip="Default tax rate applied to sales">
+                                                    <i class="fas fa-percentage"></i> Tax Rate (%)
+                                                </label>
+                                                <input type="number" id="tax-rate" name="taxRate" step="0.01" min="0" max="100" placeholder="8.25">
+                                                <div class="field-feedback"></div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="payment-types" data-tooltip="Select accepted payment methods">
+                                                <i class="fas fa-credit-card"></i> Payment Types
+                                            </label>
+                                            <div class="payment-types-grid">
+                                                <label class="checkbox-option">
+                                                    <input type="checkbox" name="paymentCash" checked>
+                                                    <span class="checkmark"></span>
+                                                    <i class="fas fa-money-bill-wave"></i> Cash
+                                                </label>
+                                                <label class="checkbox-option">
+                                                    <input type="checkbox" name="paymentCard" checked>
+                                                    <span class="checkmark"></span>
+                                                    <i class="fas fa-credit-card"></i> Card
+                                                </label>
+                                                <label class="checkbox-option">
+                                                    <input type="checkbox" name="paymentDigital">
+                                                    <span class="checkmark"></span>
+                                                    <i class="fas fa-mobile-alt"></i> Digital Wallet
+                                                </label>
+                                                <label class="checkbox-option">
+                                                    <input type="checkbox" name="paymentCredit">
+                                                    <span class="checkmark"></span>
+                                                    <i class="fas fa-hand-holding-usd"></i> Credit
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- System Preferences Card -->
+                                <div class="settings-card" data-tooltip="Customize system behavior and appearance">
+                                    <div class="card-header">
+                                        <i class="fas fa-sliders-h"></i>
+                                        <h4>System Preferences</h4>
+                                        <div class="card-actions">
+                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                                <i class="fas fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="language" data-tooltip="Interface language">
+                                                    <i class="fas fa-globe"></i> Language
+                                                </label>
+                                                <select id="language" name="language">
+                                                    <option value="en">English</option>
+                                                    <option value="es">Spanish</option>
+                                                    <option value="fr">French</option>
+                                                    <option value="de">German</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="timezone" data-tooltip="Your local time zone">
+                                                    <i class="fas fa-clock"></i> Time Zone
+                                                </label>
+                                                <select id="timezone" name="timezone">
+                                                    <option value="UTC-8">Pacific Time (UTC-8)</option>
+                                                    <option value="UTC-5">Eastern Time (UTC-5)</option>
+                                                    <option value="UTC+0">GMT (UTC+0)</option>
+                                                    <option value="UTC+1">Central European Time (UTC+1)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="date-format" data-tooltip="Preferred date display format">
+                                                    <i class="fas fa-calendar-alt"></i> Date Format
+                                                </label>
+                                                <select id="date-format" name="dateFormat">
+                                                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="loyalty-program" data-tooltip="Enable customer loyalty program">
+                                                    <i class="fas fa-gift"></i> Loyalty Program
+                                                </label>
+                                                <select id="loyalty-program" name="loyaltyProgram">
+                                                    <option value="enabled">Enabled</option>
+                                                    <option value="disabled">Disabled</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="theme-mode" data-tooltip="Choose your preferred theme">
+                                                    <i class="fas fa-palette"></i> Theme Mode
+                                                </label>
+                                                <select id="theme-mode" name="themeMode">
+                                                    <option value="light">Light</option>
+                                                    <option value="dark">Dark</option>
+                                                    <option value="auto">Auto (System)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="notifications" data-tooltip="Enable system notifications">
+                                                    <i class="fas fa-bell"></i> Notifications
+                                                </label>
+                                                <select id="notifications" name="notifications">
+                                                    <option value="enabled">Enabled</option>
+                                                    <option value="disabled">Disabled</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Notification Preferences Card -->
+                                <div class="settings-card" data-tooltip="Configure notification settings and preferences">
+                                    <div class="card-header">
+                                        <i class="fas fa-bell"></i>
+                                        <h4>Notification Preferences</h4>
+                                        <div class="card-actions">
+                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                                <i class="fas fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <div class="notification-settings">
+                                            <div class="notification-group">
+                                                <h5><i class="fas fa-shopping-cart"></i> Sales Notifications</h5>
+                                                <div class="notification-options">
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyNewSale" checked>
+                                                        <span class="checkmark"></span>
+                                                        New sales
+                                                    </label>
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyLargeSale">
+                                                        <span class="checkmark"></span>
+                                                        Large transactions (>$100)
+                                                    </label>
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyDailySummary" checked>
+                                                        <span class="checkmark"></span>
+                                                        Daily sales summary
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="notification-group">
+                                                <h5><i class="fas fa-boxes"></i> Inventory Notifications</h5>
+                                                <div class="notification-options">
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyLowStock" checked>
+                                                        <span class="checkmark"></span>
+                                                        Low stock alerts
+                                                    </label>
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyOutOfStock">
+                                                        <span class="checkmark"></span>
+                                                        Out of stock items
+                                                    </label>
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyStockUpdates">
+                                                        <span class="checkmark"></span>
+                                                        Stock level changes
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="notification-group">
+                                                <h5><i class="fas fa-user"></i> System Notifications</h5>
+                                                <div class="notification-options">
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyUserLogin" checked>
+                                                        <span class="checkmark"></span>
+                                                        User login/logout
+                                                    </label>
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifySystemUpdates">
+                                                        <span class="checkmark"></span>
+                                                        System updates
+                                                    </label>
+                                                    <label class="checkbox-option">
+                                                        <input type="checkbox" name="notifyErrors">
+                                                        <span class="checkmark"></span>
+                                                        Error notifications
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-actions">
+                                <div class="action-buttons">
+                                    <button type="submit" form="settings-form" class="btn btn-primary" id="save-settings-btn">
+                                        <i class="fas fa-save"></i> Save All Settings
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="resetSettings()">
+                                        <i class="fas fa-undo"></i> Reset to Defaults
+                                    </button>
+                                    <button type="button" class="btn btn-outline" onclick="exportSettings()">
+                                        <i class="fas fa-download"></i> Export Settings
+                                    </button>
+                                    <button type="button" class="btn btn-outline" onclick="importSettings()">
+                                        <i class="fas fa-upload"></i> Import Settings
+                                    </button>
+                                </div>
+                                <div class="last-saved">
+                                    <small id="last-saved-time">Last saved: Never</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="inventory-tab" class="settings-tab">
+                            <!-- Inventory settings content removed -->
+                        </div>
+
+                        <div id="advanced-tab" class="settings-tab">
+                            <!-- Advanced settings content removed -->
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <!-- Roles Management Modal -->
+    <div id="roles-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Roles</h2>
+                <span class="close" onclick="closeRolesModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="roles-actions">
+                    <button class="btn btn-primary" onclick="showAddRoleForm()">
+                        <i class="fas fa-plus"></i> Add New Role
+                    </button>
+                </div>
+                <div id="roles-list" class="roles-list">
+                    <!-- Roles will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Role Form Modal -->
+    <div id="role-form-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="role-form-title">Add Role</h2>
+                <span class="close" onclick="closeRoleFormModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="role-form">
+                    <div class="form-group">
+                        <label for="role-name">Role Name</label>
+                        <input type="text" id="role-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="role-description">Description</label>
+                        <textarea id="role-description" name="description" rows="3" required></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Role</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeRoleFormModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permissions Management Modal -->
+    <div id="permissions-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Set Permissions</h2>
+                <span class="close" onclick="closePermissionsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="permissions-content">
+                    <div class="permissions-section">
+                        <h3>Role-Based Permissions</h3>
+                        <div id="permissions-list" class="permissions-list">
+                            <!-- Permissions will be populated by JavaScript -->
+                        </div>
+                    </div>
+                    <div class="permissions-actions">
+                        <button class="btn btn-primary" onclick="savePermissions()">
+                            <i class="fas fa-save"></i> Save Permissions
+                        </button>
+                        <button class="btn btn-secondary" onclick="closePermissionsModal()">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Management Modal -->
+    <div id="employee-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Employees</h2>
+                <span class="close" onclick="closeEmployeeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="employee-actions">
+                    <button class="btn btn-primary" onclick="showAddEmployeeForm()">
+                        <i class="fas fa-plus"></i> Add New Employee
+                    </button>
+                </div>
+                <div id="employees-list" class="employees-list">
+                    <!-- Employee list will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Employee Form Modal -->
+    <div id="employee-form-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="employee-form-title">Add Employee</h2>
+                <span class="close" onclick="closeEmployeeFormModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="employee-form">
+                    <div class="form-group">
+                        <label for="employee-name">Name</label>
+                        <input type="text" id="employee-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee-email">Email</label>
+                        <input type="email" id="employee-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee-phone">Phone</label>
+                        <input type="text" id="employee-phone" name="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee-role">Role</label>
+                        <select id="employee-role" name="role" required>
+                            <option value="">Select Role</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Staff">Staff</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee-status">Status</label>
+                        <select id="employee-status" name="status" required>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="On Leave">On Leave</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Employee</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEmployeeFormModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+    <script src="auth.js"></script>
+
+</body>
+</html>
