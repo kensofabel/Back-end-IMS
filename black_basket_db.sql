@@ -7,6 +7,9 @@
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
+CREATE DATABASE IF NOT EXISTS black_basket_db;
+USE black_basket_db;
+
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
@@ -33,7 +36,7 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
   `created_at` datetime NOT NULL,
-  `updated_at` int(11) DEFAULT NULL
+  `updated_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
