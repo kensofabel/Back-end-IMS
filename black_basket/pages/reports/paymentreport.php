@@ -1,5 +1,4 @@
 <?php
-<?php
 session_start();
 ?>
 
@@ -17,13 +16,55 @@ session_start();
     <?php include '../../partials/navigation.php'; ?>
     <?php include '../../partials/header.php'; ?>
             <!-- Content Area -->
-            <div class="content-area">
-                <!-- Dashboard Section -->
-                <section id="dashboard-section" class="section active">
-                    
+            <div class="content-area">   
+                <!-- Payment Reports Section -->
+                <section id="payment-reports-section" class="section active">
+                    <div class="section-header">
+                        <h2>Payment Reports</h2>
+                        <div class="report-filters">
+                            <input type="date" id="payment-report-start-date">
+                            <input type="date" id="payment-report-end-date">
+                            <button class="btn btn-primary" onclick="generatePaymentReport()">
+                                <i class="fas fa-chart-line"></i> Generate Report
+                            </button>
+                        </div>
+                    </div>
+                    <div class="report-summary">
+                        <div class="summary-card">
+                            <h3 id="total-payment-transactions">0</h3>
+                            <p>Total Transactions</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="total-payment-revenue">$0.00</h3>
+                            <p>Total Revenue</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="cash-payments">0</h3>
+                            <p>Cash Payments</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="card-payments">0</h3>
+                            <p>Card Payments</p>
+                        </div>
+                    </div>
+                    <div class="payment-report-table-container">
+                        <table class="payment-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Transaction ID</th>
+                                    <th>Date & Time</th>
+                                    <th>Payment Method</th>
+                                    <th>Amount</th>
+                                    <th>Products</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payment-report-table-body">
+                                <!-- Payment report data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
             </div>
-        </div>
-    </div>
+
 </body>
 </html>

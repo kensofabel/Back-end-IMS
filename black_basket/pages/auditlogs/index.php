@@ -17,12 +17,52 @@ session_start();
     <?php include '../../partials/header.php'; ?>
             <!-- Content Area -->
             <div class="content-area">
-                <!-- Dashboard Section -->
-                <section id="dashboard-section" class="section active">
-                    
+                    <!-- Audit Logs Section -->
+                <section id="audit-logs-section" class="section active">
+                    <div class="section-header">
+                        <h2>Audit Logs</h2>
+                        <div class="search-box">
+                            <input type="text" id="search-audit-logs" placeholder="Search audit logs...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="audit-logs-content">
+                        <div class="audit-logs-filters">
+                            <select id="audit-log-filter">
+                                <option value="all">All Activities</option>
+                                <option value="login">Login/Logout</option>
+                                <option value="product">Product Changes</option>
+                                <option value="sales">Sales Transactions</option>
+                                <option value="inventory">Inventory Updates</option>
+                            </select>
+                            <input type="date" id="audit-log-date-from">
+                            <input type="date" id="audit-log-date-to">
+                            <button class="btn btn-primary" onclick="filterAuditLogs()">
+                                <i class="fas fa-filter"></i> Filter
+                            </button>
+                            <button class="btn btn-secondary" onclick="exportAuditLogs()">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
+                        <div class="audit-logs-table-container">
+                            <table class="audit-logs-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>Action</th>
+                                        <th>Details</th>
+                                        <th>IP Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-logs-table-body">
+                                    <!-- Audit logs will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
             </div>
-        </div>
-    </div>
+
 </body>
 </html>

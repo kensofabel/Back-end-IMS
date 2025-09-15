@@ -1,5 +1,4 @@
 <?php
-<?php
 session_start();
 ?>
 
@@ -18,12 +17,49 @@ session_start();
     <?php include '../../partials/header.php'; ?>
             <!-- Content Area -->
             <div class="content-area">
-                <!-- Dashboard Section -->
-                <section id="dashboard-section" class="section active">
-                    
+                <!-- Inventory Reports Section -->
+                <section id="inventory-reports-section" class="section active">
+                    <div class="section-header">
+                        <h2>Inventory Reports</h2>
+                    </div>
+                    <div class="report-summary">
+                        <div class="summary-card">
+                            <h3 id="total-inventory-value">$0.00</h3>
+                            <p>Total Inventory Value</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="total-inventory-items">0</h3>
+                            <p>Total Items</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="low-stock-count">0</h3>
+                            <p>Low Stock Items</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3 id="out-of-stock-count">0</h3>
+                            <p>Out of Stock Items</p>
+                        </div>
+                    </div>
+                    <div class="report-content">
+                        <div class="inventory-report-table-container">
+                            <table class="inventory-report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Stock</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-report-table-body">
+                                    <!-- Inventory report data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
             </div>
-        </div>
-    </div>
+
 </body>
 </html>

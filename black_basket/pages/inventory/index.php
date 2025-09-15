@@ -17,12 +17,33 @@ session_start();
     <?php include '../../partials/header.php'; ?>
             <!-- Content Area -->
             <div class="content-area">
-                <!-- Dashboard Section -->
-                <section id="dashboard-section" class="section active">
-                    
+                     <!-- Inventory Section -->
+                <section id="inventory-section" class="section active">
+                    <div class="section-header">
+                        <h2>Inventory Management</h2>
+                        <div class="search-box">
+                            <input type="text" id="search-inventory" placeholder="Search products...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="inventory-table-container">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Category</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                                <!-- Inventory data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
             </div>
-        </div>
-    </div>
 </body>
 </html>
