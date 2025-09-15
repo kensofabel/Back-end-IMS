@@ -1,12 +1,11 @@
 <?php
 $currentPage = basename($_SERVER['PHP_SELF']);
 ?>
-<body>
 <!-- Header -->
         <header class="dashboard-header">
             <div class="header-left" style="display: flex; align-items: center;">
                 <button class="sidebar-toggle-btn" id="sidebarToggle" aria-label="Toggle sidebar">&#9776;</button>
-                <img class="dashboard-logo" src="https://github.com/kensofabel/B2-IMS/blob/main/Inventory%20Management%20System-20250829T034006Z-1-001/Inventory%20Management%20System/Untitled_design__1_-removebg-preview.png?raw=true" alt="Black Basket" style="height:40px; width:auto; object-fit:contain;">
+                <img class="dashboard-logo" src="../../assets/images/dboardlogo.webp" alt="Black Basket" style="height:40px; width:auto; object-fit:contain;">
             </div>
             <div class="header-search">
                 <form id="dashboard-search-form" onsubmit="event.preventDefault(); /* Add search logic here */">
@@ -30,4 +29,3 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 </div>
             </div>
         </header>
-</body>

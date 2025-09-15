@@ -14,7 +14,7 @@ if(isset($_POST['username']) && isset($_POST['password'])) {
         $user = $result->fetch_assoc();
         if($password === $user['password']) { // plain text for now
             $_SESSION['user'] = $user['id']; // store user id
-            header("Location: pages/dashboard.php"); // redirect after login
+            header("Location: pages/dashboard/index.php"); // redirect after login
             exit();
         } else {
             $_SESSION['error'] = "Wrong password!";
@@ -36,14 +36,14 @@ if(isset($_POST['username']) && isset($_POST['password'])) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Inventory Management System</title>
         <link rel="stylesheet" href="assets/css/style.css">
-        <link rel="icon" type="image/x-icon" href="https://github.com/kensofabel/B2-IMS/blob/main/Inventory%20Management%20System-20250829T034006Z-1-001/Inventory%20Management%20System/Gemini_Generated_Image_lup4cylup4cylup4__1_-removebg-preview.png?raw=true">
+        <link rel="icon" type="image/x-icon" href="assets\images\icon.webp">
     </head>
     <body>
         <div class="login-container">
             <div class="background-animated"></div>
             <div class="login-card">
                 <div class="login-header">
-                    <img class="logo" src="https://github.com/kensofabel/B2-IMS/blob/main/Inventory%20Management%20System-20250829T034006Z-1-001/Inventory%20Management%20System/df3a0c5c-88e6-43fe-b0a1-6107f98d72b9_removalai_preview%20(1).png?raw=true" alt="Black Basket Logo">
+                    <img class="logo" src="assets\images\indexlogo.webp" alt="Black Basket Logo">
                 </div>
                 <div id="errorMessage" class="error-message">
                     <?php
