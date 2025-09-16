@@ -44,3 +44,50 @@ All data (inventory, sales, etc.) should be linked to the owner_id, so only user
 This structure keeps each owner's data separate and lets you manage roles and permissions for each account under the same database tables.
 
 GPT-4.1 • 0x
+
+-- Users table: stores all users (owners, staff, admins)
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT DEFAULT NULL, -- NULL for owners, set to owner's id for staff/admins
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    business_name VARCHAR(100), -- Only filled for owners
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Roles table: defines possible roles
+CREATE TABLE roles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT DEFAULT NULL, -- Roles can be global (NULL) or owner-specific
+    name VARCHAR(50) NOT NULL,
+    description VARCHAR(255)
+);
+
+-- Permissions table: defines possible permissions
+CREATE TABLE permissions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    description VARCHAR(255)
+);
+
+-- User-Roles table: assigns roles to users
+CREATE TABLE user_roles (
+    user_id INT,
+    role_id INT,
+    PRIMARY KEY (user_id, role_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+);
+
+-- Role-Permissions table: assigns permissions to roles
+CREATE TABLE role_permissions (
+    role_id INT,
+    permission_id INT,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+);
