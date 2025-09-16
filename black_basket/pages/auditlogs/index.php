@@ -1,5 +1,10 @@
 <?php
 session_start();
+include '../../config/db.php';
+
+// Fetch all audit logs, newest first
+$sql = "SELECT al.*, u.username FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id ORDER BY al.created_at DESC";
+$result = $conn->query($sql);
 ?>
 
 <!DOCTYPE html>
@@ -56,7 +61,19 @@ session_start();
                                     </tr>
                                 </thead>
                                 <tbody id="audit-logs-table-body">
-                                    <!-- Audit logs will be populated by JavaScript -->
+                                    <?php if ($result && $result->num_rows > 0): ?>
+                                        <?php while($row = $result->fetch_assoc()): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($row['created_at']) ?></td>
+                                                <td><?= htmlspecialchars($row['username'] ?? 'Unknown') ?></td>
+                                                <td><?= htmlspecialchars($row['action']) ?></td>
+                                                <td><?= htmlspecialchars($row['details'] ?? '') ?></td>
+                                                <td><?= htmlspecialchars($row['ip_address']) ?></td>
+                                            </tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="5">No audit logs found.</td></tr>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>

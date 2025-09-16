@@ -24,7 +24,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-user-circle"></i>
                     <div class="profile-menu">
                         <div class="profile-item" onclick="profile()"><i class="fas fa-user"></i> Profile</div>
-                        <div class="profile-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</div>
+                        <div class="profile-item" onclick="window.location.href='/black_basket/logout.php'"><i class="fas fa-sign-out-alt"></i>Logout</div>
                     </div>
                 </div>
             </div>
