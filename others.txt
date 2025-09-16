@@ -18,4 +18,29 @@
             passwordInput.type = 'password';
             toggleIcon.classList.add('slashed');
         }
+
     }
+
+You do not need to create a new table for every account (owner). Instead, you should use a relational structure with these main tables:
+
+users — Stores all users (owners, staff, admins, etc.), with a column like owner_id to link staff/admins to their owner.
+roles — Stores possible roles (e.g., Owner, Admin, Staff, or custom roles).
+permissions — Stores possible permissions (e.g., view_inventory, edit_sales, etc.).
+user_roles — Links users to roles (user_id, role_id).
+role_permissions — Links roles to permissions (role_id, permission_id).
+This way:
+
+Each owner is a user with no owner_id (or owner_id = their own id).
+Staff/admins have owner_id set to the owner's user id.
+Roles and permissions are flexible and can be assigned per owner.
+You do not need a new table for each account; just use relationships and foreign keys. This is scalable and standard for multi-tenant systems. If you want, I can help you design the SQL for this structure!
+
+Yes, exactly! Each user's access will depend on their owner_id:
+
+The owner (main account) will have their own user record (e.g., owner_id is NULL or their own id).
+Any staff/admins created by the owner will have their user records with owner_id set to the owner's user id.
+When a user logs in, you check their owner_id to determine which owner's data they can access.
+All data (inventory, sales, etc.) should be linked to the owner_id, so only users with the same owner_id can access that owner's data.
+This structure keeps each owner's data separate and lets you manage roles and permissions for each account under the same database tables.
+
+GPT-4.1 • 0x
