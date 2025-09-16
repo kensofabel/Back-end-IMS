@@ -91,3 +91,15 @@ CREATE TABLE role_permissions (
     FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
     FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
 );
+
+
+
+
+
+INSERT INTO users (owner_id, username, email, password, business_name, status)
+VALUES (NULL, 'owner', 'owner@example.com', '@wner321', 'TakeIt', 'active');
+
+
+
+
+DROP TABLE IF EXISTS users;
