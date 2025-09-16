@@ -203,9 +203,16 @@
 
 
 // Toggle sidebar collapse/expand
-document.getElementById('sidebarToggle').onclick = function() {
-  document.getElementById('sidebar').classList.toggle('collapsed');
-};
+
+var sidebarToggleBtn = document.getElementById('sidebarToggle');
+if (sidebarToggleBtn) {
+    sidebarToggleBtn.onclick = function() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.classList.toggle('collapsed');
+        }
+    };
+}
 
 document.addEventListener('click', function(event) {
   const sidebar = document.getElementById('sidebar');x``

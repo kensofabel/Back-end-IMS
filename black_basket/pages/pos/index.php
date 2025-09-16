@@ -57,50 +57,6 @@ session_start();
                     </div>
                 </div>
             </section>
-            
-            <!-- Add Product Section -->
-            <section id="add-product-section" class="section active">
-                <div class="section-header">
-                    <h2>Add New Product</h2>
-                </div>
-                <form id="add-product-form" class="product-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="product-name">Product Name</label>
-                            <input type="text" id="product-name" name="name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="product-category">Category</label>
-                            <select id="product-category" name="category" required>
-                                <option value="">Select Category</option>
-                                <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                                <option value="Dairy & Eggs">Dairy & Eggs</option>
-                                <option value="Meat & Poultry">Meat & Poultry</option>
-                                <option value="Bakery">Bakery</option>
-                                <option value="Beverages">Beverages</option>
-                                <option value="Snacks">Snacks</option>
-                                <option value="Frozen Foods">Frozen Foods</option>
-                                <option value="Household">Household</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="product-price">Price ($)</label>
-                            <input type="number" id="product-price" name="price" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="product-stock">Initial Stock</label>
-                            <input type="number" id="product-stock" name="stock" min="0" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="product-description">Description (Optional)</label>
-                        <textarea id="product-description" name="description" rows="3"></textarea>
-                    </div>
-                    <button type="submit" class="submit-btn">Add Product</button>
-                </form>
-            </section>
 
             <!-- Sales Section -->
             <section id="sales-section" class="section active">

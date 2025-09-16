@@ -1,0 +1,20 @@
+    // 8. validateLoginInput
+    function validateLoginInput(username, password) {
+        if (!username) {
+            return 'Username is required';
+        }
+        if (username.length < 3) {
+            return 'Username must be at least 3 characters long';
+        }
+        if (!password) {
+            return 'Password is required';
+        }
+        if (password.length < 4) {
+            return 'Password must be at least 4 characters long';
+        }
+        const weakPasswords = ['password', '123456', 'admin', '123456789'];
+        if (weakPasswords.includes(password.toLowerCase())) {
+            return 'This password is too common. Please choose a stronger password.';
+        }
+        return null;
+    }
