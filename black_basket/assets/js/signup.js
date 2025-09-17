@@ -1,10 +1,22 @@
-// assets/js/signup.js
+// Toggle password visibility
+    function togglePassword() {
+    const passwordInput = document.getElementById('signupPassword');
+    const toggleIcon = document.querySelector('.password-toggle');
+
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.classList.remove('slashed');
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.classList.add('slashed');
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle sign-up form submission
     const signupForm = document.getElementById('signupForm');
     if (!signupForm) return;
-
+    console.log(signupForm.outerHTML);
+    
     signupForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -20,21 +32,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = document.getElementById('signupEmail').value.trim();
         const password = document.getElementById('signupPassword').value;
         const business = document.getElementById('signupBusiness').value.trim();
-        const country = document.getElementById('signupCountry').value;
 
         // Client-side validation
-        const validationError = validateSignupInput(username, email, password, business, country);
+        const validationError = validateSignupInput(username, email, password, business);
         if (validationError) {
             showSignupError(validationError);
             setSignupLoading(false);
             return;
         }
 
-        setSignupLoading(true);
-
-        // Prepare form data
+        // Prepare form data BEFORE disabling inputs!
         const formData = new FormData(signupForm);
         formData.append('ajax', '1');
+
+        setSignupLoading(true);
+
+        // Debug: Log all FormData values before sending
+        for (let pair of formData.entries()) {
+            console.log('FormData:', pair[0], '=', pair[1]);
+        }
 
         try {
             const response = await fetch('signup.php', {
@@ -42,17 +58,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
             const text = await response.text();
-            // Try to parse as JSON, fallback to HTML
             let result;
             try {
                 result = JSON.parse(text);
             } catch {
-                // Not JSON, fallback to HTML reload
-                window.location.reload();
+                showSignupError('Server error: ' + text);
                 return;
             }
             if (result.success) {
-                window.location.href = 'index.php';
+                window.location.href = 'pages/dashboard/index.php';
             } else {
                 showSignupError(result.reason || 'Registration failed.');
             }
@@ -81,7 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const emailInput = document.getElementById('signupEmail');
         const passwordInput = document.getElementById('signupPassword');
         const businessInput = document.getElementById('signupBusiness');
-        const countryInput = document.getElementById('signupCountry');
 
         if (isLoading) {
             if (signupBtn) {
@@ -92,7 +105,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (emailInput) emailInput.disabled = true;
             if (passwordInput) passwordInput.disabled = true;
             if (businessInput) businessInput.disabled = true;
-            if (countryInput) countryInput.disabled = true;
         } else {
             if (signupBtn) {
                 signupBtn.disabled = false;
@@ -102,11 +114,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (emailInput) emailInput.disabled = false;
             if (passwordInput) passwordInput.disabled = false;
             if (businessInput) businessInput.disabled = false;
-            if (countryInput) countryInput.disabled = false;
         }
     }
 
-    function validateSignupInput(username, email, password, business, country) {
+    function validateSignupInput(username, email, password, business) {
         if (!username) return 'Username is required';
         if (username.length < 3) return 'Username must be at least 3 characters long';
         if (!email) return 'Email is required';
@@ -117,8 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return 'This password is too common. Please choose a stronger password.';
         }
         if (!business) return 'Business name is required';
-        if (!country) return 'Country is required';
-        // Add more validation as needed (e.g., email format)
         return null;
     }
+
 });

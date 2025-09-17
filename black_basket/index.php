@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             echo json_encode(['success' => false, 'reason' => 'Employee account is inactive']);
             exit();
         }
-        if ($password === $user['password']) {
+    if (password_verify($password, $user['password'])) {
             $_SESSION['user'] = $user['id'];
 
             // --- INSERT THIS BLOCK FOR AUDIT LOGGING ---
@@ -87,9 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                     <label for="password">Password</label>
                     <span class="password-toggle slashed" onclick="togglePassword()">👁️</span>
                 </div>
-                <button type="submit" id="loginBtn" class="login-btn">Log in</button>
+                <button type="submit" id="loginBtn" class="login-btn">Sign in</button>
                 <div class="login-links">
-                    <a href="#" class="forgot-password">Forgot password?</a>
+                    <a href="forgot_password.php" class="forgot-password">Forgot password?</a>
                 </div>
             </form>
             <div class="signup-section">

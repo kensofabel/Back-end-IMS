@@ -195,6 +195,7 @@ body::before {
     padding-right: 10px;
 }
 .login-card {
+    user-select: none;
     background: transparent;
     padding: 10px 40px 30px 40px;
     border-radius: 20px;
@@ -228,7 +229,7 @@ body::before {
 
 .signup-centered .login-card {
     animation: zoomInFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    max-width: 370px;
+    max-width: 360px;
     min-width: 350px;
     transform: translateY(-5px) scale(1.02);
     box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
@@ -249,6 +250,8 @@ body::before {
 }
 
 .logo {
+    user-select: none;
+    pointer-events: none;
     width: 250px;
     height: 250px;
     object-fit: contain;
