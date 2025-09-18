@@ -1,3 +1,9 @@
+/* Larger Change Password Popup */
+#changePasswordPopup .profile-popup-content {
+    min-width: 420px !important;
+    max-width: 98vw !important;
+    padding: 48px 40px 36px 40px !important;
+}
 /* Profile Popup Styles */
 .profile-popup {
     display: none;
@@ -29,11 +35,9 @@
 .profile-popup-avatar {
     width: 90px;
     height: 90px;
-    border-radius: 0;
+    border-radius: 50%;
     object-fit: cover;
     margin-bottom: 18px;
-    border: none;
-    background: none;
 }
 .profile-popup-content h2 {
     color: #ff9800;
@@ -998,7 +1002,7 @@ body::before {
 
 .section-header h2 {
     color: #ff9800;
-    font-size: 1.8rem;
+    font-size: 20px;
 }
 
 .search-box {

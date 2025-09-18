@@ -9,6 +9,7 @@ session_start();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Management System</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../../assets/css/content.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
 </head>
@@ -17,97 +18,80 @@ session_start();
     <?php include '../../partials/header.php'; ?>
         <!-- Content Area -->
         <div class="content-area">
-                <!-- Access Rights Section -->
-            <section id="access-rights-section" class="section active">
-                <div class="section-header">
-                    <h2>Access Rights Management</h2>
-                </div>
-                <div class="access-rights-content">
-                    <p>Access rights management content will be displayed here.</p>
-                    <!-- Add access rights management specific content -->
-                    <div class="access-rights-actions">
-                        <button class="btn btn-edit" onclick="manageRoles()">
-                            <i class="fas fa-user-shield"></i> Manage Roles
-                        </button>
-                        <button class="btn btn-edit" onclick="setPermissions()">
-                            <i class="fas fa-key"></i> Set Permissions
-                        </button>
-                    </div>
-                </div>
-            </section>
-        </div>
-            <!-- Roles Management Modal -->
-    <div id="roles-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Manage Roles</h2>
-                <span class="close" onclick="closeRolesModal()">&times;</span>
+            <div class="section-header">
+                <h2 class="access-header-title">
+                    Access Rights
+                    <span class="access-header-breadcrumb">
+                        |
+                        <i class="fas fa-users-cog"></i>
+                        - Access Rights
+                    </span>
+                </h2>
             </div>
-            <div class="modal-body">
-                <div class="roles-actions">
-                    <button class="btn btn-primary" onclick="showAddRoleForm()">
-                        <i class="fas fa-plus"></i> Add New Role
+            <div class="access-header-spacer"></div>
+            <div class="access-box-section">
+                <div class="access-rights-actions">
+                    <button class="btn btn-edit active" id="tab-manage-roles" onclick="showTab('roles')">
+                        Manage Roles
+                    </button>
+                    <button class="btn btn-edit" id="tab-set-permissions" onclick="showTab('permissions')">
+                        Set Permissions
                     </button>
                 </div>
-                <div id="roles-list" class="roles-list">
-                    <!-- Roles will be populated by JavaScript -->
+                <div id="tab-content-roles">
+                    <p>Choose this option to manage user roles. You can add, edit, or remove roles for your system.</p>
+                    <button class="btn btn-primary access-add-role"><i class="fas fa-plus"></i> Add New Role</button>
+                    <table class="access-table">
+                        <thead>
+                            <tr>
+                                <th>Role Name</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Admin</td>
+                                <td>Full access to all features</td>
+                                <td class="access-status"><i class="fas fa-check-circle"></i> Active</td>
+                                <td><button class="btn btn-secondary access-action-btn">Manage</button></td>
+                            </tr>
+                            <!-- More rows as needed -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="tab-content-permissions" style="display:none;">
+                    <p>Set permissions for each role. Assign or revoke access to specific features.</p>
+                    <table class="access-table">
+                        <thead>
+                            <tr>
+                                <th>Role</th>
+                                <th>Permission</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Admin</td>
+                                <td>Manage Users</td>
+                                <td class="access-status"><i class="fas fa-check-circle"></i> Enabled</td>
+                                <td><button class="btn btn-secondary access-action-btn">Edit</button></td>
+                            </tr>
+                            <!-- More rows as needed -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Add/Edit Role Form Modal -->
-    <div id="role-form-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="role-form-title">Add Role</h2>
-                <span class="close" onclick="closeRoleFormModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <form id="role-form">
-                    <div class="form-group">
-                        <label for="role-name">Role Name</label>
-                        <input type="text" id="role-name" name="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="role-description">Description</label>
-                        <textarea id="role-description" name="description" rows="3" required></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Save Role</button>
-                        <button type="button" class="btn btn-secondary" onclick="closeRoleFormModal()">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Permissions Management Modal -->
-    <div id="permissions-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Set Permissions</h2>
-                <span class="close" onclick="closePermissionsModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="permissions-content">
-                    <div class="permissions-section">
-                        <h3>Role-Based Permissions</h3>
-                        <div id="permissions-list" class="permissions-list">
-                            <!-- Permissions will be populated by JavaScript -->
-                        </div>
-                    </div>
-                    <div class="permissions-actions">
-                        <button class="btn btn-primary" onclick="savePermissions()">
-                            <i class="fas fa-save"></i> Save Permissions
-                        </button>
-                        <button class="btn btn-secondary" onclick="closePermissionsModal()">
-                            <i class="fas fa-times"></i> Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        <script>
+            function showTab(tab) {
+                document.getElementById('tab-content-roles').style.display = (tab === 'roles') ? '' : 'none';
+                document.getElementById('tab-content-permissions').style.display = (tab === 'permissions') ? '' : 'none';
+                document.getElementById('tab-manage-roles').classList.toggle('active', tab === 'roles');
+                document.getElementById('tab-set-permissions').classList.toggle('active', tab === 'permissions');
+            }
+        </script>
 </body>
 </html>

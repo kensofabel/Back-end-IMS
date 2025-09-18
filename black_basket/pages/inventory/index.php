@@ -88,6 +88,5 @@ session_start();
                 </form>
             </section>
         </div>
-    <script src="inventory.js"></script>
 </body>
 </html>

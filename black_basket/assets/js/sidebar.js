@@ -1,3 +1,10 @@
+// Stub for closePermissionsModal to prevent ReferenceError
+function closePermissionsModal() {
+    const modal = document.getElementById('permissions-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
 // Consolidated DOMContentLoaded event listener for all initialization
     document.addEventListener('DOMContentLoaded', function() {
         // Remove 'active' from .has-submenu if any of its submenu items is active (prevents flash)
@@ -67,6 +74,13 @@
         const roleForm = document.getElementById('role-form');
         if (roleForm) {
             roleForm.addEventListener('submit', handleRoleFormSubmit);
+        }
+
+        // Stub for handleRoleFormSubmit to prevent ReferenceError
+        function handleRoleFormSubmit(e) {
+            e.preventDefault();
+            // TODO: Implement role form submission logic
+            alert('Role form submitted (stub handler).');
         }
 
         // Initialize permissions modal event listeners
@@ -228,15 +242,15 @@ if (sidebarToggleBtn) {
 }
 
 document.addEventListener('click', function(event) {
-  const sidebar = document.getElementById('sidebar');x``
-  const toggleBtn = document.getElementById('sidebarToggle');
-  // Only run on mobile/tablet
-  if (window.innerWidth <= 1200) {
-    // If sidebar is open and click is outside sidebar and toggle button
-    if (!sidebar.classList.contains('collapsed') &&
-        !sidebar.contains(event.target) &&
-        event.target !== toggleBtn) {
-      sidebar.classList.add('collapsed');
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    // Only run on mobile/tablet
+    if (window.innerWidth <= 1200) {
+        // If sidebar is open and click is outside sidebar and toggle button
+        if (!sidebar.classList.contains('collapsed') &&
+                !sidebar.contains(event.target) &&
+                event.target !== toggleBtn) {
+            sidebar.classList.add('collapsed');
+        }
     }
-  }
 });
