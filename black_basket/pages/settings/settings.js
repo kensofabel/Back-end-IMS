@@ -16,11 +16,17 @@ function showSettingsTab(tabName) {
 function toggleCardExpansion(btn) {
     const card = btn.closest('.settings-card');
     if (!card) return;
+    const isExpanding = !card.classList.contains('expanded');
     card.classList.toggle('expanded');
     const icon = btn.querySelector('i');
     if (icon) {
-        icon.classList.toggle('fa-chevron-down');
-        icon.classList.toggle('fa-chevron-up');
+        if (isExpanding) {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        } else {
+            icon.classList.add('fa-chevron-down');
+            icon.classList.remove('fa-chevron-up');
+        }
     }
 }
 
@@ -70,9 +76,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Card expand/collapse
+    // Card expand/collapse (remove any inline onclick and use only JS)
     document.querySelectorAll('.card-expand-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.onclick = null;
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
             toggleCardExpansion(this);
         });
     });
