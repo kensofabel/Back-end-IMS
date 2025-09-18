@@ -1,5 +1,15 @@
 // Consolidated DOMContentLoaded event listener for all initialization
     document.addEventListener('DOMContentLoaded', function() {
+        // Remove 'active' from .has-submenu if any of its submenu items is active (prevents flash)
+        document.querySelectorAll('.has-submenu').forEach(function(parent) {
+            const submenuId = parent.getAttribute('onclick')?.match(/'([^']+)'\)$/)?.[1];
+            if (submenuId) {
+                const submenu = document.getElementById(submenuId);
+                if (submenu && submenu.querySelector('.submenu-item.active')) {
+                    parent.classList.remove('active');
+                }
+            }
+        });
         // Initialize sidebar navigation
         const sidebarNav = document.querySelector('.sidebar');
         if (sidebarNav) {
@@ -7,14 +17,15 @@
                 // Only act if clicking a major nav item (not a submenu item or submenu toggle)
                 const navItem = e.target.closest('.nav-item');
                 if (navItem && !navItem.classList.contains('has-submenu') && !e.target.classList.contains('submenu-item')) {
+                    // Remove active from all submenu parents immediately to prevent flash
+                    document.querySelectorAll('.has-submenu.active').forEach(a => {
+                        a.classList.remove('active');
+                    });
                     // Close all open submenus
                     document.querySelectorAll('.sidebar-submenu.open').forEach(s => {
                         s.classList.remove('open');
                     });
-                    // Reset all carets and active states
-                    document.querySelectorAll('.has-submenu.active').forEach(a => {
-                        a.classList.remove('active');
-                    });
+                    // Reset all carets
                     document.querySelectorAll('.submenu-caret').forEach(caret => {
                         caret.classList.remove('fa-caret-down');
                         caret.classList.add('fa-caret-right');
@@ -175,39 +186,29 @@
         const isOpen = submenu.classList.contains('open');
         // If submenu is not open, and not already inside submenu, redirect to first submenu item
         if (!isOpen) {
-            // Close other submenus
-            document.querySelectorAll('.sidebar-submenu.open').forEach(s => {
-                s.classList.remove('open');
+            // Only redirect if NO submenu item is currently active
+            const submenuLinks = submenu.querySelectorAll('a');
+            let foundActive = false;
+            submenuLinks.forEach(link => {
+                if (link.classList.contains('active')) foundActive = true;
             });
-            document.querySelectorAll('.has-submenu.active').forEach(a => {
-                a.classList.remove('active');
-            });
-            document.querySelectorAll('.submenu-caret').forEach(caret => {
-                caret.classList.remove('fa-caret-down');
-                caret.classList.add('fa-caret-right');
-            });
+            if (!foundActive && submenuLinks.length > 0) {
+                window.location.href = submenuLinks[0].href;
+                return;
+            }
+            // Otherwise, just open the submenu (no redirect)
             submenu.classList.add('open');
-            parent.classList.add('active');
+            // Only add 'active' to parent if NO submenu item is active
+            if (!foundActive) {
+                parent.classList.add('active');
+            } else {
+                parent.classList.remove('active');
+            }
             caret.classList.remove('fa-caret-right');
             caret.classList.add('fa-caret-down');
-
-            // Check if current page is not a submenu item, then redirect
-            // Get all submenu links
-            const submenuLinks = submenu.querySelectorAll('a');
-            if (submenuLinks.length > 0) {
-                // Check if any submenu link is active
-                let foundActive = false;
-                submenuLinks.forEach(link => {
-                    if (link.classList.contains('active')) foundActive = true;
-                });
-                if (!foundActive) {
-                    // Redirect to first submenu link
-                    window.location.href = submenuLinks[0].href;
-                }
-            }
         } else {
+            parent.classList.remove('active'); // Remove active first to prevent flash
             submenu.classList.remove('open');
-            parent.classList.remove('active');
             caret.classList.remove('fa-caret-down');
             caret.classList.add('fa-caret-right');
         }
