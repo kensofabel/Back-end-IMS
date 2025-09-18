@@ -22,7 +22,7 @@ $isAccountsPage = in_array($currentPage, $accountsPages);
             <a href="../inventory/index.php" class="nav-item <?php echo ($currentPage == 'index.php' && $currentDir == 'inventory') ? 'active' : ''; ?>">
                 <i class="fas fa-boxes"></i> Inventory
             </a>
-            <a href="#" class="nav-item has-submenu<?php echo $isReportsPage ? ' active' : ''; ?>" onclick="toggleSidebarSubmenu(event, 'report-submenu')">
+            <a href="../reports/salesreport.php" class="nav-item has-submenu<?php echo $isReportsPage ? ' active' : ''; ?>" onclick="toggleSidebarSubmenu(event, 'report-submenu')">
                 <i class="fas fa-file-alt"></i> Reports
                 <i class="fas submenu-caret <?php echo ($isReportsPage ? 'fa-caret-down' : 'fa-caret-right'); ?>"></i>
             </a>
@@ -37,7 +37,7 @@ $isAccountsPage = in_array($currentPage, $accountsPages);
                     Payment Report
                 </a>
             </div>
-            <a href="#" class="nav-item has-submenu<?php echo $isAccountsPage ? ' active' : ''; ?>" onclick="toggleSidebarSubmenu(event, 'accounts-submenu')">
+            <a href="../accounts/accessrights.php" class="nav-item has-submenu<?php echo $isAccountsPage ? ' active' : ''; ?>" onclick="toggleSidebarSubmenu(event, 'accounts-submenu')">
                 <i class="fas fa-users-cog"></i> Accounts
                 <i class="fas submenu-caret <?php echo ($isAccountsPage ? 'fa-caret-down' : 'fa-caret-right'); ?>"></i>
             </a>
