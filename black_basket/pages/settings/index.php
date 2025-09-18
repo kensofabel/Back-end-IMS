@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 ?>
@@ -18,18 +19,8 @@ session_start();
     <?php include '../../partials/header.php'; ?>
             <!-- Content Area -->
             <div class="content-area">
-                    <!-- Settings Section -->
+             <!-- Settings Section -->
                 <section id="settings-section" class="section active">
-                    <div class="section-header">
-                        <h2>Settings</h2>
-                    </div>
-                    <div class="settings-content">
-                        <div class="settings-tabs">
-                            <button class="tab-btn active" onclick="showSettingsTab('general')">General</button>
-                            <button class="tab-btn" onclick="showSettingsTab('inventory')">Inventory</button>
-                            <button class="tab-btn" onclick="showSettingsTab('advanced')">Advanced</button>
-                        </div>
-
                         <div id="general-tab" class="settings-tab active">
                             <div class="settings-overview">
                                 <div class="settings-header">
@@ -119,7 +110,7 @@ session_start();
                                         <i class="fas fa-building"></i>
                                         <h4>Business Information</h4>
                                         <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                            <button class="card-expand-btn" type="button">
                                                 <i class="fas fa-chevron-down"></i>
                                             </button>
                                         </div>
@@ -173,7 +164,7 @@ session_start();
                                         <i class="fas fa-dollar-sign"></i>
                                         <h4>Financial Settings</h4>
                                         <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                            <button class="card-expand-btn" type="button">
                                                 <i class="fas fa-chevron-down"></i>
                                             </button>
                                         </div>
@@ -202,22 +193,18 @@ session_start();
                                             <div class="payment-types-grid">
                                                 <label class="checkbox-option">
                                                     <input type="checkbox" name="paymentCash" checked>
-                                                    <span class="checkmark"></span>
                                                     <i class="fas fa-money-bill-wave"></i> Cash
                                                 </label>
                                                 <label class="checkbox-option">
                                                     <input type="checkbox" name="paymentCard" checked>
-                                                    <span class="checkmark"></span>
                                                     <i class="fas fa-credit-card"></i> Card
                                                 </label>
                                                 <label class="checkbox-option">
                                                     <input type="checkbox" name="paymentDigital">
-                                                    <span class="checkmark"></span>
                                                     <i class="fas fa-mobile-alt"></i> Digital Wallet
                                                 </label>
                                                 <label class="checkbox-option">
                                                     <input type="checkbox" name="paymentCredit">
-                                                    <span class="checkmark"></span>
                                                     <i class="fas fa-hand-holding-usd"></i> Credit
                                                 </label>
                                             </div>
@@ -231,7 +218,7 @@ session_start();
                                         <i class="fas fa-sliders-h"></i>
                                         <h4>System Preferences</h4>
                                         <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                            <button class="card-expand-btn" type="button">
                                                 <i class="fas fa-chevron-down"></i>
                                             </button>
                                         </div>
@@ -312,7 +299,7 @@ session_start();
                                         <i class="fas fa-bell"></i>
                                         <h4>Notification Preferences</h4>
                                         <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
+                                            <button class="card-expand-btn" type="button">
                                                 <i class="fas fa-chevron-down"></i>
                                             </button>
                                         </div>
@@ -324,17 +311,14 @@ session_start();
                                                 <div class="notification-options">
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyNewSale" checked>
-                                                        <span class="checkmark"></span>
                                                         New sales
                                                     </label>
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyLargeSale">
-                                                        <span class="checkmark"></span>
                                                         Large transactions (>$100)
                                                     </label>
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyDailySummary" checked>
-                                                        <span class="checkmark"></span>
                                                         Daily sales summary
                                                     </label>
                                                 </div>
@@ -344,17 +328,14 @@ session_start();
                                                 <div class="notification-options">
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyLowStock" checked>
-                                                        <span class="checkmark"></span>
                                                         Low stock alerts
                                                     </label>
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyOutOfStock">
-                                                        <span class="checkmark"></span>
                                                         Out of stock items
                                                     </label>
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyStockUpdates">
-                                                        <span class="checkmark"></span>
                                                         Stock level changes
                                                     </label>
                                                 </div>
@@ -364,17 +345,14 @@ session_start();
                                                 <div class="notification-options">
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifyUserLogin" checked>
-                                                        <span class="checkmark"></span>
                                                         User login/logout
                                                     </label>
                                                     <label class="checkbox-option">
                                                         <input type="checkbox" name="notifySystemUpdates">
-                                                        <span class="checkmark"></span>
                                                         System updates
                                                     </label>
                                                     <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyErrors">
-                                                        <span class="checkmark"></span>
+                                                        <input type="checkbox" name="notifyErrors"> 
                                                         Error notifications
                                                     </label>
                                                 </div>
@@ -402,17 +380,7 @@ session_start();
                                 <div class="last-saved">
                                     <small id="last-saved-time">Last saved: Never</small>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div id="inventory-tab" class="settings-tab">
-                            
-                        </div>
-
-                        <div id="advanced-tab" class="settings-tab">
-                            <!-- Advanced settings content removed -->
-                        </div>
-                    </div>
+                          </div>
                 </section>
             </div>
         </div>
@@ -420,3 +388,5 @@ session_start();
     <script src="settings.js"></script>
 </body>
 </html>
+
+            
