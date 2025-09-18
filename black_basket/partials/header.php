@@ -21,11 +21,33 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     </div>
                 </div>
                 <div class="profile-dropdown">
-                    <i class="fas fa-user-circle"></i>
-                    <div class="profile-menu">
-                        <div class="profile-item" onclick="profile()"><i class="fas fa-user"></i> Profile</div>
-                        <div class="profile-item" onclick="window.location.href='/black_basket/logout.php'"><i class="fas fa-sign-out-alt"></i>Logout</div>
-                    </div>
+                    <i class="fas fa-user-circle" id="profileIcon" style="cursor:pointer;"></i>
                 </div>
             </div>
         </header>
+
+<?php include __DIR__ . '/profile_popup.php'; ?>
+<script>
+// Profile popup open/close logic
+document.addEventListener('DOMContentLoaded', function() {
+    var profilePopup = document.getElementById('profilePopup');
+    var closeBtn = document.getElementById('closeProfilePopup');
+    var profileIcon = document.getElementById('profileIcon');
+    if (profileIcon && profilePopup) {
+        profileIcon.addEventListener('click', function() {
+            profilePopup.style.display = 'flex';
+        });
+    }
+    if (closeBtn && profilePopup) {
+        closeBtn.addEventListener('click', function() {
+            profilePopup.style.display = 'none';
+        });
+    }
+    // Close popup when clicking outside
+    window.addEventListener('mousedown', function(e) {
+        if (profilePopup && profilePopup.style.display === 'flex' && !profilePopup.contains(e.target) && e.target !== profileIcon) {
+            profilePopup.style.display = 'none';
+        }
+    });
+});
+</script>

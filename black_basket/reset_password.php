@@ -12,15 +12,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->bind_result($user_id, $expires_at);
     if ($stmt->fetch() && strtotime($expires_at) > time()) {
         $stmt->close();
-        $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
-        $update = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-        $update->bind_param('si', $hashed, $user_id);
-        $update->execute();
-        $update->close();
-        $conn->query("DELETE FROM password_resets WHERE user_id = $user_id");
-        // Redirect after success
-        header("Location: reset_password.php?success=1");
-        exit;
+        // Backend password validation
+        $weakPasswords = ['password', '123456', 'admin', '123456789'];
+        if (strlen($newPassword) < 4) {
+            $message = "<div class='error-message'>Password must be at least 4 characters long.</div>";
+        } elseif (in_array(strtolower($newPassword), $weakPasswords)) {
+            $message = "<div class='error-message'>This password is too common. Please choose a stronger password.</div>";
+        } else {
+            // Fetch current password hash
+            $userStmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
+            $userStmt->bind_param('i', $user_id);
+            $userStmt->execute();
+            $userStmt->bind_result($current_hash);
+            if ($userStmt->fetch()) {
+                if (password_verify($newPassword, $current_hash)) {
+                    $message = "<div class='error-message'>New password must be different from old password.</div>";
+                } else {
+                    $userStmt->close();
+                    $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
+                    $update = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+                    $update->bind_param('si', $hashed, $user_id);
+                    $update->execute();
+                    $update->close();
+                    $conn->query("DELETE FROM password_resets WHERE user_id = $user_id");
+                    // Redirect after success
+                    header("Location: reset_password.php?success=1");
+                    exit;
+                }
+            } else {
+                $message = "<div class='error-message'>User not found.</div>";
+            }
+            $userStmt->close();
+        }
     } else {
         $stmt->close();
         $message = "<div class='error-message'>Invalid or expired token.</div>";

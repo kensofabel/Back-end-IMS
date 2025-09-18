@@ -1,3 +1,94 @@
+/* Profile Popup Styles */
+.profile-popup {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.55);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s;
+}
+.profile-popup-content {
+    background: #232323;
+    color: #dbdbdb;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    padding: 36px 32px 28px 32px;
+    min-width: 320px;
+    max-width: 95vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    animation: zoomInFadeIn 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.profile-popup-avatar {
+    width: 90px;
+    height: 90px;
+    border-radius: 0;
+    object-fit: cover;
+    margin-bottom: 18px;
+    border: none;
+    background: none;
+}
+.profile-popup-content h2 {
+    color: #ff9800;
+    margin-bottom: 6px;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+.profile-popup-email {
+    color: #dbdbdb;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+.profile-popup-role {
+    color: #ff9800;
+    font-size: 0.98rem;
+    margin-bottom: 18px;
+}
+.profile-popup-btn {
+    width: 100%;
+    padding: 10px 0;
+    margin: 6px 0;
+    background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.profile-popup-btn.logout {
+    background: #e53e3e;
+    color: #fff;
+}
+.profile-popup-btn.logout:hover {
+    background: #c53030;
+}
+.profile-popup-btn:hover {
+    background: linear-gradient(135deg, #e68900 0%, #e64100 100%);
+    color: #fff;
+}
+.profile-popup-close {
+    position: absolute;
+    top: 12px;
+    right: 18px;
+    font-size: 1.5rem;
+    color: #dbdbdb;
+    cursor: pointer;
+    transition: color 0.2s;
+    z-index: 10;
+}
+.profile-popup-close:hover {
+    color: #ff9800;
+}
 /* Dashboard Header Search Bar */
 .header-search {
     flex: 1;

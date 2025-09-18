@@ -14,8 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$email = trim($_POST['email'] ?? '');
 	$password = $_POST['password'] ?? '';
 	$business_name = trim($_POST['business_name'] ?? '');
+	$full_name = trim($_POST['full_name'] ?? '');
 	// Basic validation
-	if (!$username || !$email || !$password || !$business_name) {
+	if (!$full_name || !$username || !$email || !$password || !$business_name) {
 		$signupError = 'All fields are required.';
 		if (isset($_POST['ajax'])) {
 			header('Content-Type: application/json');
@@ -38,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		} else {
 			// Hash password
 			$hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-			$stmt = $conn->prepare('INSERT INTO users (owner_id, username, email, password, business_name, status) VALUES (NULL, ?, ?, ?, ?, "active")');
-			$stmt->bind_param('ssss', $username, $email, $hashedPassword, $business_name);
+			$stmt = $conn->prepare('INSERT INTO users (owner_id, username, full_name, email, password, business_name, status) VALUES (NULL, ?, ?, ?, ?, ?, "active")');
+			$stmt->bind_param('sssss', $username, $full_name, $email, $hashedPassword, $business_name);
 			if ($stmt->execute()) {
 				// Auto-login: fetch the new user and set session
 				$user_id = $stmt->insert_id;
@@ -172,6 +173,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				<div class="error-message" style="color: #e74c3c; text-align: center; margin-bottom: 15px;"> <?= htmlspecialchars($signupError) ?> </div>
 			<?php endif; ?>
 			<form id="signupForm" class="login-form" method="POST">
+				<div class="form-group">
+					<input type="text" id="signupFullName" name="full_name" required autocomplete="name">
+					<label for="signupFullName">Full Name</label>
+				</div>
 				<div class="form-group">
 					<input type="text" id="signupUsername" name="username" required autocomplete="username">
 					<label for="signupUsername">Username</label>
