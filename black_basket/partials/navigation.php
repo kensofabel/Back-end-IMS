@@ -22,8 +22,9 @@ $isAccountsPage = in_array($currentPage, $accountsPages);
             <a href="../inventory/index.php" class="nav-item <?php echo ($currentPage == 'index.php' && $currentDir == 'inventory') ? 'active' : ''; ?>">
                 <i class="fas fa-boxes"></i> Inventory
             </a>
-            <a href="../reports/salesreport.php" class="nav-item has-submenu">
-                <i class="fas fa-file-alt"></i> Reports <i class="fas fa-caret-down submenu-caret"></i>
+            <a href="#" class="nav-item has-submenu<?php echo $isReportsPage ? ' active' : ''; ?>" onclick="toggleSidebarSubmenu(event, 'report-submenu')">
+                <i class="fas fa-file-alt"></i> Reports
+                <i class="fas submenu-caret <?php echo ($isReportsPage ? 'fa-caret-down' : 'fa-caret-right'); ?>"></i>
             </a>
             <div class="sidebar-submenu<?php echo $isReportsPage ? ' open' : ''; ?>" id="report-submenu">
                 <a href="../reports/salesreport.php" class="nav-item submenu-item <?php echo $currentPage == 'salesreport.php' ? 'active' : ''; ?>">
@@ -36,8 +37,9 @@ $isAccountsPage = in_array($currentPage, $accountsPages);
                     Payment Report
                 </a>
             </div>
-            <a href="../accounts/accessrights.php" class="nav-item has-submenu">
-                <i class="fas fa-users-cog"></i> Accounts <i class="fas fa-caret-down submenu-caret"></i>
+            <a href="#" class="nav-item has-submenu<?php echo $isAccountsPage ? ' active' : ''; ?>" onclick="toggleSidebarSubmenu(event, 'accounts-submenu')">
+                <i class="fas fa-users-cog"></i> Accounts
+                <i class="fas submenu-caret <?php echo ($isAccountsPage ? 'fa-caret-down' : 'fa-caret-right'); ?>"></i>
             </a>
             <div class="sidebar-submenu<?php echo $isAccountsPage ? ' open' : ''; ?>" id="accounts-submenu">
                 <a href="../accounts/accessrights.php" class="nav-item submenu-item <?php echo $currentPage == 'accessrights.php' ? 'active' : ''; ?>">
@@ -61,3 +63,13 @@ $isAccountsPage = in_array($currentPage, $accountsPages);
 </main>
 
 <script src="../../assets/js/sidebar.js"></script>
+<script>
+// Prevent reload when clicking the nav item for the current page
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.nav-item.active').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+        });
+    });
+});
+</script>
