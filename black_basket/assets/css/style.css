@@ -132,6 +132,7 @@
     top: 0;
     background: #232323;
 }
+
 .has-submenu .submenu-caret {
     margin-left: auto;
     transition: transform 0.2s;
@@ -682,6 +683,14 @@ body::before {
     background: #232323;
     color: #ff9800;
     border-left: 4px solid #ff9800;
+}
+/* Remove active background/border for submenu parents */
+.has-submenu.active,
+.has-submenu.active:focus,
+.has-submenu.active:hover {
+    background: none;
+    border: none;
+    color: #dbdbdb;
 }
 
 /* Dropdown Styles */
