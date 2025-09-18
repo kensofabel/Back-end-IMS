@@ -52,11 +52,6 @@
         setupDelayedDropdown('.notification-dropdown', '.notification-menu');
         setupDelayedDropdown('.profile-dropdown', '.profile-menu');
 
-        // Initialize submenu carets
-        document.querySelectorAll('.submenu-caret').forEach(function(caret) {
-            caret.classList.add('fa-caret-right');
-        });
-
         // Initialize role form event listener
         const roleForm = document.getElementById('role-form');
         if (roleForm) {
@@ -177,12 +172,9 @@
         const submenu = document.getElementById(submenuId);
         const parent = event.currentTarget;
         const caret = parent.querySelector('.submenu-caret');
-        if (submenu.classList.contains('open')) {
-            submenu.classList.remove('open');
-            parent.classList.remove('active');
-            caret.classList.remove('fa-caret-down');
-            caret.classList.add('fa-caret-right');
-        } else {
+        const isOpen = submenu.classList.contains('open');
+        // If submenu is not open, and not already inside submenu, redirect to first submenu item
+        if (!isOpen) {
             // Close other submenus
             document.querySelectorAll('.sidebar-submenu.open').forEach(s => {
                 s.classList.remove('open');
@@ -198,6 +190,26 @@
             parent.classList.add('active');
             caret.classList.remove('fa-caret-right');
             caret.classList.add('fa-caret-down');
+
+            // Check if current page is not a submenu item, then redirect
+            // Get all submenu links
+            const submenuLinks = submenu.querySelectorAll('a');
+            if (submenuLinks.length > 0) {
+                // Check if any submenu link is active
+                let foundActive = false;
+                submenuLinks.forEach(link => {
+                    if (link.classList.contains('active')) foundActive = true;
+                });
+                if (!foundActive) {
+                    // Redirect to first submenu link
+                    window.location.href = submenuLinks[0].href;
+                }
+            }
+        } else {
+            submenu.classList.remove('open');
+            parent.classList.remove('active');
+            caret.classList.remove('fa-caret-down');
+            caret.classList.add('fa-caret-right');
         }
     }
 
