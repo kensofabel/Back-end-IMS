@@ -57,7 +57,9 @@ session_start();
                     </div>
                 </div>
             </section>
+        </div>
 
+        <div class="content-area">
             <!-- Sales Section -->
             <section id="sales-section" class="section active">
                 <div class="section-header">
@@ -81,5 +83,6 @@ session_start();
                 </div>
             </section>
         </div>
+    </div>
 </body>
 </html>

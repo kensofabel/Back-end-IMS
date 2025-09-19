@@ -20,7 +20,14 @@ session_start();
             <!-- Employee Section -->
             <section id="employee-section" class="section active">
                 <div class="section-header">
-                    <h2>Employee Management</h2>
+                    <h2 class="access-header-title">
+                        Employee Management
+                        <span class="access-header-breadcrumb">
+                            |
+                            <i class="fas fa-users-cog" ></i>
+                            - Employees
+                        </span>
+                    </h2>
                 </div>
                 <div class="employee-content">
                     <p>Employee management content will be displayed here.</p>

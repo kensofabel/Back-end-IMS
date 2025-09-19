@@ -1,50 +1,519 @@
-/* Spacer below access rights header */
-.access-header-spacer {
-	height: 1.5rem;
+.access-content-area {
+    display: flex !important;
+    height: auto !important;
+	flex-direction: column;
+	align-items: center;
+    justify-content: center;
 }
-/* Access Rights Header Styles */
+/* --- Access Rights Header Styles --- */
 .access-header-title {
-	display: flex;
-	align-items: center;
-	gap: 1rem;
-	font-size: 2rem;
-	font-weight: 700;
-	color: #ff9800;
-	margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 2rem;
+    color: #ff9800;
+    margin-bottom: 0;
+    transition: color 0.2s;
+    font-weight: 700; /* keep bold for main header */
 }
-
 .access-header-breadcrumb {
-	color: #7c7c8a;
-	font-size: 1rem;
-	font-weight: 400;
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
+    color: #7c7c8a;
+    font-size: 1rem;
+    font-weight: 400; /* match table text */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
 }
-
 .access-header-breadcrumb .fas {
-	color: #7c7c8a;
+    color: #7c7c8a;
+    transition: color 0.2s;
 }
-/* --- Box Section for Access Rights --- */
-
-/* For Access Rights page: left-align content, center box under heading */
-.content-area {
-  display: block;
-  width: 100%;
-  max-width: 1100px;
-  padding: 130px 20px;
+.access-header-breadcrumb:hover,
+.access-header-breadcrumb:hover .fas {
+    color: #ff9800;
 }
 
-
-
-.access-box-section {
-	max-width: 700px;
-	width: 100%;
-	margin: 2rem auto 0 auto;
-	background: #fff;
+/* --- Tabs Styling --- */
+.tabs {
+    display: flex;
+	background-color: #181818;
+	border: 1px solid #232323;
 	border-radius: 12px;
-	box-shadow: 0 1px 8px rgba(60,60,60,0.06);
-	padding: 2rem 2.5rem 1.5rem 2.5rem;
-	margin-bottom: 2rem;
-	border: 1px solid #ececec;
+	border-bottom-left-radius: 0px;
+	border-bottom-right-radius: 0px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.10);
+    border-bottom: 1px solid #232323;
+    margin-top: 10px;
+}
+.tab {
+    padding: 10px 24px;
+    cursor: pointer;
+    color: #dbdbdb;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background-color: #181818;
+    transition: all 0.3s;
+    font-weight: 400;
+}
+.tab.first-child {
+	margin-left: 10px;
+}
+
+.tab.active,
+.tab:focus {
+    color: #ff9800;
+    background: transparent;
+    border-color: #181818 #181818 #181818 #181818;
+}
+.tab:hover:not(.active) {
+    color: #ff9800;
+    background: transparent	;
+    border-color: #181818 #181818 #181818 #181818;
+}
+.tab.active {
+    position: relative;
+}
+.tab.active::after {
+    content: "";
+    position: absolute;
+    left: -1%;
+    right: -1%;
+    bottom: -1px;
+    height: 2px;
+    background: #ff9800;
+    border-radius: 2px;
+    z-index: 2;
+}
+.tab:hover:not(.active) {
+    position: relative;
+}
+
+.tab:hover:not(.active)::after {
+    content: "";
+    position: absolute;
+    left: -1%;
+    right: -1%;
+    bottom: -1px;
+    height: 1px;
+    background: #ff9800;
+    border-radius: 2px;
+    z-index: 2;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+/* --- Tab Content --- */
+.tab-content {
+    background-color: #232323;
+    border: 1px solid #232323;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.10);
+    color: #dbdbdb;
+    width: 100%;
+    max-width: 1100px;
+	margin: 0 auto 2rem auto;
+    /* overflow: hidden; */ /* Remove or comment out if you want dropdowns to overflow */
+    display: block; /* Use block layout for natural stacking */
+}
+
+/* --- Section Header --- */
+.section-header {
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+/* --- Roles Table Section --- */
+.btn-add-role {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 1.5rem;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-add-role:hover {
+    background: #ff6600;
+    color: #fff;
+}
+.roles-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #dbdbdb;
+    background: #181818;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.roles-table th,
+.roles-table td {
+    text-align: left;
+    border-bottom: 1px solid #232323;
+    outline: none;
+}
+.roles-table th {
+    color: #ff9800;
+    font-weight: 700;
+    text-align: left; /* Keep headers left-aligned */
+    padding: 18px 25px; /* Optional: make header row a bit taller */
+}
+
+.roles-table td {
+    text-align: left; /* left text in table cells */
+    padding: 30px 25px; /* Make rows taller */
+    vertical-align: middle;
+    font-size: 1.08rem; /* Optional: slightly larger text */
+}
+.roles-table td[contenteditable="true"]:focus {
+    background: #232323;
+    border: 1px solid #ff9800;
+    outline: none;
+}
+.roles-table th {
+    color: #ff9800;
+    font-weight: 700;
+}
+.roles-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.status-active {
+    color: #ff9800;
+    display: flex;
+    align-items: center;
+}
+.status-active i {
+    margin-right: 6px;
+}
+.btn-manage {
+    background: transparent;
+    border: 1px solid #ff9800;
+    color: #ff9800;
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    font-size: 1rem;
+    margin-right: 8px;
+}
+.btn-manage:hover {
+    background: #ff9800;
+    color: #232323;
+}
+.ellipsis-icon {
+    cursor: pointer;
+    color: #ff9800;
+    font-size: 1.2rem;
+    margin-left: 8px;
+    transition: color 0.2s;
+}
+.ellipsis-icon:hover {
+    color: #fff;
+}
+.table-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+.ellipsis-menu {
+    position: relative;
+    display: inline-block;
+}
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 24px;
+    background: #232323;
+    border: 1px solid #ff9800;
+    border-radius: 6px;
+    min-width: 100px;
+    z-index: 10;
+}
+.ellipsis-menu.open .dropdown-menu {
+    display: block;
+}
+.btn-delete-role {
+    background: none;
+    border: none;
+    color: #ff4d4f;
+    font-size: 1.2rem;
+    cursor: pointer;
+    float: right;
+    margin-left: 8px;
+    transition: color 0.2s, background 0.2s;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+.btn-delete-role:hover {
+    color: #fff;
+    background: #ff4d4f;
+}
+.roles-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.2rem;
+    width: 100%;
+    gap: 1rem;
+}
+
+.roles-header-text {
+    color: #dbdbdb;
+    font-size: 1.05rem;
+    flex: 1;
+    text-align: left;
+    min-width: 0;
+    white-space: normal;
+}
+.tab-info-bar {
+    width: 100%;
+    max-width: 1100px;
+    margin-bottom: 18px;
+    padding: 0 25px 12px 25px;
+    display: flex;
+    flex-direction: column;      /* Stack children vertically */
+    align-items: flex-start;     /* Align to the left */
+    background: #181818;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.tab-info-text {
+    color: #dbdbdb;
+    font-size: 1rem;
+    padding-top: 25px;
+}
+
+.btn-add-role {
+    margin-top: 25px;            /* Add space between text and button */
+    margin-bottom: 12px;            /* Remove extra margin if any */
+}
+.btn-edit-role,
+.btn-save-role,
+.btn-cancel-role {
+    background: none;
+    border: none;
+    color: #ff9800;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-right: 8px;
+    transition: color 0.2s;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+.btn-save-role {
+    color: #4caf50;
+}
+.btn-cancel-role {
+    color: #ff4d4f;
+}
+.btn-edit-role:hover {
+    color: #fff;
+}
+.btn-save-role:hover {
+    color: #fff;
+    background: #4caf50;
+}
+.btn-cancel-role:hover {
+    color: #fff;
+    background: #ff4d4f;
+}
+.btn-select-role {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-select-role.delete {
+    background: #ff4d4f;
+    color: #fff;
+}
+.btn-select-role:hover {
+    background: #ff6600;
+    color: #fff;
+}
+
+/* --- Selectable Rows Styles --- */
+.select-col {
+    display: none; /* Hidden by default, shown in select mode */
+}
+.row-select-checkbox {
+    display: none; /* Hidden by default, shown in select mode */
+}
+.btn-add-role.cancel {
+    background: #ff9800;
+    color: #fff;
+}
+.btn-add-role.cancel:hover {
+    background: #d32f2f;
+    color: #fff;
+}
+.btn-select-role.delete {
+    background: #ff4d4f;
+    color: #fff;
+}
+.btn-select-role.delete:hover {
+    background: #ff3b3b;
+}
+.role-permissions {
+    background: #181818;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border-left: 4px solid #ff9800;
+    padding: 18px 24px 18px 24px;
+}
+.role-permissions-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.role-permissions-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #ff9800;
+}
+
+.role-permissions-separator {
+    color: #dbdbdb;
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin: 0 6px;
+    user-select: none;
+}
+
+.role-permissions-desc {
+    color: #dbdbdb;
+    font-size: 1.05rem;
+    font-weight: 400;
+}
+
+/* Permissions Checklist (dropdown area) */
+.permissions-checkboxes {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two columns on desktop */
+    gap: 16px 24px;
+}
+
+/* Hide permissions list by default */
+.permissions-checkboxes {
+    display: none;
+}
+
+/* Show as grid when open */
+.role-permissions.open .permissions-checkboxes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 700px) {
+    .role-permissions.open .permissions-checkboxes {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+}
+
+/* Each Permission Card */
+.permission-card {
+    background: #232323;
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Permission Label and Checkbox */
+.permission-card label {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    width: 100%;
+    cursor: pointer;
+    flex-direction: row; /* Always row: checkbox left, text right */
+}
+
+.permission-texts {
+    display: flex;
+    flex-direction: column;      /* Always stacked: title above, description below */
+    align-items: flex-start;
+    gap: 2px;
+}
+
+/* Checkbox Style */
+.permissions-checkboxes input[type="checkbox"] {
+    accent-color: #ff9800;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+}
+
+/* Permission Title and Description */
+.permission-title {
+    font-weight: 700;
+    color: #dbdbdb;
+    font-size: 1.08rem;
+    margin-bottom: 0;         /* Remove bottom margin */
+    white-space: nowrap;      /* Prevent wrapping */
+}
+
+.permission-desc {
+    color: #dbdbdb;
+    font-size: 0.98rem;
+    margin-left: 0;
+    margin-top: 0;
+    white-space: normal;
+    flex: 1;                  /* Take remaining space */
+}
+.btn-save-permissions {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: background 0.2s, color 0.2s;
+    margin-top: 18px;
+    display: block;
+    margin-left: auto;
+}
+.btn-save-permissions:hover {
+    background: #ff6600;
+    color: #fff;
+}
+.btn-edit-permissions {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 25px;      /* Space above if below text */
+    margin-bottom: 12px;
+    align-self: flex-start; /* Left align in flex column */
+    transition: background 0.2s, color 0.2s;
+}
+.btn-edit-permissions:hover {
+    background: #ff6600;
+    color: #fff;
 }
