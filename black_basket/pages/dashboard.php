@@ -1,7 +1,12 @@
 <?php
 session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /black_basket/index.php');
+    exit();
+}
 include '../partials/navigation.php'; // database connection
 include '../partials/header.php';
+
 ?>
 
 <!DOCTYPE html>

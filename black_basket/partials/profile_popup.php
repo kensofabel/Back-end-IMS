@@ -8,8 +8,8 @@ $user = [
     'email' => 'Not set',
     'role' => 'User'
 ];
-if (isset($_SESSION['user'])) {
-    $user_id = intval($_SESSION['user']);
+if (isset($_SESSION['user_id'])) {
+    $user_id = intval($_SESSION['user_id']);
     $stmt = $conn->prepare('SELECT full_name, email FROM users WHERE id = ? LIMIT 1');
     $stmt->bind_param('i', $user_id);
     if ($stmt->execute()) {
@@ -31,21 +31,26 @@ if (isset($_SESSION['user'])) {
         }
     }
     $role_stmt->close();
-    // If no role found, check if user is owner (owner_id IS NULL)
+    // If no role found, check if user is owner (session or DB fallback)
     if (!$role) {
-        $owner_stmt = $conn->prepare('SELECT id FROM users WHERE id = ? AND owner_id IS NULL LIMIT 1');
-        $owner_stmt->bind_param('i', $user_id);
-        if ($owner_stmt->execute()) {
-            $owner_stmt->store_result();
-            if ($owner_stmt->num_rows > 0) {
-                $role = 'Owner';
+        if (isset($_SESSION['owner_id']) && $_SESSION['owner_id'] == $user_id) {
+            $role = 'Owner';
+        } else {
+            // Fallback: check DB if user has owner_id IS NULL
+            $owner_stmt = $conn->prepare('SELECT id FROM users WHERE id = ? AND owner_id IS NULL LIMIT 1');
+            $owner_stmt->bind_param('i', $user_id);
+            if ($owner_stmt->execute()) {
+                $owner_stmt->store_result();
+                if ($owner_stmt->num_rows > 0) {
+                    $role = 'Owner';
+                } else {
+                    $role = 'User';
+                }
             } else {
                 $role = 'User';
             }
-        } else {
-            $role = 'User';
+            $owner_stmt->close();
         }
-        $owner_stmt->close();
     }
     $user['role'] = $role;
 }

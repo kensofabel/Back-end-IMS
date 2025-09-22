@@ -26,6 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             exit();
         }
     if (password_verify($password, $user['password'])) {
+
+            // Set user_id for consistency
+            $_SESSION['user_id'] = $user['id'];
+            // Set owner_id if user has one, otherwise set to their own id
+            if (isset($user['owner_id']) && !is_null($user['owner_id'])) {
+                $_SESSION['owner_id'] = $user['owner_id'];
+            } else {
+                $_SESSION['owner_id'] = $user['id'];
+            }
+            // For backward compatibility
             $_SESSION['user'] = $user['id'];
 
             // --- INSERT THIS BLOCK FOR AUDIT LOGGING ---

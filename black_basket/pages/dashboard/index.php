@@ -1,10 +1,8 @@
 <?php
 session_start();
 include '../../config/db.php';
-
-// Check if user is logged in
-if (!isset($_SESSION['user'])) {
-    header("Location: ../../index.php");
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /black_basket/index.php');
     exit();
 }
 ?>

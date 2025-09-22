@@ -1,5 +1,10 @@
 <?php
 session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /black_basket/index.php');
+    exit();
+}
+
 include '../../config/db.php';
 
 // Fetch all audit logs, newest first

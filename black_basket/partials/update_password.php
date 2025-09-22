@@ -3,12 +3,12 @@ session_start();
 header('Content-Type: application/json');
 require '../config/db.php';
 
-if (!isset($_SESSION['user'])) {
-    echo json_encode(['success' => false, 'message' => 'Not logged in.']);
-    exit;
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /black_basket/index.php');
+    exit();
 }
 
-$user_id = intval($_SESSION['user']);
+$user_id = intval($_SESSION['user_id']);
 $old_password = $_POST['old_password'] ?? '';
 $confirm_old_password = $_POST['confirm_old_password'] ?? '';
 $new_password = $_POST['password'] ?? '';

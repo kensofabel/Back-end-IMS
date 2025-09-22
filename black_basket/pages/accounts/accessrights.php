@@ -1,5 +1,59 @@
 <?php
 session_start();
+require_once '../../config/db.php';
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /black_basket/index.php');
+    exit();
+}
+
+// Fetch roles
+$roles = [];
+$user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : null;
+if ($user_id !== null) {
+    $result = $conn->query("SELECT owner_id FROM users WHERE id = $user_id");
+    if ($result && $row = $result->fetch_assoc()) {
+        $owner_id = is_null($row['owner_id']) ? $user_id : intval($row['owner_id']);
+        $sql_roles = "SELECT * FROM roles WHERE owner_id = $owner_id ORDER BY id ASC";
+    } else {
+        // fallback: show all roles if user not found
+        $sql_roles = "SELECT * FROM roles ORDER BY id ASC";
+    }
+} else {
+    // fallback: show all roles if not logged in
+    $sql_roles = "SELECT * FROM roles ORDER BY id ASC";
+}
+$result_roles = $conn->query($sql_roles);
+if ($result_roles && $result_roles->num_rows > 0) {
+    while ($row = $result_roles->fetch_assoc()) {
+        $roles[] = $row;
+    }
+}
+
+// Fetch permissions
+$permissions = [];
+$sql_permissions = "SELECT * FROM permissions ORDER BY id ASC";
+$result_permissions = $conn->query($sql_permissions);
+if ($result_permissions && $result_permissions->num_rows > 0) {
+    while ($row = $result_permissions->fetch_assoc()) {
+        $permissions[] = $row;
+    }
+}
+
+// Fetch role-permissions mapping
+$role_permissions = [];
+$sql_role_permissions = "SELECT * FROM role_permissions";
+$result_role_permissions = $conn->query($sql_role_permissions);
+if ($result_role_permissions && $result_role_permissions->num_rows > 0) {
+    while ($row = $result_role_permissions->fetch_assoc()) {
+        $role_permissions[$row['role_id']][] = $row['permission_id'];
+    }
+}
+
+// Determine which tab should be active based on cookie
+$active_tab = 'manage-roles';
+if (isset($_COOKIE['access_tab']) && in_array($_COOKIE['access_tab'], ['manage-roles', 'set-permissions'])) {
+    $active_tab = $_COOKIE['access_tab'];
+}
 ?>
 
 <!DOCTYPE html>
@@ -30,395 +84,160 @@ session_start();
         </div>
 
         <div class="tabs">
-            <div class="tab first-child active" id="tab-manage-roles" onclick="showTab('manage-roles')">Manage Roles</div>
-            <div class="tab" id="tab-set-permissions" onclick="showTab('set-permissions')">Set Permissions</div>
+            <div class="tab first-child<?php if ($active_tab === 'manage-roles') echo ' active'; ?>" id="tab-manage-roles" onclick="showTab('manage-roles')">Manage Roles</div>
+            <div class="tab<?php if ($active_tab === 'set-permissions') echo ' active'; ?>" id="tab-set-permissions" onclick="showTab('set-permissions')">Set Permissions</div>
         </div>
 
         <div class="tab-info-bar">
             <span class="tab-info-text" id="tab-info-text">
-                Manage user roles. Add, edit, or remove roles as needed for your system.
+                <?php if ($active_tab === 'set-permissions'): ?>
+                    Use this section to define what each role can access and modify within the application.
+                <?php else: ?>
+                    Manage user roles. Add, edit, or remove roles as needed for your system. Note: Adding a new role will automatically assign all permissions to it.
+                <?php endif; ?>
             </span>
             <div id="tab-info-actions">
-                <button class="btn-add-role" id="btn-add-role"><i class="fas fa-plus"></i> Add Role</button>
-                <button class="btn-select-role" id="btn-select-role"><i class="fas fa-check-square"></i> Select</button>
+                <?php if ($active_tab === 'set-permissions'): ?>
+                    <button class="btn-edit-permissions" id="btn-edit-permissions"><i class="fas fa-pen-to-square"></i>Edit</button>
+                <?php else: ?>
+                    <button class="btn-add-role" id="btn-add-role"><i class="fas fa-plus"></i> Add Role</button>
+                    <button class="btn-select-role" id="btn-select-role"><i class="fas fa-check-square"></i></button>
+                <?php endif; ?>
             </div>
         </div>
 
         <!-- Manage Roles Tab -->
-        <div class="tab-content" id="content-manage-roles">
+        <div class="tab-content" id="content-manage-roles" style="<?php if ($active_tab !== 'manage-roles') echo 'display:none;'; ?>">
             <table class="roles-table">
                 <thead>
                     <tr>
                         <th>Role Name</th>
                         <th>Description</th>
-                        <th>Action</th>
+                        <th class="status-col">Status</th>
+                        <th class="action-col">Action</th>
                         <th style="width:40px; text-align:center; display:none;" class="select-col">
                             <input type="checkbox" id="select-all-checkbox">
                         </th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td class="editable-cell">Admin</td>
-                        <td class="editable-cell">Full access to all features</td>
-                        <td>
+                <?php if (count($roles) > 0): ?>
+                    <?php foreach ($roles as $role): ?>
+                    <tr data-role-id="<?php echo (int)$role['id']; ?>">
+                        <td class="editable-cell"><?php echo htmlspecialchars($role['name']); ?></td>
+                        <td class="editable-cell"><?php echo htmlspecialchars($role['description']); ?></td>
+                        <td class="status-col">
+                            <span class="status-badge status-badge-view editable-cell" data-role-id="<?php echo (int)$role['id']; ?>">
+                                <?php if ($role['status'] === 'active'): ?>
+                                    <i class="fas fa-check-circle" style="color:#4caf50; margin-left: -10px;"></i><span class="status-text" style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">active</span>
+                                <?php else: ?>
+                                    <i class="fas fa-times-circle" style="color:#e53e3e; margin-left: -10px;"></i><span class="status-text" style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">inactive</span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="status-badge status-badge-edit" data-role-id="<?php echo (int)$role['id']; ?>" style="display:none; cursor:pointer; user-select:none; outline:none; border:none;">
+                                <?php if ($role['status'] === 'active'): ?>
+                                    <i class="fas fa-check-circle" style="color:#4caf50; margin-left: -10px;"></i><span class="status-text" style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">active</span>
+                                <?php else: ?>
+                                    <i class="fas fa-times-circle" style="color:#e53e3e; margin-left: -10px;"></i><span class="status-text" style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">inactive</span>
+                                <?php endif; ?>
+                            </span>
+                        </td>
+                        <td class="action-col">
                             <button class="btn-edit-role" title="Edit">
-                                <i class="fas fa-pen"></i>
+                                <i class="fas fa-pen-to-square"></i><span></span>
                             </button>
                             <button class="btn-save-role" style="display:none;" title="Save">
-                                <i class="fas fa-check"></i>
+                                <i class="fas fa-check"></i><span></span>
                             </button>
                             <button class="btn-cancel-role" style="display:none;" title="Cancel">
-                                <i class="fas fa-times"></i>
+                                <i class="fas fa-times"></i><span></span>
                             </button>
-                            <button class="btn-delete-role" style="display:none; float:right;" title="Delete">
-                                <i class="fas fa-trash"></i>
+                            <button class="btn-delete-role" style="display:none;" title="Delete">
+                                <i class="fas fa-trash"></i><span></span>
                             </button>
                         </td>
-                        <td style="text-align:center; display:none;" class="select-col">
-                            <input type="checkbox" class="row-select-checkbox">
+                        <td style="text-align:center; display:none; user-select:none;" class="select-col">
+                            <input type="checkbox" class="row-select-checkbox" tabindex="-1" style="user-select:none;">
                         </td>
                     </tr>
-                    <!-- More rows as needed -->
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="4">No roles found.</td></tr>
+                <?php endif; ?>
                 </tbody>
             </table>
         </div>
 
         <!-- Set Permissions Tab -->
-        <div class="tab-content" id="content-set-permissions" style="display:none;">
+    <div class="tab-content" id="content-set-permissions" style="<?php if ($active_tab !== 'set-permissions') echo 'display:none;'; ?>">
             <div class="permissions-list">
-                <!-- Example Role Permissions Block -->
-                <div class="role-permissions">
-                    <div class="role-permissions-header" onclick="togglePermissions(this)">
-                        <span class="role-permissions-title">Admin</span>
-                        <span class="role-permissions-separator">-</span>
-                        <span class="role-permissions-desc">Full access to all features</span>
-                    </div>
-                    <div class="permissions-checkboxes">
-                        <div class="permission-card">
-                            <label>
-                                <input type="checkbox" checked>
-                                <span class="permission-texts">
-                                    <span class="permission-title">Dashboard Access</span>
-                                    <span class="permission-desc">Access to dashboard and statistics</span>
-                                </span>
-                            </label>
+                <?php if (count($roles) > 0): ?>
+                    <?php foreach ($roles as $role): ?>
+                    <div class="role-permissions" data-role-id="<?php echo (int)$role['id']; ?>">
+                        <div class="role-permissions-header" onclick="togglePermissions(this)">
+                            <span class="role-permissions-title"><?php echo htmlspecialchars($role['name']); ?></span>
+                            <span class="role-permissions-separator">-</span>
+                            <span class="role-permissions-desc"><?php echo htmlspecialchars($role['description']); ?></span>
                         </div>
-                        <div class="permission-card">
-                            <label>
-                                <input type="checkbox" checked>
-                                <span class="permission-texts">
-                                    <span class="permission-title">Inventory Management</span>
-                                    <span class="permission-desc">View and manage inventory</span>
-                                </span>
-                            </label>
-                        </div>
-                        <div class="permission-card">
-                            <label>
-                                <input type="checkbox" checked>
-                                <span class="permission-texts">
-                                    <span class="permission-title">Add Products</span>
-                                    <span class="permission-desc">Add new products to inventory</span>
-                                </span>
-                            </label>
-                        </div>
-                        <div class="permission-card">
-                            <label>
-                                <input type="checkbox" checked>
-                                <span class="permission-texts">
-                                    <span class="permission-title">Edit Products</span>
-                                    <span class="permission-desc">Edit existing products</span>
-                            </label>
-                        </div>
-                        <div class="permission-card">
-                            <label>
-                                <input type="checkbox">
-                                <span class="permission-texts">
-                                    <span class="permission-title">Dashboard Access</span>
-                                    <span class="permission-desc">Access to dashboard and statistics</span>
-                                </span>
-                            </label>
-                        </div>
-                        <div class="permission-card">
-                            <label>
-                                <input type="checkbox">
-                                <span class="permission-texts">
-                                    <span class="permission-title">View Payment Reports</span>
-                                    <span class="permission-desc">Access payment reports</span>
-                                </span>
-                            </label>
+                        <div class="permissions-checkboxes">
+                            <?php foreach ($permissions as $perm): ?>
+                                <?php $checked = (isset($role_permissions[$role['id']]) && in_array($perm['id'], $role_permissions[$role['id']])); ?>
+                                <div class="permission-card" data-permission-id="<?php echo (int)$perm['id']; ?>" style="display:<?php echo $checked ? 'block' : 'none'; ?>;">
+                                    <span class="permission-texts">
+                                        <span class="permission-title"><?php echo htmlspecialchars($perm['name']); ?></span>
+                                        <span class="permission-desc"><?php echo htmlspecialchars($perm['description']); ?></span>
+                                    </span>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                </div>
-                <!-- Repeat .role-permissions for each role -->
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div>No roles found.</div>
+                <?php endif; ?>
             </div>
             <button class="btn-save-permissions" id="btn-save-permissions" style="display:none;">Save</button>
         </div>
     </div>
 
+    <script src="../../assets/js/content.js"></script>
     <script>
-        function showTab(tab) {
-            document.getElementById('content-manage-roles').style.display = (tab === 'manage-roles') ? '' : 'none';
-            document.getElementById('content-set-permissions').style.display = (tab === 'set-permissions') ? '' : 'none';
-            document.getElementById('tab-manage-roles').classList.toggle('active', tab === 'manage-roles');
-            document.getElementById('tab-set-permissions').classList.toggle('active', tab === 'set-permissions');
-
-            const infoText = document.getElementById('tab-info-text');
-            const infoActions = document.getElementById('tab-info-actions');
-            const infoBar = document.querySelector('.tab-info-bar');
-            // Remove any previously injected edit button
-            let oldEditBtn = document.getElementById('btn-edit-permissions');
-            if (oldEditBtn) oldEditBtn.remove();
-
-            if (tab === 'manage-roles') {
-                infoText.textContent = "Manage user roles. Add, edit, or remove roles as needed for your system.";
-                infoActions.innerHTML = `
-                    <button class="btn-add-role" id="btn-add-role"><i class="fas fa-plus"></i> Add Role</button>
-                    <button class="btn-select-role" id="btn-select-role"><i class="fas fa-check-square"></i> Select</button>
-                `;
-
-                // Re-select and re-attach event listeners
-                const addRoleBtn = document.getElementById('btn-add-role');
-                const selectBtn = document.getElementById('btn-select-role');
-
-                addRoleBtn.addEventListener('click', function() {
-                    if (selectMode) {
-                        setSelectMode(false);
-                    } else {
-                        alert('Add Role clicked!');
-                    }
-                });
-
-                selectBtn.addEventListener('click', function() {
-                    if (!selectMode) {
-                        setSelectMode(true);
-                    } else {
-                        const checkedRows = Array.from(rowCheckboxes).filter(cb => cb.checked);
-                        if (checkedRows.length === 0) return;
-                        if (checkedRows.length === rowCheckboxes.length) {
-                            if (!confirm('Are you sure you want to delete ALL selected roles?')) return;
-                        } else {
-                            if (!confirm('Are you sure you want to delete the selected roles?')) return;
-                        }
-                        checkedRows.forEach(cb => {
-                            const row = cb.closest('tr');
-                            row.parentNode.removeChild(row);
-                        });
-                        setSelectMode(false);
-                    }
-                });
-            } else {
-                infoText.textContent = "Use this section to define what each role can access and modify within the application.";
-                infoActions.innerHTML = '';
-                let editBtn = document.createElement('button');
-                editBtn.className = 'btn-edit-permissions';
-                editBtn.id = 'btn-edit-permissions';
-                editBtn.innerHTML = '<i class="fas fa-pen"></i> Edit';
-                editBtn.style.marginTop = '25px';
-                infoBar.appendChild(editBtn);
-                document.getElementById('btn-save-permissions').style.display = "none";
+    // Show/hide status badge toggle in edit mode
+    document.querySelectorAll('.btn-edit-role').forEach(function(editBtn) {
+        editBtn.addEventListener('click', function() {
+            var row = this.closest('tr');
+            var statusBadgeView = row.querySelector('.status-badge-view');
+            var statusBadgeEdit = row.querySelector('.status-badge-edit');
+            if (statusBadgeView && statusBadgeEdit) {
+                statusBadgeView.style.display = 'none';
+                statusBadgeEdit.style.display = 'inline-block';
             }
-            localStorage.setItem('activeTab', tab); // Save active tab
-        }
-
-        function togglePermissions(header) {
-            const container = header.closest('.role-permissions');
-            container.classList.toggle('open');
-        }
-
-        // Add this script to handle ellipsis menu toggle
-        document.querySelectorAll('.ellipsis-icon').forEach(icon => {
-            icon.addEventListener('click', function(e) {
-                e.stopPropagation();
-                document.querySelectorAll('.ellipsis-menu').forEach(menu => menu.classList.remove('open'));
-                this.parentElement.classList.toggle('open');
-            });
         });
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.ellipsis-menu').forEach(menu => menu.classList.remove('open'));
-        });
-
-        document.querySelectorAll('.btn-edit-role').forEach(function(editBtn) {
-            editBtn.addEventListener('click', function() {
-                const row = this.closest('tr');
-                row.querySelectorAll('.editable-cell').forEach(cell => {
-                    cell.contentEditable = "true";
-                    cell.style.background = "#232323";
-                    cell.focus();
-                });
-                this.style.display = "none";
-                row.querySelector('.btn-save-role').style.display = "inline-block";
-                row.querySelector('.btn-cancel-role').style.display = "inline-block";
-                row.querySelector('.btn-delete-role').style.display = "inline-block"; // Show delete
-                // Store original values for cancel
-                row.dataset.original = JSON.stringify(Array.from(row.querySelectorAll('.editable-cell')).map(cell => cell.innerText));
-            });
-        });
-
-        document.querySelectorAll('.btn-save-role').forEach(function(saveBtn) {
-            saveBtn.addEventListener('click', function() {
-                const row = this.closest('tr');
-                const original = JSON.parse(row.dataset.original || "[]");
-                const current = Array.from(row.querySelectorAll('.editable-cell')).map(cell => cell.innerText);
-                const changed = original.some((val, idx) => val !== current[idx]);
-                if (!changed || confirm("Are you sure you want to save changes?")) {
-                    row.querySelectorAll('.editable-cell').forEach(cell => {
-                        cell.contentEditable = "false";
-                        cell.style.background = "";
-                    });
-                    this.style.display = "none";
-                    row.querySelector('.btn-cancel-role').style.display = "none";
-                    row.querySelector('.btn-edit-role').style.display = "inline-block";
-                    row.querySelector('.btn-delete-role').style.display = "none"; // Hide delete
-                }
-            });
-        });
-
-        document.querySelectorAll('.btn-cancel-role').forEach(function(cancelBtn) {
-            cancelBtn.addEventListener('click', function() {
-                const row = this.closest('tr');
-                const original = JSON.parse(row.dataset.original || "[]");
-                const current = Array.from(row.querySelectorAll('.editable-cell')).map(cell => cell.innerText);
-                const changed = original.some((val, idx) => val !== current[idx]);
-                if (!changed || confirm("Are you sure you want to cancel editing?")) {
-                    // Restore original values if needed
-                    if (changed) {
-                        row.querySelectorAll('.editable-cell').forEach((cell, idx) => {
-                            cell.innerText = original[idx] || cell.innerText;
-                        });
-                    }
-                    row.querySelectorAll('.editable-cell').forEach(cell => {
-                        cell.contentEditable = "false";
-                        cell.style.background = "";
-                    });
-                    this.style.display = "none";
-                    row.querySelector('.btn-save-role').style.display = "none";
-                    row.querySelector('.btn-edit-role').style.display = "inline-block";
-                    row.querySelector('.btn-delete-role').style.display = "none"; // Hide delete
-                }
-            });
-        });
-
-        const addRoleBtn = document.getElementById('btn-add-role');
-const selectBtn = document.getElementById('btn-select-role');
-const selectCols = document.querySelectorAll('.select-col');
-const selectAllCheckbox = document.getElementById('select-all-checkbox');
-const rowCheckboxes = document.querySelectorAll('.row-select-checkbox');
-
-let selectMode = false;
-
-function setSelectMode(enabled) {
-    selectMode = enabled;
-
-    // Always re-select the current buttons
-    const addRoleBtn = document.getElementById('btn-add-role');
-    const selectBtn = document.getElementById('btn-select-role');
-    const selectCols = document.querySelectorAll('.select-col');
-    const selectAllCheckbox = document.getElementById('select-all-checkbox');
-    const rowCheckboxes = document.querySelectorAll('.row-select-checkbox');
-
-    // Show/hide the select column (header and cells)
-    selectCols.forEach(col => col.style.display = enabled ? 'table-cell' : 'none');
-    // Show/hide the checkboxes
-    rowCheckboxes.forEach(cb => cb.style.display = enabled ? 'inline-block' : 'none');
-    if (selectAllCheckbox) selectAllCheckbox.style.display = enabled ? 'inline-block' : 'none';
-
-    if (enabled) {
-        // Change Add Role to Cancel
-        if (addRoleBtn) {
-            addRoleBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
-            addRoleBtn.classList.add('cancel');
-        }
-        // Change Select to Delete
-        if (selectBtn) {
-            selectBtn.classList.add('delete');
-            selectBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
-        }
-    } else {
-        // Restore Add Role
-        if (addRoleBtn) {
-            addRoleBtn.innerHTML = '<i class="fas fa-plus"></i> Add Role';
-            addRoleBtn.classList.remove('cancel');
-        }
-        // Restore Select
-        if (selectBtn) {
-            selectBtn.classList.remove('delete');
-            selectBtn.innerHTML = '<i class="fas fa-check-square"></i> Select';
-        }
-        rowCheckboxes.forEach(cb => cb.checked = false);
-        if (selectAllCheckbox) selectAllCheckbox.checked = false;
-    }
-}
-
-// Select button logic
-selectBtn.addEventListener('click', function() {
-    if (!selectMode) {
-        setSelectMode(true);
-    } else {
-        // Delete selected
-        const checkedRows = Array.from(rowCheckboxes).filter(cb => cb.checked);
-        if (checkedRows.length === 0) return;
-        if (checkedRows.length === rowCheckboxes.length) {
-            if (!confirm('Are you sure you want to delete ALL selected roles?')) return;
-        } else {
-            if (!confirm('Are you sure you want to delete the selected roles?')) return;
-        }
-        checkedRows.forEach(cb => {
-            const row = cb.closest('tr');
-            row.parentNode.removeChild(row);
-        });
-        setSelectMode(false);
-    }
-});
-
-// Add Role/Cancel button logic
-addRoleBtn.addEventListener('click', function() {
-    if (selectMode) {
-        setSelectMode(false);
-    } else {
-        // Your add role logic here
-        alert('Add Role clicked!');
-    }
-});
-
-// Select all logic
-if (selectAllCheckbox) {
-    selectAllCheckbox.addEventListener('change', function() {
-        rowCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
     });
-}
-rowCheckboxes.forEach(cb => {
-    cb.addEventListener('change', function() {
-        if (selectAllCheckbox) {
-            selectAllCheckbox.checked = Array.from(rowCheckboxes).every(cb => cb.checked);
-        }
+    document.querySelectorAll('.btn-cancel-role, .btn-save-role').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var row = this.closest('tr');
+            var statusBadgeView = row.querySelector('.status-badge-view');
+            var statusBadgeEdit = row.querySelector('.status-badge-edit');
+            if (statusBadgeView && statusBadgeEdit) {
+                // Update badge icon/text based on toggle
+                statusBadgeView.innerHTML = statusBadgeEdit.innerHTML;
+                statusBadgeView.style.display = '';
+                statusBadgeEdit.style.display = 'none';
+            }
+        });
     });
-});
-
-// Edit/Save button logic for permissions
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'btn-edit-permissions') {
-        // Enable all checkboxes
-        document.querySelectorAll('#content-set-permissions input[type="checkbox"]').forEach(cb => cb.disabled = false);
-        document.getElementById('btn-edit-permissions').textContent = "Save";
-        document.getElementById('btn-save-permissions').style.display = "block";
-        document.getElementById('btn-edit-permissions').id = "btn-save-permissions";
-    } else if (e.target && e.target.id === 'btn-save-permissions') {
-        // Save logic here (AJAX or local update)
-        if (confirm("Are you sure you want to save permission changes?")) {
-            document.querySelectorAll('#content-set-permissions input[type="checkbox"]').forEach(cb => cb.disabled = true);
-            e.target.textContent = "Edit";
-            e.target.id = "btn-edit-permissions";
-            e.target.style.display = "block";
-        }
-    }
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-    const savedTab = localStorage.getItem('activeTab') || 'manage-roles';
-    showTab(savedTab);
-});
-document.querySelectorAll('#content-set-permissions input[type="checkbox"]').forEach(cb => cb.disabled = true);
-</script>
+    // Toggle logic for badge in edit mode
+    document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
+        badge.addEventListener('click', function() {
+            var isActive = this.innerHTML.includes('fa-check-circle');
+            if (isActive) {
+                this.innerHTML = '<i class="fas fa-times-circle" style="color:#e53e3e; margin-left: -10px;"></i><span style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">inactive</span>';
+            } else {
+                this.innerHTML = '<i class="fas fa-check-circle" style="color:#4caf50; margin-left: -10px;"></i><span style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">active</span>';
+            }
+        });
+    });
+    </script>
 </body>
 </html>

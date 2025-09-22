@@ -1,3 +1,118 @@
+
+/* Always stack action buttons vertically and keep them together */
+@media (max-width: 600px) {
+    .tab-content {
+        overflow-x: unset;
+    }
+    .roles-table {
+        min-width: unset;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .roles-table th,
+    .roles-table td {
+        padding: 6px 2px;
+        font-size: 0.92rem;
+    }
+        .roles-table th.status-col,
+        .roles-table th.action-col,
+        .roles-table th.select-col,
+        .roles-table td.status-col,
+        .roles-table td.action-col,
+        .roles-table td.select-col {
+            width: 5%;
+            min-width: 50px;
+            max-width: 80px;
+            padding: 4px 0;
+            text-align: center;
+    }
+    .status-badge span.status-text {
+        display: none;
+    }
+    .status-badge i {
+        font-size: 1.1em;
+        margin: 0 !important;
+    }
+    .btn-edit-role,
+    .btn-save-role,
+    .btn-cancel-role,
+    .btn-delete-role {
+        padding: 2px 4px;
+        font-size: 1.1em;
+        min-width: 28px;
+        max-width: 32px;
+    }
+    .btn-edit-role span,
+    .btn-save-role span,
+    .btn-cancel-role span,
+    .btn-delete-role span {
+        display: none;
+    }
+}
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    min-width: 0;
+}
+@media (max-width: 600px) {
+    .status-badge {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+    }
+    .status-badge span.status-text {
+        display: none;
+    }
+}
+
+.tab-content {
+    user-select: none;
+}
+.status-badge,
+.btn-edit-role {
+    user-select: none;
+}
+.status-badge-edit {
+    cursor: pointer;
+    background: none !important;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.status-badge-edit:hover {
+    background: rgba(255,255,255,0.18) !important;
+}
+.permissions-checkboxes input[type="checkbox"]:checked::after {
+    content: '✓';
+    display: flex-start;
+    color: #232323;
+    font-size: 14px;
+    font-weight: bold;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+.permissions-checkboxes input[type="checkbox"] {
+    position: relative;
+    z-index: 1;
+}
+/* --- Permission Card Hover in Edit Mode --- */
+body.edit-permissions-mode .permissions-checkboxes .permission-card:hover,
+body.edit-permissions-mode .permission-card:hover {
+    border: 1px solid #ff9800 !important;
+    background: #2a2a2a !important;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+    
+/* Flex row for permission checkbox and texts */
+.permission-flex-row {
+    display: flex;
+    gap: 10px;
+}
 .access-content-area {
     display: flex !important;
     height: auto !important;
@@ -17,7 +132,7 @@
     font-weight: 700; /* keep bold for main header */
 }
 .access-header-breadcrumb {
-    color: #7c7c8a;
+    color: #858585;
     font-size: 1rem;
     font-weight: 400; /* match table text */
     display: flex;
@@ -26,7 +141,7 @@
     transition: color 0.2s;
 }
 .access-header-breadcrumb .fas {
-    color: #7c7c8a;
+    color: #858585;
     transition: color 0.2s;
 }
 .access-header-breadcrumb:hover,
@@ -36,24 +151,25 @@
 
 /* --- Tabs Styling --- */
 .tabs {
+    user-select: none;
     display: flex;
-	background-color: #181818;
-	border: 1px solid #232323;
+    background-color: #232323;
 	border-radius: 12px;
 	border-bottom-left-radius: 0px;
 	border-bottom-right-radius: 0px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.10);
-    border-bottom: 1px solid #232323;
+    border-bottom: 1px solid #3f3f3f;
+    box-shadow: 0 5px 15px 0 rgba(0,0,0,0.25);;
     margin-top: 10px;
 }
 .tab {
-    padding: 10px 24px;
+    user-select: none;
+    padding: 15px 24px;
     cursor: pointer;
     color: #dbdbdb;
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: 6px 6px 0 0;
-    background-color: #181818;
+    background-color: #232323;
     transition: all 0.3s;
     font-weight: 400;
 }
@@ -65,12 +181,12 @@
 .tab:focus {
     color: #ff9800;
     background: transparent;
-    border-color: #181818 #181818 #181818 #181818;
+    border-color: #232323 #232323 #232323 #232323;
 }
 .tab:hover:not(.active) {
     color: #ff9800;
     background: transparent	;
-    border-color: #181818 #181818 #181818 #181818;
+    border-color: #232323 #232323 #232323 #232323;
 }
 .tab.active {
     position: relative;
@@ -81,7 +197,7 @@
     left: -1%;
     right: -1%;
     bottom: -1px;
-    height: 2px;
+    height: 1px;
     background: #ff9800;
     border-radius: 2px;
     z-index: 2;
@@ -104,19 +220,6 @@
     transition: opacity 0.2s;
 }
 
-/* --- Tab Content --- */
-.tab-content {
-    background-color: #232323;
-    border: 1px solid #232323;
-    border-radius: 12px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.10);
-    color: #dbdbdb;
-    width: 100%;
-    max-width: 1100px;
-	margin: 0 auto 2rem auto;
-    /* overflow: hidden; */ /* Remove or comment out if you want dropdowns to overflow */
-    display: block; /* Use block layout for natural stacking */
-}
 
 /* --- Section Header --- */
 .section-header {
@@ -141,35 +244,36 @@
     color: #fff;
 }
 .roles-table {
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25) !important;
     width: 100%;
-    border-collapse: collapse;
     color: #dbdbdb;
-    background: #181818;
+    background: #232323;
     border-radius: 8px;
     overflow: hidden;
 }
 .roles-table th,
 .roles-table td {
     text-align: left;
-    border-bottom: 1px solid #232323;
+    border-bottom: 1px solid #3f3f3f;
     outline: none;
 }
 .roles-table th {
     color: #ff9800;
     font-weight: 700;
     text-align: left; /* Keep headers left-aligned */
-    padding: 18px 25px; /* Optional: make header row a bit taller */
+    padding: 15px 25px; /* Optional: make header row a bit taller */
 }
 
 .roles-table td {
     text-align: left; /* left text in table cells */
-    padding: 30px 25px; /* Make rows taller */
+    padding: 25px 25px; /* Make rows taller */
     vertical-align: middle;
-    font-size: 1.08rem; /* Optional: slightly larger text */
+    font-size: 1rem; /* Optional: slightly larger text */
 }
 .roles-table td[contenteditable="true"]:focus {
     background: #232323;
     border: 1px solid #ff9800;
+    border-radius: 6px;
     outline: none;
 }
 .roles-table th {
@@ -178,6 +282,8 @@
 }
 .roles-table tbody tr:last-child td {
     border-bottom: none;
+    border-right: none !important;
+    border-left: none !important;
 }
 .status-active {
     color: #ff9800;
@@ -202,16 +308,7 @@
     background: #ff9800;
     color: #232323;
 }
-.ellipsis-icon {
-    cursor: pointer;
-    color: #ff9800;
-    font-size: 1.2rem;
-    margin-left: 8px;
-    transition: color 0.2s;
-}
-.ellipsis-icon:hover {
-    color: #fff;
-}
+
 .table-actions {
     display: flex;
     align-items: center;
@@ -227,7 +324,7 @@
     position: absolute;
     right: 0;
     top: 24px;
-    background: #232323;
+    background:#3f3f3f;
     border: 1px solid #ff9800;
     border-radius: 6px;
     min-width: 100px;
@@ -242,10 +339,8 @@
     color: #ff4d4f;
     font-size: 1.2rem;
     cursor: pointer;
-    float: right;
-    margin-left: 8px;
     transition: color 0.2s, background 0.2s;
-    padding: 6px 10px;
+    padding: 6px;
     border-radius: 4px;
 }
 .btn-delete-role:hover {
@@ -263,13 +358,14 @@
 
 .roles-header-text {
     color: #dbdbdb;
-    font-size: 1.05rem;
+    font-size: 1rem;
     flex: 1;
     text-align: left;
     min-width: 0;
     white-space: normal;
 }
 .tab-info-bar {
+    user-select: none;
     width: 100%;
     max-width: 1100px;
     margin-bottom: 18px;
@@ -277,10 +373,13 @@
     display: flex;
     flex-direction: column;      /* Stack children vertically */
     align-items: flex-start;     /* Align to the left */
-    background: #181818;
+    background: #232323;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
 }
+
+
 
 .tab-info-text {
     color: #dbdbdb;
@@ -365,9 +464,10 @@
     background: #ff3b3b;
 }
 .role-permissions {
-    background: #181818;
+    user-select: none;
+    background: #232323;
     border-radius: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
     border-left: 4px solid #ff9800;
     padding: 18px 24px 18px 24px;
 }
@@ -381,7 +481,7 @@
 }
 
 .role-permissions-title {
-    font-size: 1.2rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #ff9800;
 }
@@ -396,7 +496,7 @@
 
 .role-permissions-desc {
     color: #dbdbdb;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 400;
 }
 
@@ -404,7 +504,7 @@
 .permissions-checkboxes {
     margin-top: 18px;
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Two columns on desktop */
+    grid-template-columns: 1fr 1fr 1fr; /* Three columns on desktop */
     gap: 16px 24px;
 }
 
@@ -416,28 +516,32 @@
 /* Show as grid when open */
 .role-permissions.open .permissions-checkboxes {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 16px 24px;
 }
 
-/* Responsive: stack on mobile */
-@media (max-width: 700px) {
+/* Responsive: 2 columns on medium screens, 1 column on mobile */
+@media (max-width: 900px) {
     .role-permissions.open .permissions-checkboxes {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
+        grid-template-columns: 1fr 1fr;
+    }
+}
+@media (max-width: 650px) {
+    .role-permissions.open .permissions-checkboxes {
+        grid-template-columns: 1fr;
     }
 }
 
 /* Each Permission Card */
 .permission-card {
-    background: #232323;
+    user-select: none;
+    background: #3f3f3f;
     border-radius: 8px;
     padding: 16px 20px;
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
 }
 
 /* Permission Label and Checkbox */
@@ -459,17 +563,29 @@
 
 /* Checkbox Style */
 .permissions-checkboxes input[type="checkbox"] {
-    accent-color: #ff9800;
+    appearance: none;
+    -webkit-appearance: none;
+    border-radius: 4px;
+    border: 2px solid #555;
+    padding-left: 10px;
     width: 20px;
     height: 20px;
+    accent-color: #ff9800;
+    background: #232323;
+    align-self: flex-start;
     margin-top: 2px;
+}
+
+.permissions-checkboxes input[type="checkbox"]:checked {
+    background: #ff9800;
+    border-color: #ff9800;
 }
 
 /* Permission Title and Description */
 .permission-title {
     font-weight: 700;
     color: #dbdbdb;
-    font-size: 1.08rem;
+    font-size: 1rem;
     margin-bottom: 0;         /* Remove bottom margin */
     white-space: nowrap;      /* Prevent wrapping */
 }
@@ -482,24 +598,26 @@
     white-space: normal;
     flex: 1;                  /* Take remaining space */
 }
+/* Save button for permissions (header) visually matches cancel button */
 .btn-save-permissions {
     background: #ff9800;
     color: #232323;
     border: none;
-    padding: 12px 32px;
+    padding: 10px 22px;
     border-radius: 6px;
     font-weight: 700;
     cursor: pointer;
-    font-size: 1.1rem;
-    transition: background 0.2s, color 0.2s;
-    margin-top: 18px;
-    display: block;
     margin-left: auto;
+    margin-top: 0;
+    margin-bottom: 0;
+    transition: background 0.2s, color 0.2s;
+    display: inline-block;
+    vertical-align: middle;
 }
 .btn-save-permissions:hover {
     background: #ff6600;
     color: #fff;
-}
+}   
 .btn-edit-permissions {
     background: #ff9800;
     color: #232323;
@@ -516,4 +634,9 @@
 .btn-edit-permissions:hover {
     background: #ff6600;
     color: #fff;
+}
+.status-badge-edit:hover {
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    transition: background 0.2s;
 }

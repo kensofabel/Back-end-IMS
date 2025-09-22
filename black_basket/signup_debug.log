@@ -67,3 +67,24 @@ Array
 Array
 (
 )
+Array
+(
+)
+Array
+(
+    [full_name] => Owner Sample
+    [username] => owner
+    [email] => owner@sample.com
+    [password] => @wner321
+    [business_name] => Sample Basket
+    [ajax] => 1
+)
+Array
+(
+)
+Array
+(
+)
+Array
+(
+)

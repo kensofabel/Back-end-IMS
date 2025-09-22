@@ -1,4 +1,3 @@
-
 -- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
@@ -38,33 +37,9 @@ CREATE TABLE `audit_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `audit_logs`
---
-
-INSERT INTO `audit_logs` (`id`, `user_id`, `action`, `ip_address`, `user_agent`, `created_at`) VALUES
-(1, NULL, 'failed_login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:21:39'),
-(2, NULL, 'failed_login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:21:48'),
-(3, NULL, 'failed_login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:26:21'),
-(4, NULL, 'failed_login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:26:53'),
-(5, NULL, 'failed_login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:31:36'),
-(6, 1, 'login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:34:24'),
-(7, 1, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-16 21:34:33'),
-(8, 1, 'login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 09:29:30'),
-(9, 1, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 09:29:32'),
-(10, 1, 'login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 09:29:41'),
-(11, 1, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 09:29:43'),
-(12, NULL, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 09:37:10'),
-(13, NULL, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 09:40:33'),
-(14, NULL, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 10:05:18'),
-(15, 1, 'login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 10:11:00'),
-(16, 1, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 10:11:42'),
-(17, 1, 'login', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 12:40:41'),
-(18, 1, 'logout', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', '2025-09-17 12:40:47');
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `password_resets`
 --
 
 CREATE TABLE `password_resets` (
@@ -74,12 +49,10 @@ CREATE TABLE `password_resets` (
   `expires_at` datetime NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `password_resets`
---
 
-INSERT INTO `password_resets` (`id`, `user_id`, `token`, `expires_at`) VALUES
-(46, 1, '546e8f95af7a1984b8c4e8231abc5fa3792bba4ecc7bbed555dde86c12274a95', '2025-09-17 08:55:36');
+
+-- Before importing this SQL, run the following to remove invalid password_resets rows:
+-- DELETE FROM password_resets WHERE user_id NOT IN (SELECT id FROM users);
 
 -- --------------------------------------------------------
 
@@ -103,13 +76,14 @@ INSERT INTO `permissions` (`id`, `name`, `description`) VALUES
 (3, 'Add Products', 'Add new products to inventory'),
 (4, 'Edit Products', 'Edit existing products'),
 (5, 'Delete Products', 'Delete products from inventory'),
-(6, 'Sales Processing', 'Process sales transactions'),
-(7, 'View Sales Reports', 'Access sales reports'),
-(8, 'View Inventory Reports', 'Access inventory reports'),
+(6, 'POS', 'Process sales transactions'),
+(7, 'View Sales Report', 'Access sales reports'),
+(8, 'View Inventory Report', 'Access inventory reports'),
 (9, 'Manage Roles', 'Create and manage user roles'),
 (10, 'Set Permissions', 'Assign permissions to roles'),
 (11, 'Employee Management', 'Manage employee accounts'),
-(12, 'Audit Logs Access', 'View system audit logs');
+(12, 'Audit Logs Access', 'View system audit logs'),
+(13, 'Payment Report', 'Access payment reports');
 
 -- --------------------------------------------------------
 
@@ -117,27 +91,20 @@ INSERT INTO `permissions` (`id`, `name`, `description`) VALUES
 -- Table structure for table `roles`
 --
 
+
 CREATE TABLE `roles` (
   `id` int(11) NOT NULL,
   `owner_id` int(11) DEFAULT NULL,
   `name` varchar(50) NOT NULL,
-  `description` varchar(255) DEFAULT NULL
+  `description` varchar(255) DEFAULT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `roles`
 --
 
-INSERT INTO `roles` (`id`, `owner_id`, `name`, `description`) VALUES
-(1, 2, 'Owner', 'Full access to all features'),
-(2, 2, 'Admin', 'Admin role with elevated permissions'),
-(3, 2, 'Staff', 'Staff role with limited permissions'),
-(4, 3, 'Owner', 'Full access to all features'),
-(5, 3, 'Admin', 'Admin role with elevated permissions'),
-(6, 3, 'Staff', 'Staff role with limited permissions'),
-(7, 4, 'Owner', 'Full access to all features'),
-(8, 4, 'Admin', 'Admin role with elevated permissions'),
-(9, 4, 'Staff', 'Staff role with limited permissions');
+
 
 -- --------------------------------------------------------
 
@@ -154,88 +121,7 @@ CREATE TABLE `role_permissions` (
 -- Dumping data for table `role_permissions`
 --
 
-INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
-(1, 1),
-(1, 2),
-(1, 3),
-(1, 4),
-(1, 5),
-(1, 6),
-(1, 7),
-(1, 8),
-(1, 9),
-(1, 10),
-(1, 11),
-(1, 12),
-(2, 1),
-(2, 2),
-(2, 3),
-(2, 4),
-(2, 5),
-(2, 6),
-(2, 7),
-(2, 8),
-(2, 11),
-(3, 1),
-(3, 2),
-(3, 3),
-(3, 6),
-(3, 7),
-(3, 8),
-(4, 1),
-(4, 2),
-(4, 3),
-(4, 4),
-(4, 5),
-(4, 6),
-(4, 7),
-(4, 8),
-(4, 9),
-(4, 10),
-(4, 11),
-(4, 12),
-(5, 1),
-(5, 2),
-(5, 3),
-(5, 4),
-(5, 5),
-(5, 6),
-(5, 7),
-(5, 8),
-(5, 11),
-(6, 1),
-(6, 2),
-(6, 3),
-(6, 6),
-(6, 7),
-(6, 8),
-(7, 1),
-(7, 2),
-(7, 3),
-(7, 4),
-(7, 5),
-(7, 6),
-(7, 7),
-(7, 8),
-(7, 9),
-(7, 10),
-(7, 11),
-(7, 12),
-(8, 1),
-(8, 2),
-(8, 3),
-(8, 4),
-(8, 5),
-(8, 6),
-(8, 7),
-(8, 8),
-(8, 11),
-(9, 1),
-(9, 2),
-(9, 3),
-(9, 6),
-(9, 7),
-(9, 8);
+
 
 -- --------------------------------------------------------
 
@@ -247,6 +133,7 @@ CREATE TABLE `users` (
   `id` int(11) NOT NULL,
   `owner_id` int(11) DEFAULT NULL,
   `username` varchar(50) NOT NULL,
+  `full_name` varchar(100) DEFAULT NULL,
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
   `business_name` varchar(100) DEFAULT NULL,
@@ -256,11 +143,8 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `users`
---
 
-INSERT INTO `users` (`id`, `owner_id`, `username`, `email`, `password`, `business_name`, `status`, `created_at`, `updated_at`) VALUES
-(1, NULL, 'owner', 'kenny.fabellon@gmail.com', '$2y$10$9oJVyek.aNtP6/HPbIbnpORr.bufmQbPcL/S07zmWtSTqCGSbjqPu', 'TakeIt', 'active', '2025-09-16 17:16:15', '2025-09-17 13:53:53');
+
 
 -- --------------------------------------------------------
 
