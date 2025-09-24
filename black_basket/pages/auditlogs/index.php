@@ -19,6 +19,7 @@ $result = $conn->query($sql);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Management System</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="auditlogs.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
 </head>
@@ -53,6 +54,9 @@ $result = $conn->query($sql);
                             <button class="btn btn-secondary" onclick="exportAuditLogs()">
                                 <i class="fas fa-download"></i> Export
                             </button>
+                            <button class="btn btn-secondary" type="button" onclick="resetAuditLogFilters()">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
                         </div>
                         <div class="audit-logs-table-container">
                             <table class="audit-logs-table">
@@ -66,25 +70,22 @@ $result = $conn->query($sql);
                                     </tr>
                                 </thead>
                                 <tbody id="audit-logs-table-body">
-                                    <?php if ($result && $result->num_rows > 0): ?>
-                                        <?php while($row = $result->fetch_assoc()): ?>
-                                            <tr>
-                                                <td><?= htmlspecialchars($row['created_at']) ?></td>
-                                                <td><?= htmlspecialchars($row['username'] ?? 'Unknown') ?></td>
-                                                <td><?= htmlspecialchars($row['action']) ?></td>
-                                                <td><?= htmlspecialchars($row['details'] ?? '') ?></td>
-                                                <td><?= htmlspecialchars($row['ip_address']) ?></td>
-                                            </tr>
-                                        <?php endwhile; ?>
-                                    <?php else: ?>
-                                        <tr><td colspan="5">No audit logs found.</td></tr>
-                                    <?php endif; ?>
+                                    <!-- Realtime audit logs will be loaded here by JS -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </section>
             </div>
-
+    <script src="auditlogs.js"></script>
+    <script>
+    function resetAuditLogFilters() {
+        document.getElementById('audit-log-filter').value = 'all';
+        document.getElementById('audit-log-date-from').value = '';
+        document.getElementById('audit-log-date-to').value = '';
+        document.getElementById('search-audit-logs').value = '';
+        if (typeof filterAuditLogs === 'function') filterAuditLogs();
+    }
+    </script>
 </body>
 </html>

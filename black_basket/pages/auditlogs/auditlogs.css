@@ -1,0 +1,161 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.auditlogs-container {
+    max-width: 1100px;
+    margin: 48px auto;
+    background: #232323;
+    padding: 36px 44px 32px 44px;
+    border-radius: 18px;
+    box-shadow: 0 6px 32px rgba(0,0,0,0.10);
+    position: relative;
+}
+
+.auditlogs-container h1, .auditlogs-container h2 {
+    text-align: center;
+    margin-bottom: 32px;
+    color: #ff9800;
+    letter-spacing: 1px;
+    font-weight: 700;
+}
+
+/* Filter/Search Bar Styling */
+.audit-logs-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 22px;
+    justify-content: center;
+    align-items: center;
+}
+
+.audit-logs-filters select,
+.audit-logs-filters input[type="date"],
+.audit-logs-filters input[type="text"] {
+    padding: 7px 12px;
+    border: 1.5px solid #333;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: #181818;
+    color: #fff;
+    transition: border 0.2s;
+}
+.audit-logs-filters select:focus,
+.audit-logs-filters input:focus {
+    border: 1.5px solid #ff9800;
+    outline: none;
+}
+.audit-logs-filters button {
+    padding: 7px 18px;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+.audit-logs-filters button.btn-secondary {
+    background: #232323;
+    color: #ff9800;
+    border: 1px solid #ff9800;
+}
+.audit-logs-filters button:hover {
+    background: linear-gradient(135deg, #e68900 0%, #e64100 100%);
+}
+
+/* Table Styling */
+
+.audit-logs-table-container {
+    overflow-x: auto;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.18);
+    background: #232323;
+}
+.audit-logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #232323;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-top: 0;
+}
+.audit-logs-table th, .audit-logs-table td {
+    border-bottom: 1px solid #333;
+    padding: 15px 10px;
+    text-align: left;
+    font-size: 1rem;
+}
+.audit-logs-table th {
+    background: #181818;
+    color: #ff9800;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border: none;
+}
+.audit-logs-table tr:nth-child(even) td {
+    background: #181818;
+}
+.audit-logs-table tr:hover td {
+    background: #2a2a2a;
+    transition: background 0.2s;
+}
+.audit-logs-table td {
+    color: #fff;
+    vertical-align: middle;
+}
+.audit-logs-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Custom select styling */
+.audit-logs-filters select {
+    overflow-y: auto !important;
+    max-height: 40px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background: #181818;
+    color: #fff;
+    padding-right: 28px;
+    scrollbar-width: thin;
+    scrollbar-color: #ff9800 #232323;
+}
+
+.audit-logs-filters select::-webkit-scrollbar {
+    width: 8px;
+    background: #232323;
+}
+.audit-logs-filters select::-webkit-scrollbar-thumb {
+    background: #ff9800;
+    border-radius: 6px;
+}
+.audit-logs-filters select::-webkit-scrollbar-thumb:hover {
+    background: #ff5722;
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+    .auditlogs-container {
+        padding: 12px 2vw;
+    }
+    .audit-logs-table th, .audit-logs-table td {
+        font-size: 0.95rem;
+        padding: 8px 4px;
+    }
+    .audit-logs-filters {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .audit-logs-table-container {
+        border-radius: 8px;
+    }
+}
