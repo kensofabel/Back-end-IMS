@@ -471,15 +471,29 @@ function attachRoleTabHandlers() {
                     .then(res => res.json())
                     .then(data => {
                         if (data.success && data.role_id) {
+                            // Get all permission IDs from the current page
+                            const allPermissionIds = [];
+                            document.querySelectorAll('input[type="checkbox"][name="permissions[]"]').forEach(checkbox => {
+                                allPermissionIds.push(parseInt(checkbox.value));
+                            });
+                            
                             // Immediately assign all permissions to this new role in the DB
                             fetch('update_role_permissions.php', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ role_id: parseInt(data.role_id), permission_ids: 'ALL' })
+                                body: JSON.stringify({ role_id: parseInt(data.role_id), permission_ids: allPermissionIds })
                             })
-                            .then(() => {
-                                // Reload the page after successful add and permission assignment
-                                window.location.reload();
+                            .then(res => res.json())
+                            .then(permData => {
+                                if (permData.success) {
+                                    // Reload the page after successful add and permission assignment
+                                    window.location.reload();
+                                } else {
+                                    alert('Role added but failed to assign permissions: ' + (permData.message || 'Unknown error'));
+                                }
+                            })
+                            .catch(error => {
+                                alert('Role added but failed to assign permissions: ' + error.message);
                             });
                         } else {
                             alert(data.message || 'Failed to add role.');

@@ -171,7 +171,7 @@ body.edit-permissions-mode .permission-card:hover {
     border-radius: 6px 6px 0 0;
     background-color: #232323;
     transition: all 0.3s;
-    font-weight: 400;
+    font-weight: 400px;
 }
 .tab.first-child {
 	margin-left: 10px;

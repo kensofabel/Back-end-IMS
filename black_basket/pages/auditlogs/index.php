@@ -31,11 +31,14 @@ $result = $conn->query($sql);
                     <!-- Audit Logs Section -->
                 <section id="audit-logs-section" class="section active">
                     <div class="section-header">
-                        <h2>Audit Logs</h2>
-                        <div class="search-box">
-                            <input type="text" id="search-audit-logs" placeholder="Search audit logs...">
-                            <i class="fas fa-search"></i>
-                        </div>
+                        <h2 class="header-title">
+                            Audit Logs
+                            <span class="header-breadcrumb">
+                                |
+                                <i class="fas fa-history"></i>
+                                - Audit Logs
+                            </span>
+                        </h2>
                     </div>
                     <div class="audit-logs-content">
                         <div class="audit-logs-filters">

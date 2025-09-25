@@ -89,4 +89,88 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initial fetch
     fetchInventory();
+
+    // Modal logic
+    const modal = document.getElementById('productModal');
+    const addBtn = document.getElementById('addProductBtn');
+    const closeModal = document.getElementById('closeModal');
+    const cancelBtn = document.getElementById('cancelBtn');
+    addBtn.onclick = function() {
+        modal.style.display = 'flex';
+        document.getElementById('modalTitle').innerText = 'Add Product';
+        document.getElementById('add-product-form').reset();
+        document.getElementById('variantRow').style.display = 'none';
+    };
+    closeModal.onclick = cancelBtn.onclick = function() {
+        modal.style.display = 'none';
+    };
+    window.onclick = function(e) {
+        if (e.target === modal) modal.style.display = 'none';
+    };
+    window.onkeydown = function(e) {
+        if (e.key === 'Escape') modal.style.display = 'none';
+    };
+
+    // Composite product logic (as before)
+    const productType = document.getElementById('productType');
+    const variantRow = document.getElementById('variantRow');
+    const addComponentBtn = document.getElementById('addComponentBtn');
+    const componentsList = document.getElementById('componentsList');
+    let inventoryItems = [
+        { id: 1, name: 'Coke Syrup' },
+        { id: 2, name: 'Cup' },
+        { id: 3, name: 'Ice' },
+        { id: 4, name: 'Sprite Syrup' }
+    ];
+    let components = [];
+    productType.onchange = function() {
+        if (productType.value === 'product') {
+            variantRow.style.display = 'flex';
+        } else {
+            variantRow.style.display = 'none';
+            components = [];
+            renderComponents();
+        }
+    };
+    addComponentBtn.onclick = function() {
+        components.push({ itemId: '', qty: 1 });
+        renderComponents();
+    };
+    function renderComponents() {
+        componentsList.innerHTML = '';
+        components.forEach((comp, idx) => {
+            const div = document.createElement('div');
+            div.style.display = 'flex';
+            div.style.gap = '8px';
+            div.style.marginBottom = '6px';
+            div.innerHTML = `
+                <select class="component-item" data-idx="${idx}" style="flex:2;">
+                    <option value="">Select Item</option>
+                    ${inventoryItems.map(item => `<option value="${item.id}" ${comp.itemId==item.id?"selected":""}>${item.name}</option>`).join('')}
+                </select>
+                <input type="number" class="component-qty" data-idx="${idx}" min="1" value="${comp.qty}" style="width:60px;">
+                <button type="button" class="btn btn-secondary removeComponentBtn" data-idx="${idx}">Remove</button>
+            `;
+            componentsList.appendChild(div);
+        });
+        document.querySelectorAll('.removeComponentBtn').forEach(btn => {
+            btn.onclick = function() {
+                const idx = +btn.getAttribute('data-idx');
+                components.splice(idx, 1);
+                renderComponents();
+            };
+        });
+        document.querySelectorAll('.component-item').forEach(sel => {
+            sel.onchange = function() {
+                const idx = +sel.getAttribute('data-idx');
+                components[idx].itemId = sel.value;
+            };
+        });
+        document.querySelectorAll('.component-qty').forEach(input => {
+            input.oninput = function() {
+                const idx = +input.getAttribute('data-idx');
+                components[idx].qty = input.value;
+            };
+        });
+    }
 });

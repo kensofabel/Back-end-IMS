@@ -6,8 +6,10 @@ if (!isset($_SESSION['user_id'])) {
 }
 require_once '../../config/db.php';
 
+// Set proper content type for JSON response
+header('Content-Type: application/json');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    session_start();
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     // Use session owner_id if available, otherwise use user_id
@@ -39,7 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $values[] = "($id, {$perm['id']})";
             }
             if (!empty($values)) {
-                $conn->query("INSERT INTO role_permissions (role_id, permission_id) VALUES " . implode(',', $values));
+                $permResult = $conn->query("INSERT INTO role_permissions (role_id, permission_id) VALUES " . implode(',', $values));
+                if (!$permResult) {
+                    // Log the error but don't fail the role creation
+                    error_log("Failed to assign permissions to role $id: " . $conn->error);
+                }
             }
         }
         echo json_encode(['success' => true, 'role_id' => $id, 'name' => $name, 'description' => $description, 'owner_id' => $owner_id]);

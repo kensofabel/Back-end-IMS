@@ -6,8 +6,15 @@
     justify-content: center;
 }
 
+
+/*Header Styles */
+.section-header {
+    margin-bottom: 10px;
+    text-align: center;
+}
+
 /* Access Rights Header Styles */
-.access-header-title {
+.header-title {
 	display: flex;
 	align-items: center;
 	gap: 1rem;
@@ -17,7 +24,7 @@
 	transition: color 0.2s;
 }
 
-.access-header-breadcrumb {
+.header-breadcrumb {
 	color: #7c7c8a;
 	font-size: 1rem;
 	font-weight: 400;
@@ -26,11 +33,25 @@
 	gap: 0.5rem;
 	transition: color 0.2s;
 }
-.access-header-breadcrumb .fas {
+.header-breadcrumb .fas {
 	color: #7c7c8a;
 	transition: color 0.2s;
 }
-.access-header-breadcrumb:hover,
-.access-header-breadcrumb:hover .fas {
+.header-breadcrumb:hover,
+.header-breadcrumb:hover .fas {
 	color: #ff9800;
 }
+
+/*
+<div class="section-header">
+                        <h2 class="header-title">
+                            Audit Logs
+                            <span class="header-breadcrumb">
+                                |
+                                <i class="fas fa-history"></i>
+                                - Audit Logs
+                            </span>
+                        </h2>
+                    </div>
+
+					*/

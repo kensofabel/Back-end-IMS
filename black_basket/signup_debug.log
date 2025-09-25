@@ -88,3 +88,15 @@ Array
 Array
 (
 )
+Array
+(
+)
+Array
+(
+    [full_name] => Owner Sample
+    [username] => owner
+    [email] => owner@example.com
+    [password] => @wner321
+    [business_name] => @wner321
+    [ajax] => 1
+)

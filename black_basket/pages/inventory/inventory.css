@@ -1,0 +1,198 @@
+/* Inventory Page Custom Styles */
+
+/* Add Product Button Custom Padding */
+#addProductBtn {
+    padding: 10px 22px !important;
+}
+
+/* Tab Info Actions Layout */
+#tab-info-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 25px;
+    margin-bottom: 12px;
+}
+
+/* Dropdown Styling */
+#categoryFilter,
+#stockAlert {
+    padding: 8px 12px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #232323;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* Search Bar Toggle Functionality */
+.search-controls {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.search-icon-btn {
+    padding: 12px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #232323;
+    color: #ff9800;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    display: none; /* Hidden on desktop by default */
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+}
+
+.search-icon-btn:hover {
+    background: #333;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Desktop: Always show search box, hide search icon */
+.search-controls .search-box {
+    display: block;
+    position: relative;
+}
+
+/* Fix search icon positioning inside search bar */
+.search-controls .search-box i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ff9800;
+    pointer-events: none;
+}
+
+/* Remove white highlight border from search input */
+.search-controls .search-box input {
+    outline: none;
+    box-shadow: none;
+}
+
+.search-controls .search-box input:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: #333;
+}
+
+/* Mobile/Small Device Functionality */
+@media (max-width: 768px) {
+    /* Mobile layout: Search icon on rightmost side */
+    .inventory-controls {
+        flex-direction: row-reverse !important;
+        flex-wrap: nowrap !important; /* Prevent wrapping */
+        align-items: center;
+    }
+    
+    .search-controls {
+        order: 1; /* Search controls on the right */
+        flex-shrink: 0; /* Prevent shrinking */
+    }
+    
+    .filter-controls {
+        order: 2; /* Filter controls on the left */
+        flex: 1; /* Take remaining space */
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 5px; /* Reduce gap on mobile */
+        overflow-x: auto; /* Allow horizontal scrolling if needed */
+    }
+    
+    /* Mobile dropdown adjustments */
+    .filter-controls select {
+        min-width: 80px; /* Minimum width for readability */
+        max-width: 120px; /* Maximum width to fit more dropdowns */
+        font-size: 12px; /* Smaller font for mobile */
+    }
+    
+    /* Show search icon, hide search box by default on mobile */
+    .search-icon-btn {
+        display: flex;
+        flex-shrink: 0; /* Don't allow shrinking */
+    }
+    
+    .search-controls.collapsed .search-box {
+        display: none;
+    }
+    
+    .search-controls.expanded .search-icon-btn {
+        display: none;
+    }
+    
+    /* When search is expanded, keep it inline with dropdowns */
+    .search-controls.expanded {
+        flex: 1; /* Take available space */
+        max-width: 60%; /* Don't take full width */
+    }
+    
+    .search-controls.expanded .search-box {
+        display: block;
+        width: 100%;
+    }
+    
+    .search-controls.expanded .search-box input {
+        width: 100%;
+        font-size: 14px; /* Readable font size */
+    }
+    
+    /* Keep filter controls visible and inline when search expanded */
+    .search-controls.expanded ~ .filter-controls {
+        display: flex !important;
+        flex: 1;
+        max-width: 40%; /* Remaining space */
+    }
+}
+
+/* Single Toggle Button */
+.single-toggle-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.single-toggle-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+/* Toggle Button States - Orange, Yellow, Gray */
+.single-toggle-btn[data-current="all"] {
+    background: #ff9800;
+    color: #fff;
+    border-color: #ff9800;
+}
+
+.single-toggle-btn[data-current="pos"] {
+    background: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+}
+
+.single-toggle-btn[data-current="stock"] {
+    background: #6c757d;
+    color: #fff;
+    border-color: #6c757d;
+}
