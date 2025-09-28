@@ -71,11 +71,11 @@ if (isset($_COOKIE['access_tab']) && in_array($_COOKIE['access_tab'], ['manage-r
     <?php include '../../partials/navigation.php'; ?>
     <?php include '../../partials/header.php'; ?>
 
-    <div class="content-area access-content-area">
+    <div class="content-area accounts-content-area">
         <div class="section-header">
-            <h2 class="access-header-title">
+            <h2 class="accounts-header-title">
                 Access Rights
-                <span class="access-header-breadcrumb">
+                <span class="accounts-header-breadcrumb">
                     |
                     <i class="fas fa-users-cog"></i>
                     - Access Rights
@@ -169,7 +169,7 @@ if (isset($_COOKIE['access_tab']) && in_array($_COOKIE['access_tab'], ['manage-r
         </div>
 
         <!-- Set Permissions Tab -->
-    <div class="tab-content" id="content-set-permissions" style="<?php if ($active_tab !== 'set-permissions') echo 'display:none;'; ?>">
+        <div class="tab-content" id="content-set-permissions" style="<?php if ($active_tab !== 'set-permissions') echo 'display:none;'; ?>">
             <div class="permissions-list">
                 <?php if (count($roles) > 0): ?>
                     <?php foreach ($roles as $role): ?>

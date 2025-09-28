@@ -21,11 +21,11 @@ if (!isset($_SESSION['user_id'])) {
 <body>
     <?php include '../../partials/navigation.php'; ?>
     <?php include '../../partials/header.php'; ?>
-    <div class="content-area access-content-area">
+    <div class="content-area accounts-content-area">
         <div class="section-header">
-            <h2 class="access-header-title">
+            <h2 class="accounts-header-title">
                 Inventory
-                <span class="access-header-breadcrumb">
+                <span class="accounts-header-breadcrumb">
                     |
                     <i class="fas fa-boxes"></i>
                     - Inventory
@@ -106,57 +106,118 @@ if (!isset($_SESSION['user_id'])) {
                         </tbody>
                     </table>
                 </div>
-            </section>
-        </div>
-        <!-- Add Product Modal (Composite Product Example) -->
-<div class="modal" id="productModal">
-    <div class="modal-content">
+    <!-- Close main content area -->
+    </div>
+
+<!-- Scanner/Manual Modal (moved outside content area) -->
+<div class="modal" id="scannerModal">
+    <div class="modal-content scanner-modal">
         <div class="modal-header">
-            <h2 id="modalTitle">Add Item</h2>
-            <span class="close" id="closeModal">&times;</span>
+            <h2>Add Item</h2>
+            <!-- Tab Style Navigation -->
+            <button class="scanner-tab active" id="scanTab">SCAN</button>
+            <button class="scanner-tab" id="manualTab">MANUAL</button>
+            <span class="close" id="closeScanner">&times;</span>
         </div>
         <div class="modal-body">
-            <form id="add-product-form" autocomplete="off">
-                <input type="hidden" id="productId" name="id">
-                <div class="form-row">
+            
+            <!-- Scanner Mode -->
+            <div id="scannerMode" class="mode-content">
+                <!-- Camera Scanner -->
+                <div id="cameraScanner" class="scanner-section">
+                    <div class="camera-container">
+                        <video id="cameraVideo" autoplay playsinline></video>
+                        <div class="scanner-overlay">
+                            <div class="scanner-line"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hardware Scanner -->
+                <div id="hardwareScanner" class="scanner-section" style="display:none;">
+                    <div class="loading-container">
+                        <div class="loading-spinner"></div>
+                        <h3>SCANNING VIA SCANNER...</h3>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Manual Mode -->
+            <div id="manualMode" class="mode-content" style="display:none;">
+                <div class="manual-form">
+                    <div class="form-description">
+                        <p>Enter the product's barcode or SKU to identify the item you want to add to inventory.</p>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="enableBarcode" class="field-checkbox">
+                        <input type="text" id="manualBarcode" required>
+                        <label for="manualBarcode">Barcode</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="enableSKU" class="field-checkbox">
+                        <input type="text" id="manualSKU" required>
+                        <label for="manualSKU">SKU</label>
+                    </div>
+                    <button class="btn btn-primary" id="nextBtn">Next</button>
+                </div>
+            </div>
+
+            
+            <!-- Product Form Mode -->
+            <div id="formMode" class="mode-content" style="display:none;">
+                <div class="form-header">
+                    <button class="go-back-btn" id="goBackBtn">
+                        <i class="fas fa-arrow-left"></i> Go Back
+                    </button>
+                </div>
+                <div class="product-form">
                     <div class="form-group">
-                        <label for="productName">Item Name</label>
-                        <input type="text" id="productName" name="name" required>
+                        <input type="text" id="productName" required>
+                        <label for="productName">Name</label>
                     </div>
                     <div class="form-group">
-                        <label for="productType">Type</label>
-                        <select id="productType" name="type" required>
-                            <option value="product">Product (for sale)</option>
-                            <option value="item">Inventory Item (stockable)</option>
+                        <select id="productCategory" required>
+                            <option value="">Select Category</option>
+                            <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                            <option value="Dairy & Eggs">Dairy & Eggs</option>
+                            <option value="Meat & Poultry">Meat & Poultry</option>
+                            <option value="Bakery">Bakery</option>
+                            <option value="Beverages">Beverages</option>
+                            <option value="Snacks">Snacks</option>
+                            <option value="Frozen Foods">Frozen Foods</option>
+                            <option value="Household">Household</option>
                         </select>
+                        <label for="productCategory">Category</label>
                     </div>
-                </div>
-                <div class="form-row" id="variantRow" style="display:none;">
-                    <div class="form-group" style="flex:2;">
-                        <label>Components / Variants</label>
-                        <div id="componentsList"></div>
-                        <button type="button" id="addComponentBtn" class="btn btn-secondary" style="margin-top:8px;">Add Component</button>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="trackStock" class="field-checkbox">
+                        <label for="trackStock" class="checkbox-label">Track Stock</label>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="productStock">Quantity</label>
-                        <input type="number" id="productStock" name="stock" min="0" required>
+                    <div id="stockSection" class="stock-section" style="display:none;">
+                        <div class="form-group">
+                            <input type="number" id="inStock" min="0">
+                            <label for="inStock">In Stock</label>
+                        </div>
+                        <div class="form-group">
+                            <input type="number" id="lowStock" min="0">
+                            <label for="lowStock">Low Stock Alert</label>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="productPrice">Price</label>
-                        <input type="number" id="productPrice" name="price" min="0" step="0.01" required>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="availableInPOS" class="field-checkbox">
+                        <label for="availableInPOS" class="checkbox-label">Available in POS</label>
                     </div>
+                    <button class="btn btn-primary" id="saveProductBtn">Save Product</button>
                 </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="saveProductBtn">Save</button>
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-                </div>
-            </form>
+            </div>
+            
+            <!-- Skip Option -->
+            <div class="skip-section">
+                <button class="skip-btn" id="skipBtn">Skip for now</button>
+            </div>
         </div>
     </div>
-        </div>
-    </div>
+</div>
 
 <script>
 function showInventoryTab(tab) {

@@ -22,7 +22,7 @@ if (!isset($_SESSION['user_id'])) {
     <?php include '../../partials/navigation.php'; ?>
     <?php include '../../partials/header.php'; ?>
 
-     <div class="content-area accounts-content-area">
+    <div class="content-area accounts-content-area">
             <div class="section-header">
                 <h2 class="accounts-header-title">
                     Accounts

@@ -1,21 +1,23 @@
 .modal {
     display: none;
-    position: fixed;
-    z-index: 9999;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.55);
+    position: fixed !important;
+    z-index: 9999 !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0,0,0,0.7) !important;
     animation: fadeIn 0.3s;
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
     }
     .modal.show {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
 /* Always stack action buttons vertically and keep them together */
@@ -660,7 +662,7 @@ body.edit-permissions-mode .permission-card:hover {
     transition: background 0.2s;
 }
 /* Add Employee Modal Styling - Adopts Login Container Style */
-.modal {
+.modal.show {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -689,17 +691,16 @@ body.edit-permissions-mode .permission-card:hover {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 10px;
-    border-bottom: 1px solid #3f3f3f;
     padding-bottom: 8px;
 }
 .modal-header h2 {
     color: #ff9800;
-    font-size: 1.4rem;
+    font-size: 1rem;
     font-weight: 700;
     margin: 0;
 }
 .modal-header .close {
-    font-size: 1.8rem;
+    font-size: 1rem;
     color: #dbdbdb;
     cursor: pointer;
     transition: color 0.2s;

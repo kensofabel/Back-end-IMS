@@ -1,38 +1,3 @@
-/*Header Styles */
-.section-header {
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-/* Access Rights Header Styles */
-.header-title {
-	display: flex;
-	align-items: center;
-	gap: 1rem;
-	font-size: 2rem;
-	color: #ff9800;
-	margin-bottom: 0;
-	transition: color 0.2s;
-}
-
-.header-breadcrumb {
-	color: #7c7c8a;
-	font-size: 1rem;
-	font-weight: 400;
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	transition: color 0.2s;
-}
-.header-breadcrumb .fas {
-	color: #7c7c8a;
-	transition: color 0.2s;
-}
-.header-breadcrumb:hover,
-.header-breadcrumb:hover .fas {
-	color: #ff9800;
-}
-
 /* Larger Change Password Popup */
 #changePasswordPopup .profile-popup-content {
     min-width: 420px !important;

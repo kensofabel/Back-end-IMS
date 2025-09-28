@@ -1,5 +1,3 @@
-/* Inventory Page Custom Styles */
-
 /* Add Product Button Custom Padding */
 #addProductBtn {
     padding: 10px 22px !important;
@@ -168,7 +166,7 @@
     transition: all 0.2s ease;
     font-size: 14px;
     font-weight: 500;
-    display: flex;
+    display: center;
     align-items: center;
     gap: 6px;
 }
@@ -195,4 +193,632 @@
     background: #6c757d;
     color: #fff;
     border-color: #6c757d;
+}
+
+/* Scanner Modal Styles - Match Profile Popup Spacing */
+.scanner-modal {
+    max-width: 350px !important;
+    width: 100% !important;
+    background: #232323 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important;
+    position: relative !important;
+    padding: 36px 50px 28px 50px !important;
+    text-align: center !important;
+}
+
+/* Form Mode Modal - Keep same padding as regular modal */
+.scanner-modal.form-mode {
+    padding: 36px 50px 28px 50px !important;
+}
+
+/* Form Mode Modal Body - Same as regular modal body */
+.scanner-modal.form-mode .modal-body {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto;
+}
+
+/* Hide modal header in form mode */
+.scanner-modal.form-mode .modal-header {
+    display: none !important;
+}
+
+.scanner-modal .modal-body {
+    position: relative;
+    padding: 0 !important;
+    text-align: center;
+}
+
+/* Scanner Modal Header - Tab Style Layout */
+.scanner-modal .modal-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-bottom: 0 !important;
+    border: none !important;
+    position: relative !important;
+    gap: 45px !important;
+    margin-bottom: -20px !important;
+}
+
+/* Hide the h2 title since we're using tabs */
+.scanner-modal .modal-header h2 {
+    display: none !important;
+}
+
+/* Scanner Modal Close Button - Position at very right side */
+.scanner-modal .modal-header .close {
+    user-select: none;
+    position: absolute !important;
+    top: -24px !important;
+    right: -30px !important;
+    font-size: 1.5rem !important;
+    font-weight: 400 !important;
+    color: #dbdbdb !important;
+    cursor: pointer !important;
+    transition: color 0.2s !important;
+    z-index: 10 !important;
+}
+
+.scanner-modal .modal-header .close:hover {
+    color: #ff9800 !important;
+}
+
+/* Tab Style Buttons - Previous Button Style */
+.scanner-tab {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 70px;
+    justify-content: center;
+    user-select: none;
+    position: relative;
+    z-index: 10;
+}
+
+.scanner-tab.active {
+    background: #ff9800;
+    color: #232323;
+    transform: scale(1.05);
+}
+
+.scanner-tab:not(.active) {
+    background: #333;
+    color: #dbdbdb;
+}
+
+.scanner-tab:hover {
+    background: #ff6600;
+    color: #232323;
+    transform: scale(1.05);
+}
+
+/* Mode Content */
+.mode-content {
+    min-height: 350px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Form Mode Content - Same as other modes */
+#formMode.mode-content {
+    min-height: 350px;
+    height: auto;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+}
+
+/* Camera Scanner */
+.camera-container {
+    position: relative;
+    width: 100%;
+    max-width: 350px;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+#cameraVideo {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid #ff9800;
+    border-radius: 12px;
+}
+
+.scanner-line {
+    position: absolute;
+    top: 50%;
+    left: 20px;
+    right: 20px;
+    height: 2px;
+    background: #ff9800;
+    animation: scanMove 2s ease-in-out infinite;
+    box-shadow: 0 0 10px #ff9800;
+}
+
+@keyframes scanMove {
+    0%, 100% { transform: translateY(-60px); opacity: 0.7; }
+    50% { transform: translateY(60px); opacity: 1; }
+}
+
+/* Hardware Scanner */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #dbdbdb;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #333;
+    border-top: 4px solid #ff9800;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-container h3 {
+    color: #ff9800;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Manual Mode */
+.manual-form {
+    width: 100%;
+    max-width: 300px;
+}
+
+.manual-form .form-description {
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.manual-form .form-description p {
+    color: #dbdbdb;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.manual-form .form-group {
+    user-select: none;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.manual-form .form-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+/* Disable ALL transitions for inputs and labels */
+#scannerModal .manual-form input,
+#scannerModal .manual-form label,
+#scannerModal .manual-form *,
+#scannerModal input,
+#scannerModal label {
+    animation: none !important;
+}
+
+.manual-form input {
+    width: 100%;
+    padding: 17px 5px 5px;
+    border: 0.5px solid #7a7a7a;
+    border-radius: 3px;
+    background: transparent;
+    color: #fff;
+    font-size: 16px;
+    outline: none;
+}
+
+.manual-form input:focus {
+    border-color: #ff9800;
+}
+
+.manual-form label {
+    position: absolute;
+    top: 18px;
+    left: 8px;
+    color: #dbdbdb;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+.manual-form input::placeholder {
+    color: transparent;
+}
+
+/* Input states for checkbox functionality */
+.manual-form input.input-disabled {
+    pointer-events: none;
+    user-select: none;
+    background: #1a1a1a !important;
+    border-color: #444 !important;
+    color: transparent !important;
+    cursor: not-allowed !important;
+    text-shadow: none !important;
+}
+
+.manual-form input.input-disabled + label {
+    pointer-events: none;
+    user-select: none;
+    color: #666 !important;
+}
+
+.manual-form input.input-enabled {
+    background: transparent !important;
+    border-color: #7a7a7a !important;
+    color: #fff !important;
+    cursor: text !important;
+}
+
+.manual-form input.input-enabled + label {
+    color: #dbdbdb !important;
+}
+
+/* Checkbox Group Styling */
+.manual-form .checkbox-group {
+    position: relative;
+    margin-bottom: 20px;
+    margin-left: 30px;
+}
+
+.manual-form .field-checkbox {
+    position: absolute;
+    left: -30px;
+    top: 8px;
+    width: 22px !important;
+    height: 20px !important;
+    padding: 0 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 4px !important;
+    border: 2px solid #555 !important;
+    background: #232323 !important;
+    cursor: pointer !important;
+    z-index: 5 !important;
+    margin: 0 !important;
+    outline: none !important;
+}
+
+.manual-form .field-checkbox:checked {
+    background: #ff9800 !important;
+    border-color: #ff9800 !important;
+}
+
+.manual-form .field-checkbox:checked::after {
+    content: '✓' !important;
+    display: block !important;
+    color: #232323 !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    position: absolute !important;
+    left: 40% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    pointer-events: none !important;
+    line-height: 1 !important;
+}
+
+.manual-form .field-checkbox:hover {
+    border-color: #777 !important;
+}
+
+.manual-form .field-checkbox:focus {
+    outline: none !important;
+    border-color: #ff9800 !important;
+}
+
+#nextBtn {
+    user-select: none;
+    width: 100%;
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+#nextBtn:hover {
+    background: #ff6600;
+    transform: translateY(-1px);
+}
+
+/* Skip Section */
+.skip-section {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.skip-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+}
+
+.skip-btn:hover {
+    color: #fff;
+}
+
+/* Product Form Styles - Same as Manual Form */
+.product-form {
+    box-shadow: none;
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    display: block;
+    margin: 0;
+    padding: 0;
+}
+
+.product-form .form-group {
+    user-select: none;
+    position: relative;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.product-form input[type="text"],
+.product-form input[type="number"],
+.product-form select {
+    width: 100%;
+    padding: 17px 5px 5px !important;
+    border: 0.5px solid #7a7a7a !important;
+    border-radius: 3px !important;
+    background-color: transparent !important;
+    text-indent: 4px;
+    font-size: 12px;
+    font-weight: 100 !important;
+    color: #ffffff !important;
+    transition: all 0.1s ease-in-out;
+    outline: none;
+    min-height: 0;
+    height: 38px;
+    box-sizing: border-box;
+}
+
+.product-form input[type="text"]:focus,
+.product-form input[type="number"]:focus,
+.product-form select:focus {
+    outline: none;
+    border: 0.5px solid #dbdbdb !important;
+    background-color: transparent;
+}
+
+.product-form input[type="text"]:focus + label,
+.product-form input[type="text"]:valid + label,
+.product-form input[type="number"]:focus + label,
+.product-form input[type="number"]:valid + label,
+.product-form select:focus + label,
+.product-form select:valid + label {
+    top: 9px;
+    left: 8px;
+    font-size: 10px;
+    color: #d6d6d6;
+    transform: translateY(-4px);
+    background-color: transparent;
+    padding: 0 2px;
+}
+
+.product-form label:not(.checkbox-label):not(.radio-option) {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+    color: #dbdbdb !important;
+    font-size: 12px;
+    font-weight: 100 !important;
+    pointer-events: none;
+    transition: all 0.1s ease-in-out;
+    background-color: transparent;
+}
+
+.product-form select {
+    padding-top: 20px;
+}
+
+/* Checkbox for Available in POS */
+.product-form .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 0;
+}
+
+.product-form .checkbox-label {
+    color: #dbdbdb;
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.product-form .field-checkbox {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 18px !important;
+    height: 18px !important;
+    margin: 0 !important;
+    margin-right: 8px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 3px !important;
+    border: 2px solid #555 !important;
+    background: #232323 !important;
+    cursor: pointer !important;
+    outline: none !important;
+    flex-shrink: 0;
+}
+
+.product-form .field-checkbox:checked {
+    background: #ff9800 !important;
+    border-color: #ff9800 !important;
+}
+
+.product-form .field-checkbox:checked::after {
+    content: '✓' !important;
+    display: block !important;
+    color: white !important;
+    font-size: 12px !important;
+    text-align: center !important;
+    line-height: 14px !important;
+}
+
+/* Stock Section */
+.stock-section {
+    margin-top: 15px;
+    padding: 15px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background: #1a1a1a;
+}
+
+.section-label {
+    display: block;
+    color: #ff9800;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: #dbdbdb;
+    font-size: 14px;
+    user-select: none;
+}
+
+.radio-option input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #ff9800;
+    cursor: pointer;
+}
+
+.radio-text {
+    cursor: pointer;
+}
+
+#saveProductBtn {
+    user-select: none;
+    width: 100%;
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+#saveProductBtn:hover {
+    background: #ff6600;
+    transform: translateY(-1px);
+}
+
+/* Form Header with Go Back Button */
+.form-header {
+    margin-bottom: 20px;
+}
+
+.go-back-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Add Product Page Styles */
+.add-product-container .go-back-btn {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.go-back-btn:hover {
+    color: #fff;
+}
+
+.add-product-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.add-product-container .product-form {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
 }
