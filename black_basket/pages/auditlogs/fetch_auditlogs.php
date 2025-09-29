@@ -1,13 +1,27 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    exit('Unauthorized');
+}
+
+try {
+    include '../../config/db.php';
+    
+    // Check database connection
+    if (!$conn || $conn->connect_error) {
+        throw new Exception('Database connection failed');
+    }
+    
+    // Add timestamp for real-time tracking
+    $currentTime = date('Y-m-d H:i:s');
+    echo '<!-- Last Updated: ' . $currentTime . ' -->';
+    
+} catch (Exception $e) {
+    http_response_code(500);
+    echo '<tr><td colspan="5">Error: Unable to connect to database</td></tr>';
     exit;
 }
-include '../../config/db.php';
-
-// Debug: print the database and table name at the top of the output
-$dbName = $conn->query('SELECT DATABASE()')->fetch_row()[0];
-echo '<!-- Connected DB: ' . htmlspecialchars($dbName) . ' | Table: audit_logs -->';
 
 // Filtering
 $action = $_GET['action'] ?? 'all';
@@ -74,17 +88,25 @@ if ($export) {
 
 if ($result && $result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
-        echo '<tr>';
-        echo '<td>' . htmlspecialchars($row['created_at']) . '</td>';
-        echo '<td>' . htmlspecialchars($row['username'] ?? 'Unknown') . '</td>';
-        echo '<td>' . htmlspecialchars($row['action']) . '</td>';
-        // No details column
-        echo '<td></td>';
-        echo '<td>' . htmlspecialchars($row['ip_address']) . '</td>';
+        // Use raw timestamp for client-side processing
+        $rawTimestamp = $row['created_at'];
+        
+        // Add data attributes for real-time sorting and processing
+        echo '<tr data-timestamp="' . htmlspecialchars($rawTimestamp) . '" data-log-id="' . htmlspecialchars($row['id'] ?? '') . '">';
+        
+        // Let JavaScript handle the timestamp formatting for real-time updates
+        echo '<td class="timestamp-cell" title="' . htmlspecialchars($rawTimestamp) . '">Loading...</td>';
+        
+        echo '<td>' . htmlspecialchars($row['username'] ?? 'System') . '</td>';
+        echo '<td><span class="action-badge action-' . strtolower(htmlspecialchars($row['action'])) . '">' . htmlspecialchars($row['action']) . '</span></td>';
+        // Add details if available (from the database schema, there might be details)
+        $details = $row['details'] ?? $row['description'] ?? '';
+        echo '<td>' . htmlspecialchars($details) . '</td>';
+        echo '<td>' . htmlspecialchars($row['ip_address'] ?? 'N/A') . '</td>';
         echo '</tr>';
     }
 } else {
-    echo '<tr><td colspan="5">No audit logs found.</td></tr>';
+    echo '<tr><td colspan="5" class="no-data">No audit logs found. Waiting for activity...</td></tr>';
 }
 $stmt->close();
 $conn->close();

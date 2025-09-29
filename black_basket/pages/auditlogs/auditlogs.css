@@ -116,6 +116,23 @@ body {
     border-bottom: none;
 }
 
+/* Timestamp cell styling */
+.timestamp-cell {
+    font-weight: 500;
+    position: relative;
+    min-width: 120px;
+}
+
+/* Real-time timestamp updates */
+.timestamp-updated {
+    animation: timestamp-flash 0.5s ease-out;
+}
+
+@keyframes timestamp-flash {
+    0% { background-color: rgba(76, 175, 80, 0.3); }
+    100% { background-color: transparent; }
+}
+
 /* Custom select styling */
 .audit-logs-filters select {
     overflow-y: auto !important;

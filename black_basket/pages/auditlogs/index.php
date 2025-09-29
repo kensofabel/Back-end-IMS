@@ -39,6 +39,10 @@ $result = $conn->query($sql);
                                 - Audit Logs
                             </span>
                         </h2>
+                        <div class="header-search">
+                            <input type="text" id="search-audit-logs" placeholder="Search users, actions, or IP addresses..." class="header-search-input">
+                            <i class="fas fa-search search-icon"></i>
+                        </div>
                     </div>
                     <div class="audit-logs-content">
                         <div class="audit-logs-filters">
@@ -49,8 +53,8 @@ $result = $conn->query($sql);
                                 <option value="sales">Sales Transactions</option>
                                 <option value="inventory">Inventory Updates</option>
                             </select>
-                            <input type="date" id="audit-log-date-from">
-                            <input type="date" id="audit-log-date-to">
+                            <input type="date" id="audit-log-date-from" placeholder="From Date">
+                            <input type="date" id="audit-log-date-to" placeholder="To Date">
                             <button class="btn btn-primary" onclick="filterAuditLogs()">
                                 <i class="fas fa-filter"></i> Filter
                             </button>
@@ -81,14 +85,5 @@ $result = $conn->query($sql);
                 </section>
             </div>
     <script src="auditlogs.js"></script>
-    <script>
-    function resetAuditLogFilters() {
-        document.getElementById('audit-log-filter').value = 'all';
-        document.getElementById('audit-log-date-from').value = '';
-        document.getElementById('audit-log-date-to').value = '';
-        document.getElementById('search-audit-logs').value = '';
-        if (typeof filterAuditLogs === 'function') filterAuditLogs();
-    }
-    </script>
 </body>
 </html>
