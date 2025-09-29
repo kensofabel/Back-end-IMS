@@ -1,3 +1,64 @@
+// --- Button Actions ---
+function showQuickSetup() {
+    alert('Quick Setup coming soon!');
+}
+
+function resetSettings() {
+    if (confirm('Are you sure you want to reset all settings to default?')) {
+        // Add reset logic here
+        alert('Settings have been reset to default (demo).');
+    }
+}
+
+// Change Password button
+function handleChangePassword() {
+    alert('Change Password dialog coming soon!');
+}
+
+// View Login History button
+function handleViewLoginHistory() {
+    alert('Login History feature coming soon!');
+}
+
+// Connect Integration buttons
+function handleConnectIntegration(service) {
+    alert('Connect to ' + service + ' coming soon!');
+}
+
+// Save Settings button
+function handleSaveSettings() {
+    // Collect data from the form
+    const data = {
+        businessName: document.getElementById('business-name')?.value || '',
+        businessType: document.getElementById('business-type')?.value || '',
+        businessAddress: document.getElementById('business-address')?.value || '',
+        businessPhone: document.getElementById('business-phone')?.value || '',
+        businessEmail: document.getElementById('business-email')?.value || '',
+        currency: document.getElementById('currency')?.value || '',
+        taxRate: document.getElementById('tax-rate')?.value || ''
+        // Add more fields as needed
+    };
+    fetch('save_settings.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.success) {
+            alert(res.message || 'Settings saved!');
+            // Optionally update UI, e.g., last saved time
+            const lastSaved = document.getElementById('last-saved-time');
+            if (lastSaved) {
+                lastSaved.textContent = 'Last saved: ' + new Date().toLocaleString();
+            }
+        } else {
+            alert(res.message || 'Failed to save settings.');
+        }
+    })
+    .catch(() => alert('Error saving settings.'));
+}
+
 // Tab switching logic
 function showSettingsTab(tabName) {
     document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -63,14 +124,17 @@ function showSettingsHelp() {
 // Auto-save toggle (optional, for UI feedback)
 document.addEventListener('DOMContentLoaded', function() {
     // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('.nav-tab').forEach(btn => {
         btn.addEventListener('click', function() {
-            const tabName = this.getAttribute('onclick').match(/'([^']+)'/)[1];
-            showSettingsTab(tabName);
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            this.classList.add('active');
+            const tabName = this.getAttribute('data-tab');
+            document.querySelectorAll('.settings-tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
         });
     });
 
-    // Card expand/collapse
+    // Card expand/collapse (if any)
     document.querySelectorAll('.card-expand-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             toggleCardExpansion(this);
@@ -84,4 +148,38 @@ document.addEventListener('DOMContentLoaded', function() {
             filterSettings(this.value);
         });
     }
+
+    // Change Password button
+    document.querySelectorAll('.modern-btn').forEach(btn => {
+        if (btn.textContent.includes('Change')) {
+            btn.addEventListener('click', handleChangePassword);
+        }
+        if (btn.textContent.includes('View')) {
+            btn.addEventListener('click', handleViewLoginHistory);
+        }
+        if (btn.textContent.includes('Connect')) {
+            btn.addEventListener('click', function() {
+                const service = this.closest('.integration-item')?.querySelector('h4')?.textContent || 'Integration';
+                handleConnectIntegration(service);
+            });
+        }
+    });
+
+    // Save Settings button
+    const saveBtn = document.getElementById('save-settings-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', handleSaveSettings);
+    }
+
+    // Reset to Defaults button
+    document.querySelectorAll('.modern-btn.secondary').forEach(btn => {
+        if (btn.textContent.includes('Reset')) {
+            btn.addEventListener('click', resetSettings);
+        }
+    });
+
+    // Hero Quick Setup button
+    document.querySelectorAll('.hero-btn').forEach(btn => {
+        btn.addEventListener('click', showQuickSetup);
+    });
 });

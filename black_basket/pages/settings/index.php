@@ -11,10 +11,11 @@ if (!isset($_SESSION['user_id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Management System</title>
+    <title>Settings - Black Basket</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
 </head>
 <body>
@@ -22,399 +23,598 @@ if (!isset($_SESSION['user_id'])) {
     <?php include '../../partials/header.php'; ?>
             <!-- Content Area -->
             <div class="content-area">
-                    <!-- Settings Section -->
-                <section id="settings-section" class="section active">
-                    <div class="section-header">
-                        <h2>Settings</h2>
-                    </div>
-                    <div class="settings-content">
-                        <div class="settings-tabs">
-                            <button class="tab-btn active" onclick="showSettingsTab('general')">General</button>
-                            <button class="tab-btn" onclick="showSettingsTab('inventory')">Inventory</button>
-                            <button class="tab-btn" onclick="showSettingsTab('advanced')">Advanced</button>
+                    <!-- Modern Settings Section -->
+                <section id="settings-section" class="modern-settings">
+                    <!-- Hero Header -->
+                    <div class="settings-hero">
+                        <div class="hero-content">
+                            <div class="hero-text">
+                                <h1 class="hero-title">
+                                    <i class="fas fa-cogs"></i>
+                                    Settings
+                                </h1>
+                                <p class="hero-subtitle">Customize your Black Basket experience and manage your store preferences</p>
+                            </div>
+                            <div class="hero-actions">
+                                <div class="search-container">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <input type="text" class="search-input" placeholder="Search settings..." id="settings-search">
+                                </div>
+                                <button class="hero-btn" onclick="showQuickSetup()" title="Quick Setup">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
                         </div>
-
-                        <div id="general-tab" class="settings-tab active">
-                            <div class="settings-overview">
-                                <div class="settings-header">
-                                    <div class="settings-title-section">
-                                        <h3><i class="fas fa-cog"></i> General Settings</h3>
-                                        <p class="settings-description">Configure your business information, preferences, and system settings</p>
-                                    </div>
-                                    <div class="settings-actions">
-                                        <div class="settings-search">
-                                            <input type="text" id="settings-search" placeholder="Search settings..." oninput="filterSettings(this.value)">
-                                            <i class="fas fa-search"></i>
-                                        </div>
-                                        <div class="quick-actions">
-                                            <button class="quick-action-btn" onclick="expandAllCards()" title="Expand All">
-                                                <i class="fas fa-expand-arrows-alt"></i>
-                                            </button>
-                                            <button class="quick-action-btn" onclick="collapseAllCards()" title="Collapse All">
-                                                <i class="fas fa-compress-arrows-alt"></i>
-                                            </button>
-                                            <button class="quick-action-btn" onclick="showSettingsHelp()" title="Help">
-                                                <i class="fas fa-question-circle"></i>
-                                            </button>
-                                        </div>
-                                    </div>
+                        
+                        <!-- Quick Stats -->
+                        <div class="quick-stats">
+                            <div class="stat-item">
+                                <div class="stat-icon">
+                                    <i class="fas fa-check-circle"></i>
                                 </div>
-                                <div class="settings-status">
-                                    <div class="status-indicators">
-                                        <span class="status-indicator" id="settings-status">
-                                            <i class="fas fa-circle"></i> Settings loaded
-                                        </span>
-                                        <span class="completion-indicator" id="settings-completion">
-                                            <i class="fas fa-chart-pie"></i> <span id="completion-percent">0%</span> Complete
-                                        </span>
-                                    </div>
-                                    <div class="auto-save-toggle">
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="auto-save-toggle" checked>
-                                            <span class="toggle-slider"></span>
-                                        </label>
-                                        <span class="toggle-label">Auto-save</span>
-                                    </div>
+                                <div class="stat-content">
+                                    <span class="stat-number" id="completed-settings">0</span>
+                                    <span class="stat-label">Completed</span>
                                 </div>
                             </div>
-
-                            <!-- Settings Summary Card -->
-                            <div class="settings-summary-card">
-                                <div class="summary-header">
-                                    <i class="fas fa-tachometer-alt"></i>
-                                    <h4>Settings Overview</h4>
+                            <div class="stat-item">
+                                <div class="stat-icon">
+                                    <i class="fas fa-clock"></i>
                                 </div>
-                                <div class="summary-content">
-                                    <div class="summary-item">
-                                        <span class="summary-label">Business Info</span>
-                                        <div class="summary-progress">
-                                            <div class="progress-bar" id="business-progress" style="width: 0%"></div>
-                                        </div>
-                                        <span class="summary-value" id="business-complete">0/4</span>
-                                    </div>
-                                    <div class="summary-item">
-                                        <span class="summary-label">Financial</span>
-                                        <div class="summary-progress">
-                                            <div class="progress-bar" id="financial-progress" style="width: 0%"></div>
-                                        </div>
-                                        <span class="summary-value" id="financial-complete">0/3</span>
-                                    </div>
-                                    <div class="summary-item">
-                                        <span class="summary-label">System</span>
-                                        <div class="summary-progress">
-                                            <div class="progress-bar" id="system-progress" style="width: 0%"></div>
-                                        </div>
-                                        <span class="summary-value" id="system-complete">0/4</span>
-                                    </div>
-                                    <div class="summary-item">
-                                        <span class="summary-label">Notifications</span>
-                                        <div class="summary-progress">
-                                            <div class="progress-bar" id="notification-progress" style="width: 0%"></div>
-                                        </div>
-                                        <span class="summary-value" id="notification-complete">0/3</span>
-                                    </div>
+                                <div class="stat-content">
+                                    <span class="stat-number" id="pending-settings">12</span>
+                                    <span class="stat-label">Pending</span>
                                 </div>
                             </div>
-
-                            <div class="settings-cards-grid">
-                                <!-- Business Information Card -->
-                                <div class="settings-card" data-tooltip="Configure your business details and contact information">
-                                    <div class="card-header">
-                                        <i class="fas fa-building"></i>
-                                        <h4>Business Information</h4>
-                                        <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
-                                                <i class="fas fa-chevron-down"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="card-content">
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="business-name" data-tooltip="Your business name as it appears on receipts and reports">
-                                                    <i class="fas fa-store"></i> Business Name
-                                                </label>
-                                                <input type="text" id="business-name" name="businessName" placeholder="Enter your business name" maxlength="100">
-                                                <div class="field-feedback"></div>
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="store-address" data-tooltip="Complete address for your store location">
-                                                    <i class="fas fa-map-marker-alt"></i> Store Address
-                                                </label>
-                                                <input type="text" id="store-address" name="storeAddress" placeholder="Enter store address" maxlength="200">
-                                                <div class="field-feedback"></div>
-                                            </div>
-                                        </div>
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="store-phone" data-tooltip="Primary contact phone number">
-                                                    <i class="fas fa-phone"></i> Phone Number
-                                                </label>
-                                                <input type="tel" id="store-phone" name="storePhone" placeholder="(555) 123-4567" pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}">
-                                                <div class="field-feedback"></div>
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="store-email" data-tooltip="Business email address for communications">
-                                                    <i class="fas fa-envelope"></i> Email Address
-                                                </label>
-                                                <input type="email" id="store-email" name="storeEmail" placeholder="contact@yourstore.com">
-                                                <div class="field-feedback"></div>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="store-hours" data-tooltip="Operating hours for your store">
-                                                <i class="fas fa-clock"></i> Store Hours
-                                            </label>
-                                            <textarea id="store-hours" name="storeHours" rows="3" placeholder="Mon-Fri: 9AM-6PM&#10;Sat: 10AM-4PM&#10;Sun: Closed" maxlength="500"></textarea>
-                                            <div class="field-feedback"></div>
-                                        </div>
-                                    </div>
+                            <div class="stat-item">
+                                <div class="stat-icon">
+                                    <i class="fas fa-shield-alt"></i>
                                 </div>
+                                <div class="stat-content">
+                                    <span class="stat-number">100%</span>
+                                    <span class="stat-label">Secure</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                <!-- Financial Settings Card -->
-                                <div class="settings-card" data-tooltip="Configure pricing, taxes, and payment options">
+                    <!-- Navigation Tabs -->
+                    <div class="settings-navigation">
+                        <nav class="nav-tabs">
+                            <button class="nav-tab active" data-tab="general">
+                                <i class="fas fa-store"></i>
+                                <span>General</span>
+                            </button>
+                            <button class="nav-tab" data-tab="security">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Security</span>
+                            </button>
+                            <button class="nav-tab" data-tab="notifications">
+                                <i class="fas fa-bell"></i>
+                                <span>Notifications</span>
+                            </button>
+                            <button class="nav-tab" data-tab="integrations">
+                                <i class="fas fa-plug"></i>
+                                <span>Integrations</span>
+                            </button>
+                            <button class="nav-tab" data-tab="advanced">
+                                <i class="fas fa-cog"></i>
+                                <span>Advanced</span>
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Settings Content -->
+                    <div class="settings-container">
+                        <!-- General Tab -->
+                        <div class="settings-tab active" id="general-tab">
+                            <div class="settings-grid">
+                                
+                                <!-- Business Profile Card -->
+                                <div class="setting-card featured">
                                     <div class="card-header">
-                                        <i class="fas fa-dollar-sign"></i>
-                                        <h4>Financial Settings</h4>
-                                        <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
-                                                <i class="fas fa-chevron-down"></i>
-                                            </button>
+                                        <div class="card-icon">
+                                            <i class="fas fa-building"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Business Profile</h3>
+                                            <p>Essential information about your business</p>
+                                        </div>
+                                        <div class="card-status">
+                                            <span class="status-badge incomplete">Incomplete</span>
                                         </div>
                                     </div>
-                                    <div class="card-content">
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="currency-symbol" data-tooltip="Currency symbol for your region">
-                                                    <i class="fas fa-coins"></i> Currency Symbol
+                                    <div class="card-body">
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="business-name">
+                                                    <i class="fas fa-store"></i>
+                                                    Business Name
                                                 </label>
-                                                <input type="text" id="currency-symbol" name="currencySymbol" maxlength="3" placeholder="$" value="$">
-                                                <div class="field-feedback"></div>
+                                                <input type="text" id="business-name" placeholder="Enter your business name" class="modern-input">
+                                                <div class="input-helper">This appears on receipts and reports</div>
                                             </div>
-                                            <div class="form-group">
-                                                <label for="tax-rate" data-tooltip="Default tax rate applied to sales">
-                                                    <i class="fas fa-percentage"></i> Tax Rate (%)
+                                            <div class="input-group">
+                                                <label for="business-type">
+                                                    <i class="fas fa-tag"></i>
+                                                    Business Type
                                                 </label>
-                                                <input type="number" id="tax-rate" name="taxRate" step="0.01" min="0" max="100" placeholder="8.25">
-                                                <div class="field-feedback"></div>
+                                                <select id="business-type" class="modern-select">
+                                                    <option value="">Select business type</option>
+                                                    <option value="retail">Retail Store</option>
+                                                    <option value="restaurant">Restaurant</option>
+                                                    <option value="service">Service Business</option>
+                                                    <option value="other">Other</option>
+                                                </select>
                                             </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="payment-types" data-tooltip="Select accepted payment methods">
-                                                <i class="fas fa-credit-card"></i> Payment Types
-                                            </label>
-                                            <div class="payment-types-grid">
-                                                <label class="checkbox-option">
-                                                    <input type="checkbox" name="paymentCash" checked>
-                                                    <span class="checkmark"></span>
-                                                    <i class="fas fa-money-bill-wave"></i> Cash
+                                            <div class="input-group full-width">
+                                                <label for="business-address">
+                                                    <i class="fas fa-map-marker-alt"></i>
+                                                    Business Address
                                                 </label>
-                                                <label class="checkbox-option">
-                                                    <input type="checkbox" name="paymentCard" checked>
-                                                    <span class="checkmark"></span>
-                                                    <i class="fas fa-credit-card"></i> Card
+                                                <input type="text" id="business-address" placeholder="Enter your complete address" class="modern-input">
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="business-phone">
+                                                    <i class="fas fa-phone"></i>
+                                                    Phone Number
                                                 </label>
-                                                <label class="checkbox-option">
-                                                    <input type="checkbox" name="paymentDigital">
-                                                    <span class="checkmark"></span>
-                                                    <i class="fas fa-mobile-alt"></i> Digital Wallet
+                                                <input type="tel" id="business-phone" placeholder="(555) 123-4567" class="modern-input">
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="business-email">
+                                                    <i class="fas fa-envelope"></i>
+                                                    Email Address
                                                 </label>
-                                                <label class="checkbox-option">
-                                                    <input type="checkbox" name="paymentCredit">
-                                                    <span class="checkmark"></span>
-                                                    <i class="fas fa-hand-holding-usd"></i> Credit
-                                                </label>
+                                                <input type="email" id="business-email" placeholder="business@example.com" class="modern-input">
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- System Preferences Card -->
-                                <div class="settings-card" data-tooltip="Customize system behavior and appearance">
+                                <!-- Store Settings Card -->
+                                <div class="setting-card">
                                     <div class="card-header">
-                                        <i class="fas fa-sliders-h"></i>
-                                        <h4>System Preferences</h4>
-                                        <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
-                                                <i class="fas fa-chevron-down"></i>
-                                            </button>
+                                        <div class="card-icon">
+                                            <i class="fas fa-clock"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Store Hours</h3>
+                                            <p>Operating hours and availability</p>
                                         </div>
                                     </div>
-                                    <div class="card-content">
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="language" data-tooltip="Interface language">
-                                                    <i class="fas fa-globe"></i> Language
+                                    <div class="card-body">
+                                        <div class="hours-grid">
+                                            <div class="hour-row">
+                                                <span class="day-label">Monday</span>
+                                                <input type="time" class="time-input" value="09:00">
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" value="18:00">
+                                                <button class="toggle-btn active" title="Toggle day">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                            </div>
+                                            <div class="hour-row">
+                                                <span class="day-label">Tuesday</span>
+                                                <input type="time" class="time-input" value="09:00">
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" value="18:00">
+                                                <button class="toggle-btn active" title="Toggle day">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                            </div>
+                                            <div class="hour-row">
+                                                <span class="day-label">Wednesday</span>
+                                                <input type="time" class="time-input" value="09:00">
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" value="18:00">
+                                                <button class="toggle-btn active" title="Toggle day">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                            </div>
+                                            <div class="hour-row">
+                                                <span class="day-label">Thursday</span>
+                                                <input type="time" class="time-input" value="09:00">
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" value="18:00">
+                                                <button class="toggle-btn active" title="Toggle day">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                            </div>
+                                            <div class="hour-row">
+                                                <span class="day-label">Friday</span>
+                                                <input type="time" class="time-input" value="09:00">
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" value="18:00">
+                                                <button class="toggle-btn active" title="Toggle day">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                            </div>
+                                            <div class="hour-row">
+                                                <span class="day-label">Saturday</span>
+                                                <input type="time" class="time-input" value="10:00">
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" value="16:00">
+                                                <button class="toggle-btn active" title="Toggle day">
+                                                    <i class="fas fa-toggle-on"></i>
+                                                </button>
+                                            </div>
+                                            <div class="hour-row">
+                                                <span class="day-label">Sunday</span>
+                                                <input type="time" class="time-input" disabled>
+                                                <span class="time-separator">to</span>
+                                                <input type="time" class="time-input" disabled>
+                                                <button class="toggle-btn" title="Toggle day">
+                                                    <i class="fas fa-toggle-off"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Currency & Tax Card -->
+                                <div class="setting-card">
+                                    <div class="card-header">
+                                        <div class="card-icon">
+                                            <i class="fas fa-dollar-sign"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Currency & Tax</h3>
+                                            <p>Financial settings and tax configuration</p>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="currency">
+                                                    <i class="fas fa-coins"></i>
+                                                    Currency
                                                 </label>
-                                                <select id="language" name="language">
+                                                <select id="currency" class="modern-select">
+                                                    <option value="USD">USD ($)</option>
+                                                    <option value="EUR">EUR (€)</option>
+                                                    <option value="GBP">GBP (£)</option>
+                                                    <option value="CAD">CAD (C$)</option>
+                                                    <option value="PHP">PHP (₱)</option>
+                                                </select>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="tax-rate">
+                                                    <i class="fas fa-percentage"></i>
+                                                    Tax Rate (%)
+                                                </label>
+                                                <input type="number" id="tax-rate" placeholder="8.25" step="0.01" min="0" max="100" class="modern-input">
+                                            </div>
+                                            <div class="input-group full-width">
+                                                <label>
+                                                    <i class="fas fa-credit-card"></i>
+                                                    Payment Methods
+                                                </label>
+                                                <div class="payment-methods">
+                                                    <label class="modern-checkbox">
+                                                        <input type="checkbox" checked>
+                                                        <span class="checkbox-mark"></span>
+                                                        <i class="fas fa-money-bill-wave"></i>
+                                                        Cash
+                                                    </label>
+                                                    <label class="modern-checkbox">
+                                                        <input type="checkbox" checked>
+                                                        <span class="checkbox-mark"></span>
+                                                        <i class="fas fa-credit-card"></i>
+                                                        Credit/Debit Card
+                                                    </label>
+                                                    <label class="modern-checkbox">
+                                                        <input type="checkbox">
+                                                        <span class="checkbox-mark"></span>
+                                                        <i class="fab fa-paypal"></i>
+                                                        Digital Wallet
+                                                    </label>
+                                                    <label class="modern-checkbox">
+                                                        <input type="checkbox">
+                                                        <span class="checkbox-mark"></span>
+                                                        <i class="fas fa-handshake"></i>
+                                                        Store Credit
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Preferences Card -->
+                                <div class="setting-card">
+                                    <div class="card-header">
+                                        <div class="card-icon">
+                                            <i class="fas fa-sliders-h"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Preferences</h3>
+                                            <p>Interface and system preferences</p>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="language">
+                                                    <i class="fas fa-globe"></i>
+                                                    Language
+                                                </label>
+                                                <select id="language" class="modern-select">
                                                     <option value="en">English</option>
                                                     <option value="es">Spanish</option>
                                                     <option value="fr">French</option>
                                                     <option value="de">German</option>
                                                 </select>
                                             </div>
-                                            <div class="form-group">
-                                                <label for="timezone" data-tooltip="Your local time zone">
-                                                    <i class="fas fa-clock"></i> Time Zone
+                                            <div class="input-group">
+                                                <label for="timezone">
+                                                    <i class="fas fa-clock"></i>
+                                                    Time Zone
                                                 </label>
-                                                <select id="timezone" name="timezone">
+                                                <select id="timezone" class="modern-select">
                                                     <option value="UTC-8">Pacific Time (UTC-8)</option>
                                                     <option value="UTC-5">Eastern Time (UTC-5)</option>
                                                     <option value="UTC+0">GMT (UTC+0)</option>
-                                                    <option value="UTC+1">Central European Time (UTC+1)</option>
+                                                    <option value="UTC+1">Central European (UTC+1)</option>
                                                 </select>
                                             </div>
-                                        </div>
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="date-format" data-tooltip="Preferred date display format">
-                                                    <i class="fas fa-calendar-alt"></i> Date Format
+                                            <div class="input-group">
+                                                <label for="date-format">
+                                                    <i class="fas fa-calendar-alt"></i>
+                                                    Date Format
                                                 </label>
-                                                <select id="date-format" name="dateFormat">
+                                                <select id="date-format" class="modern-select">
                                                     <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                                                     <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                                                     <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                                                 </select>
                                             </div>
-                                            <div class="form-group">
-                                                <label for="loyalty-program" data-tooltip="Enable customer loyalty program">
-                                                    <i class="fas fa-gift"></i> Loyalty Program
+                                            <div class="input-group">
+                                                <label for="theme">
+                                                    <i class="fas fa-palette"></i>
+                                                    Theme
                                                 </label>
-                                                <select id="loyalty-program" name="loyaltyProgram">
-                                                    <option value="enabled">Enabled</option>
-                                                    <option value="disabled">Disabled</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="theme-mode" data-tooltip="Choose your preferred theme">
-                                                    <i class="fas fa-palette"></i> Theme Mode
-                                                </label>
-                                                <select id="theme-mode" name="themeMode">
-                                                    <option value="light">Light</option>
-                                                    <option value="dark">Dark</option>
+                                                <select id="theme" class="modern-select">
+                                                    <option value="dark">Dark Theme</option>
+                                                    <option value="light">Light Theme</option>
                                                     <option value="auto">Auto (System)</option>
-                                                </select>
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="notifications" data-tooltip="Enable system notifications">
-                                                    <i class="fas fa-bell"></i> Notifications
-                                                </label>
-                                                <select id="notifications" name="notifications">
-                                                    <option value="enabled">Enabled</option>
-                                                    <option value="disabled">Disabled</option>
                                                 </select>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Notification Preferences Card -->
-                                <div class="settings-card" data-tooltip="Configure notification settings and preferences">
+                            </div>
+                        </div>
+
+                        <!-- Security Tab -->
+                        <div class="settings-tab" id="security-tab">
+                            <div class="settings-grid">
+                                <div class="setting-card featured">
                                     <div class="card-header">
-                                        <i class="fas fa-bell"></i>
-                                        <h4>Notification Preferences</h4>
-                                        <div class="card-actions">
-                                            <button class="card-expand-btn" onclick="toggleCardExpansion(this)">
-                                                <i class="fas fa-chevron-down"></i>
-                                            </button>
+                                        <div class="card-icon">
+                                            <i class="fas fa-shield-alt"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Security Settings</h3>
+                                            <p>Manage your account security and access</p>
                                         </div>
                                     </div>
-                                    <div class="card-content">
-                                        <div class="notification-settings">
-                                            <div class="notification-group">
-                                                <h5><i class="fas fa-shopping-cart"></i> Sales Notifications</h5>
-                                                <div class="notification-options">
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyNewSale" checked>
-                                                        <span class="checkmark"></span>
-                                                        New sales
-                                                    </label>
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyLargeSale">
-                                                        <span class="checkmark"></span>
-                                                        Large transactions (>$100)
-                                                    </label>
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyDailySummary" checked>
-                                                        <span class="checkmark"></span>
-                                                        Daily sales summary
-                                                    </label>
+                                    <div class="card-body">
+                                        <div class="security-options">
+                                            <div class="security-item">
+                                                <div class="security-icon">
+                                                    <i class="fas fa-key"></i>
+                                                </div>
+                                                <div class="security-content">
+                                                    <h4>Change Password</h4>
+                                                    <p>Update your account password</p>
+                                                </div>
+                                                <button class="modern-btn">Change</button>
+                                            </div>
+                                            <div class="security-item">
+                                                <div class="security-icon">
+                                                    <i class="fas fa-mobile-alt"></i>
+                                                </div>
+                                                <div class="security-content">
+                                                    <h4>Two-Factor Authentication</h4>
+                                                    <p>Add an extra layer of security</p>
+                                                </div>
+                                                <div class="toggle-switch">
+                                                    <input type="checkbox" id="2fa-toggle">
+                                                    <label for="2fa-toggle"></label>
                                                 </div>
                                             </div>
+                                            <div class="security-item">
+                                                <div class="security-icon">
+                                                    <i class="fas fa-history"></i>
+                                                </div>
+                                                <div class="security-content">
+                                                    <h4>Login History</h4>
+                                                    <p>View recent login activity</p>
+                                                </div>
+                                                <button class="modern-btn secondary">View</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notifications Tab -->
+                        <div class="settings-tab" id="notifications-tab">
+                            <div class="settings-grid">
+                                <div class="setting-card">
+                                    <div class="card-header">
+                                        <div class="card-icon">
+                                            <i class="fas fa-bell"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Notification Preferences</h3>
+                                            <p>Choose what notifications you want to receive</p>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="notification-groups">
                                             <div class="notification-group">
-                                                <h5><i class="fas fa-boxes"></i> Inventory Notifications</h5>
-                                                <div class="notification-options">
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyLowStock" checked>
-                                                        <span class="checkmark"></span>
-                                                        Low stock alerts
-                                                    </label>
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyOutOfStock">
-                                                        <span class="checkmark"></span>
-                                                        Out of stock items
-                                                    </label>
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyStockUpdates">
-                                                        <span class="checkmark"></span>
-                                                        Stock level changes
-                                                    </label>
+                                                <h4><i class="fas fa-shopping-cart"></i> Sales & Orders</h4>
+                                                <div class="notification-items">
+                                                    <div class="notification-item">
+                                                        <div class="notification-info">
+                                                            <span>New sales</span>
+                                                            <small>Get notified when a sale is made</small>
+                                                        </div>
+                                                        <div class="toggle-switch">
+                                                            <input type="checkbox" id="sales-new" checked>
+                                                            <label for="sales-new"></label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="notification-item">
+                                                        <div class="notification-info">
+                                                            <span>Large transactions</span>
+                                                            <small>Sales over $100</small>
+                                                        </div>
+                                                        <div class="toggle-switch">
+                                                            <input type="checkbox" id="sales-large">
+                                                            <label for="sales-large"></label>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
+                                            
                                             <div class="notification-group">
-                                                <h5><i class="fas fa-user"></i> System Notifications</h5>
-                                                <div class="notification-options">
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyUserLogin" checked>
-                                                        <span class="checkmark"></span>
-                                                        User login/logout
-                                                    </label>
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifySystemUpdates">
-                                                        <span class="checkmark"></span>
-                                                        System updates
-                                                    </label>
-                                                    <label class="checkbox-option">
-                                                        <input type="checkbox" name="notifyErrors">
-                                                        <span class="checkmark"></span>
-                                                        Error notifications
-                                                    </label>
+                                                <h4><i class="fas fa-boxes"></i> Inventory</h4>
+                                                <div class="notification-items">
+                                                    <div class="notification-item">
+                                                        <div class="notification-info">
+                                                            <span>Low stock alerts</span>
+                                                            <small>When items are running low</small>
+                                                        </div>
+                                                        <div class="toggle-switch">
+                                                            <input type="checkbox" id="inventory-low" checked>
+                                                            <label for="inventory-low"></label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="notification-item">
+                                                        <div class="notification-info">
+                                                            <span>Out of stock</span>
+                                                            <small>When items are completely out</small>
+                                                        </div>
+                                                        <div class="toggle-switch">
+                                                            <input type="checkbox" id="inventory-out" checked>
+                                                            <label for="inventory-out"></label>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="settings-actions">
-                                <div class="action-buttons">
-                                    <button type="submit" form="settings-form" class="btn btn-primary" id="save-settings-btn">
-                                        <i class="fas fa-save"></i> Save All Settings
-                                    </button>
-                                    <button type="button" class="btn btn-secondary" onclick="resetSettings()">
-                                        <i class="fas fa-undo"></i> Reset to Defaults
-                                    </button>
-                                    <button type="button" class="btn btn-outline" onclick="exportSettings()">
-                                        <i class="fas fa-download"></i> Export Settings
-                                    </button>
-                                    <button type="button" class="btn btn-outline" onclick="importSettings()">
-                                        <i class="fas fa-upload"></i> Import Settings
-                                    </button>
+                        <!-- Integrations Tab -->
+                        <div class="settings-tab" id="integrations-tab">
+                            <div class="settings-grid">
+                                <div class="setting-card">
+                                    <div class="card-header">
+                                        <div class="card-icon">
+                                            <i class="fas fa-plug"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Third-Party Integrations</h3>
+                                            <p>Connect with external services and tools</p>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="integration-list">
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="fab fa-paypal"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h4>PayPal</h4>
+                                                    <p>Accept PayPal payments</p>
+                                                    <span class="status-badge disconnected">Disconnected</span>
+                                                </div>
+                                                <button class="modern-btn">Connect</button>
+                                            </div>
+                                            
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="fab fa-stripe"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h4>Stripe</h4>
+                                                    <p>Process credit card payments</p>
+                                                    <span class="status-badge disconnected">Disconnected</span>
+                                                </div>
+                                                <button class="modern-btn">Connect</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Tab -->
+                        <div class="settings-tab" id="advanced-tab">
+                            <div class="settings-grid">
+                                <div class="setting-card">
+                                    <div class="card-header">
+                                        <div class="card-icon">
+                                            <i class="fas fa-code"></i>
+                                        </div>
+                                        <div class="card-title">
+                                            <h3>Advanced Settings</h3>
+                                            <p>System configuration and developer options</p>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="advanced-options">
+                                            <div class="option-item">
+                                                <label>Debug Mode</label>
+                                                <div class="toggle-switch">
+                                                    <input type="checkbox" id="debug-mode">
+                                                    <label for="debug-mode"></label>
+                                                </div>
+                                            </div>
+                                            <div class="option-item">
+                                                <label>Auto Backup</label>
+                                                <div class="toggle-switch">
+                                                    <input type="checkbox" id="auto-backup" checked>
+                                                    <label for="auto-backup"></label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save Actions -->
+                    <div class="save-section">
+                        <div class="save-container">
+                            <div class="save-info">
+                                <div class="auto-save-indicator">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <span>Auto-save enabled</span>
                                 </div>
                                 <div class="last-saved">
                                     <small id="last-saved-time">Last saved: Never</small>
                                 </div>
                             </div>
-                        </div>
-
-                        <div id="inventory-tab" class="settings-tab">
-                            
-                        </div>
-
-                        <div id="advanced-tab" class="settings-tab">
-                            <!-- Advanced settings content removed -->
+                            <div class="save-actions">
+                                <button class="modern-btn secondary" onclick="resetSettings()">
+                                    <i class="fas fa-undo"></i>
+                                    Reset to Defaults
+                                </button>
+                                <button class="modern-btn primary" id="save-settings-btn">
+                                    <i class="fas fa-save"></i>
+                                    Save All Changes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </section>
