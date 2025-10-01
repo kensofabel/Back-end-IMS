@@ -15,6 +15,8 @@ if (!isset($_SESSION['user_id'])) {
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
+    <!-- Payment Report Page Specific CSS -->
+    <link rel="stylesheet" href="paymentreport.css">
 </head>
 <body>
     <?php include '../../partials/navigation.php'; ?>
@@ -67,6 +69,8 @@ if (!isset($_SESSION['user_id'])) {
                             </tbody>
                         </table>
                     </div>
+                    <!-- Payment Report Page Specific JS -->
+                    <script src="paymentreport.js"></script>
                 </section>
             </div>
 

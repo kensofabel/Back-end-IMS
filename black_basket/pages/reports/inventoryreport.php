@@ -15,6 +15,8 @@ if (!isset($_SESSION['user_id'])) {
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
+    <!-- Inventory Report Page Specific CSS -->
+    <link rel="stylesheet" href="inventoryreport.css">
 </head>
 <body>
     <?php include '../../partials/navigation.php'; ?>
@@ -25,6 +27,11 @@ if (!isset($_SESSION['user_id'])) {
                 <section id="inventory-reports-section" class="section active">
                     <div class="section-header">
                         <h2>Inventory Reports</h2>
+                        <div class="report-filters">
+                            <button class="btn btn-primary" onclick="generateInventoryReport()">
+                                <i class="fas fa-chart-line"></i> Generate Report
+                            </button>
+                        </div>
                     </div>
                     <div class="report-summary">
                         <div class="summary-card">
@@ -61,6 +68,8 @@ if (!isset($_SESSION['user_id'])) {
                                 </tbody>
                             </table>
                         </div>
+                        <!-- Inventory Report Page Specific JS -->
+                        <script src="inventoryreport.js"></script>
                     </div>
                 </section>
             </div>

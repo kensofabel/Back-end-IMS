@@ -15,6 +15,8 @@ if (!isset($_SESSION['user_id'])) {
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
+        <!-- Sales Report Page Specific CSS -->
+        <link rel="stylesheet" href="salesreport.css">
 </head>
 <body>
     <?php include '../../partials/navigation.php'; ?>
@@ -70,5 +72,7 @@ if (!isset($_SESSION['user_id'])) {
                     </div>
                 </section>
             </div>
+        <!-- Sales Report Page Specific JS -->
+        <script src="salesreport.js"></script>
 </body>
 </html>
