@@ -1,0 +1,98 @@
+/* dashboard.css - Custom styles for dashboard page */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+.stat-card {
+  background: #232323;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat-card:hover {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  transform: translateY(-2px);
+}
+.stat-icon {
+  width: 54px;
+  height: 54px;
+  background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-size: 1.7rem;
+}
+.stat-info h3 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ff9800;
+}
+.stat-info p {
+  margin: 0.2rem 0 0 0;
+  color: rgba(255,255,255,0.7);
+  font-size: 1rem;
+}
+.recent-activities {
+  background: #232323;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  padding: 2rem 1.5rem;
+}
+.recent-activities h2 {
+  margin-top: 0;
+  color: #ff9800;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+.activities-list {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.activity-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(255,152,0,0.18);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff9800;
+  font-size: 1.2rem;
+}
+.activity-text {
+  flex: 1;
+  color: #fff;
+  font-size: 1rem;
+}
+.activity-time {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.95rem;
+}
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .recent-activities {
+    padding: 1rem;
+  }
+}
