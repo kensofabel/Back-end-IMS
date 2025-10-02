@@ -71,8 +71,8 @@ if (!isset($_SESSION['user_id'])) {
                                     <i class="fas fa-shield-alt"></i>
                                 </div>
                                 <div class="stat-content">
-                                    <span class="stat-number">100%</span>
-                                    <span class="stat-label">Secure</span>
+                                    <span class="stat-number" id="secure-percent">100%</span>
+                                    <span class="stat-label" id="secure-label">Secure</span>
                                 </div>
                             </div>
                         </div>
@@ -85,17 +85,9 @@ if (!isset($_SESSION['user_id'])) {
                                 <i class="fas fa-store"></i>
                                 <span>General</span>
                             </button>
-                            <button class="nav-tab" data-tab="security">
-                                <i class="fas fa-shield-alt"></i>
-                                <span>Security</span>
-                            </button>
                             <button class="nav-tab" data-tab="notifications">
                                 <i class="fas fa-bell"></i>
                                 <span>Notifications</span>
-                            </button>
-                            <button class="nav-tab" data-tab="integrations">
-                                <i class="fas fa-plug"></i>
-                                <span>Integrations</span>
                             </button>
                             <button class="nav-tab" data-tab="advanced">
                                 <i class="fas fa-cog"></i>
@@ -172,85 +164,6 @@ if (!isset($_SESSION['user_id'])) {
                                     </div>
                                 </div>
 
-                                <!-- Store Settings Card -->
-                                <div class="setting-card">
-                                    <div class="card-header">
-                                        <div class="card-icon">
-                                            <i class="fas fa-clock"></i>
-                                        </div>
-                                        <div class="card-title">
-                                            <h3>Store Hours</h3>
-                                            <p>Operating hours and availability</p>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="hours-grid">
-                                            <div class="hour-row">
-                                                <span class="day-label">Monday</span>
-                                                <input type="time" class="time-input" value="09:00">
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" value="18:00">
-                                                <button class="toggle-btn active" title="Toggle day">
-                                                    <i class="fas fa-toggle-on"></i>
-                                                </button>
-                                            </div>
-                                            <div class="hour-row">
-                                                <span class="day-label">Tuesday</span>
-                                                <input type="time" class="time-input" value="09:00">
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" value="18:00">
-                                                <button class="toggle-btn active" title="Toggle day">
-                                                    <i class="fas fa-toggle-on"></i>
-                                                </button>
-                                            </div>
-                                            <div class="hour-row">
-                                                <span class="day-label">Wednesday</span>
-                                                <input type="time" class="time-input" value="09:00">
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" value="18:00">
-                                                <button class="toggle-btn active" title="Toggle day">
-                                                    <i class="fas fa-toggle-on"></i>
-                                                </button>
-                                            </div>
-                                            <div class="hour-row">
-                                                <span class="day-label">Thursday</span>
-                                                <input type="time" class="time-input" value="09:00">
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" value="18:00">
-                                                <button class="toggle-btn active" title="Toggle day">
-                                                    <i class="fas fa-toggle-on"></i>
-                                                </button>
-                                            </div>
-                                            <div class="hour-row">
-                                                <span class="day-label">Friday</span>
-                                                <input type="time" class="time-input" value="09:00">
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" value="18:00">
-                                                <button class="toggle-btn active" title="Toggle day">
-                                                    <i class="fas fa-toggle-on"></i>
-                                                </button>
-                                            </div>
-                                            <div class="hour-row">
-                                                <span class="day-label">Saturday</span>
-                                                <input type="time" class="time-input" value="10:00">
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" value="16:00">
-                                                <button class="toggle-btn active" title="Toggle day">
-                                                    <i class="fas fa-toggle-on"></i>
-                                                </button>
-                                            </div>
-                                            <div class="hour-row">
-                                                <span class="day-label">Sunday</span>
-                                                <input type="time" class="time-input" disabled>
-                                                <span class="time-separator">to</span>
-                                                <input type="time" class="time-input" disabled>
-                                                <button class="toggle-btn" title="Toggle day">
-                                                    <i class="fas fa-toggle-off"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
 
                                 <!-- Currency & Tax Card -->
                                 <div class="setting-card">
@@ -387,59 +300,6 @@ if (!isset($_SESSION['user_id'])) {
                             </div>
                         </div>
 
-                        <!-- Security Tab -->
-                        <div class="settings-tab" id="security-tab">
-                            <div class="settings-grid">
-                                <div class="setting-card featured">
-                                    <div class="card-header">
-                                        <div class="card-icon">
-                                            <i class="fas fa-shield-alt"></i>
-                                        </div>
-                                        <div class="card-title">
-                                            <h3>Security Settings</h3>
-                                            <p>Manage your account security and access</p>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="security-options">
-                                            <div class="security-item">
-                                                <div class="security-icon">
-                                                    <i class="fas fa-key"></i>
-                                                </div>
-                                                <div class="security-content">
-                                                    <h4>Change Password</h4>
-                                                    <p>Update your account password</p>
-                                                </div>
-                                                <button class="modern-btn">Change</button>
-                                            </div>
-                                            <div class="security-item">
-                                                <div class="security-icon">
-                                                    <i class="fas fa-mobile-alt"></i>
-                                                </div>
-                                                <div class="security-content">
-                                                    <h4>Two-Factor Authentication</h4>
-                                                    <p>Add an extra layer of security</p>
-                                                </div>
-                                                <div class="toggle-switch">
-                                                    <input type="checkbox" id="2fa-toggle">
-                                                    <label for="2fa-toggle"></label>
-                                                </div>
-                                            </div>
-                                            <div class="security-item">
-                                                <div class="security-icon">
-                                                    <i class="fas fa-history"></i>
-                                                </div>
-                                                <div class="security-content">
-                                                    <h4>Login History</h4>
-                                                    <p>View recent login activity</p>
-                                                </div>
-                                                <button class="modern-btn secondary">View</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Notifications Tab -->
                         <div class="settings-tab" id="notifications-tab">
@@ -513,49 +373,6 @@ if (!isset($_SESSION['user_id'])) {
                             </div>
                         </div>
 
-                        <!-- Integrations Tab -->
-                        <div class="settings-tab" id="integrations-tab">
-                            <div class="settings-grid">
-                                <div class="setting-card">
-                                    <div class="card-header">
-                                        <div class="card-icon">
-                                            <i class="fas fa-plug"></i>
-                                        </div>
-                                        <div class="card-title">
-                                            <h3>Third-Party Integrations</h3>
-                                            <p>Connect with external services and tools</p>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="integration-list">
-                                            <div class="integration-item">
-                                                <div class="integration-icon">
-                                                    <i class="fab fa-paypal"></i>
-                                                </div>
-                                                <div class="integration-info">
-                                                    <h4>PayPal</h4>
-                                                    <p>Accept PayPal payments</p>
-                                                    <span class="status-badge disconnected">Disconnected</span>
-                                                </div>
-                                                <button class="modern-btn">Connect</button>
-                                            </div>
-                                            
-                                            <div class="integration-item">
-                                                <div class="integration-icon">
-                                                    <i class="fab fa-stripe"></i>
-                                                </div>
-                                                <div class="integration-info">
-                                                    <h4>Stripe</h4>
-                                                    <p>Process credit card payments</p>
-                                                    <span class="status-badge disconnected">Disconnected</span>
-                                                </div>
-                                                <button class="modern-btn">Connect</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Advanced Tab -->
                         <div class="settings-tab" id="advanced-tab">

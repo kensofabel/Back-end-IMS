@@ -38,7 +38,7 @@ function handleSaveSettings() {
         taxRate: document.getElementById('tax-rate')?.value || ''
         // Add more fields as needed
     };
-    fetch('save_settings.php', {
+    return fetch('save_settings.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -64,18 +64,18 @@ function showSettingsTab(tabName) {
     document.querySelectorAll('.settings-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('.nav-tab').forEach(btn => {
         btn.classList.remove('active');
     });
     const tab = document.getElementById(`${tabName}-tab`);
-    const btn = document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
+    const btn = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
     if (tab) tab.classList.add('active');
     if (btn) btn.classList.add('active');
 }
 
 // Card expand/collapse logic
 function toggleCardExpansion(btn) {
-    const card = btn.closest('.settings-card');
+    const card = btn.closest('.setting-card');
     if (!card) return;
     card.classList.toggle('expanded');
     const icon = btn.querySelector('i');
@@ -87,7 +87,7 @@ function toggleCardExpansion(btn) {
 
 // Expand/collapse all cards
 function expandAllCards() {
-    document.querySelectorAll('.settings-card').forEach(card => {
+    document.querySelectorAll('.setting-card').forEach(card => {
         card.classList.add('expanded');
         const icon = card.querySelector('.card-expand-btn i');
         if (icon) {
@@ -97,7 +97,7 @@ function expandAllCards() {
     });
 }
 function collapseAllCards() {
-    document.querySelectorAll('.settings-card').forEach(card => {
+    document.querySelectorAll('.setting-card').forEach(card => {
         card.classList.remove('expanded');
         const icon = card.querySelector('.card-expand-btn i');
         if (icon) {
@@ -110,7 +110,7 @@ function collapseAllCards() {
 // Settings search filter
 function filterSettings(query) {
     query = query.toLowerCase();
-    document.querySelectorAll('.settings-card').forEach(card => {
+    document.querySelectorAll('.setting-card').forEach(card => {
         const text = card.textContent.toLowerCase();
         card.style.display = text.includes(query) ? '' : 'none';
     });
@@ -123,6 +123,8 @@ function showSettingsHelp() {
 
 // Auto-save toggle (optional, for UI feedback)
 document.addEventListener('DOMContentLoaded', function() {
+    // Load stats on page load
+    fetchSettingsStats();
     // Tab switching
     document.querySelectorAll('.nav-tab').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -168,7 +170,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save Settings button
     const saveBtn = document.getElementById('save-settings-btn');
     if (saveBtn) {
-        saveBtn.addEventListener('click', handleSaveSettings);
+        saveBtn.addEventListener('click', async function() {
+            await handleSaveSettings();
+            // Refresh stats after saving
+            fetchSettingsStats();
+        });
     }
 
     // Reset to Defaults button
@@ -182,4 +188,75 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.hero-btn').forEach(btn => {
         btn.addEventListener('click', showQuickSetup);
     });
+
+    // Real-time stats: update tiles as fields change (without saving)
+    const trackedIds = [
+        'business-name',
+        'business-type',
+        'business-address',
+        'business-phone',
+        'business-email',
+        'currency',
+        'tax-rate'
+    ];
+    trackedIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', updateStatsFromInputs);
+        el.addEventListener('change', updateStatsFromInputs);
+    });
 });
+
+// Fetch and update settings stats
+function fetchSettingsStats() {
+    fetch('get_settings_stats.php', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+            if (!data || !data.success) return;
+            const completedEl = document.getElementById('completed-settings');
+            const pendingEl = document.getElementById('pending-settings');
+            const secureEl = document.getElementById('secure-percent');
+            const secureLabel = document.getElementById('secure-label');
+            if (completedEl) completedEl.textContent = data.completed;
+            if (pendingEl) pendingEl.textContent = data.pending;
+            if (secureEl) secureEl.textContent = `${data.securePercent}%`;
+            if (secureLabel) secureLabel.textContent = data.securePercent >= 80 ? 'Secure' : 'Needs Attention';
+        })
+        .catch(() => {});
+}
+
+// Compute stats from current input values (instant feedback)
+function updateStatsFromInputs() {
+    const values = {
+        business_name: (document.getElementById('business-name')?.value || '').trim(),
+        business_type: (document.getElementById('business-type')?.value || '').trim(),
+        business_address: (document.getElementById('business-address')?.value || '').trim(),
+        business_phone: (document.getElementById('business-phone')?.value || '').trim(),
+        business_email: (document.getElementById('business-email')?.value || '').trim(),
+        currency: (document.getElementById('currency')?.value || '').trim(),
+        tax_rate: (document.getElementById('tax-rate')?.value || '').trim(),
+    };
+
+    const requiredKeys = Object.keys(values);
+    let completed = 0;
+    requiredKeys.forEach(k => {
+        if (values[k] !== '') completed++;
+    });
+    const total = requiredKeys.length;
+    const pending = Math.max(0, total - completed);
+
+    // Heuristic for secure percent (match backend approach)
+    let securePercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    if (values.business_email && /.+@.+\..+/.test(values.business_email)) securePercent = Math.min(100, securePercent + 5);
+    const tr = parseFloat(values.tax_rate);
+    if (!isNaN(tr) && tr >= 0 && tr <= 100) securePercent = Math.min(100, securePercent + 5);
+
+    const completedEl = document.getElementById('completed-settings');
+    const pendingEl = document.getElementById('pending-settings');
+    const secureEl = document.getElementById('secure-percent');
+    const secureLabel = document.getElementById('secure-label');
+    if (completedEl) completedEl.textContent = completed;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (secureEl) secureEl.textContent = `${securePercent}%`;
+    if (secureLabel) secureLabel.textContent = securePercent >= 80 ? 'Secure' : 'Needs Attention';
+}
