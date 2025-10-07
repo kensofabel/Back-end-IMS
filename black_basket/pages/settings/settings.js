@@ -123,7 +123,30 @@ function showSettingsHelp() {
 
 // Auto-save toggle (optional, for UI feedback)
 document.addEventListener('DOMContentLoaded', function() {
-    // Load stats on page load
+    // Prefill inputs from server settings, then compute stats
+    fetch('get_settings.php', { credentials: 'same-origin', cache: 'no-store' })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(json => {
+            if (!json || !json.success) return;
+            const d = json.data || {};
+            const map = [
+                ['business-name', d.businessName],
+                ['business-type', d.businessType],
+                ['business-address', d.businessAddress],
+                ['business-phone', d.businessPhone],
+                ['business-email', d.businessEmail],
+                ['currency', d.currency],
+                ['tax-rate', d.taxRate]
+            ];
+            map.forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.value = (val ?? '').toString();
+            });
+            try { updateStatsFromInputs(); } catch (_) {}
+        })
+        .catch(() => {});
+    // Load stats on page load (after possible prefill)
     fetchSettingsStats();
     // Tab switching
     document.querySelectorAll('.nav-tab').forEach(btn => {

@@ -35,7 +35,7 @@ if (!isset($_SESSION['user_id'])) {
                     </div>
                     <div class="report-summary">
                         <div class="summary-card">
-                            <h3 id="total-inventory-value">$0.00</h3>
+                            <h3 id="total-inventory-value">₱0.00</h3>
                             <p>Total Inventory Value</p>
                         </div>
                         <div class="summary-card">

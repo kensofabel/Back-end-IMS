@@ -25,48 +25,47 @@ document.addEventListener('DOMContentLoaded', function() {
 });
   // Attach Generate Report button handler
   window.generatePaymentReport = function() {
-    // Get date range
     const startDate = document.getElementById('payment-report-start-date').value;
     const endDate = document.getElementById('payment-report-end-date').value;
 
-    // Mock data (replace with AJAX/fetch in production)
-    const mockData = [
-      { id: 'TXN001', date: '2025-09-01 10:00', method: 'Cash', amount: 120.00, products: 'Apples, Bananas' },
-      { id: 'TXN002', date: '2025-09-01 11:30', method: 'Card', amount: 75.50, products: 'Oranges' },
-      { id: 'TXN003', date: '2025-09-02 09:15', method: 'Cash', amount: 200.00, products: 'Milk, Bread' },
-      { id: 'TXN004', date: '2025-09-02 14:20', method: 'Card', amount: 50.00, products: 'Eggs' }
-    ];
-
-    // Filter by date if needed (for demo, just use all)
-    let filtered = mockData;
-    if (startDate) {
-      filtered = filtered.filter(row => row.date >= startDate);
-    }
-    if (endDate) {
-      filtered = filtered.filter(row => row.date <= endDate + ' 23:59');
-    }
-
-    // Update summary cards
-    document.getElementById('total-payment-transactions').textContent = filtered.length;
-    const totalRevenue = filtered.reduce((sum, row) => sum + row.amount, 0);
-    document.getElementById('total-payment-revenue').textContent = '$' + totalRevenue.toFixed(2);
-    const cashCount = filtered.filter(row => row.method === 'Cash').length;
-    const cardCount = filtered.filter(row => row.method === 'Card').length;
-    document.getElementById('cash-payments').textContent = cashCount;
-    document.getElementById('card-payments').textContent = cardCount;
-
-    // Update table
     const tbody = document.getElementById('payment-report-table-body');
-    tbody.innerHTML = '';
-    filtered.forEach(row => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${row.id}</td>
-        <td>${row.date}</td>
-        <td>${row.method}</td>
-        <td>$${row.amount.toFixed(2)}</td>
-        <td>${row.products}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ff9800;">Loading...</td></tr>';
+
+    const params = new URLSearchParams();
+    if (startDate) params.append('start', startDate);
+    if (endDate) params.append('end', endDate);
+
+    fetch('paymentreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Network error')))
+      .then(json => {
+        if (!json || !json.success) throw new Error(json.message || 'Failed to load report');
+        const { transactions, summary, currencySymbol } = json;
+
+        // Summary cards
+        document.getElementById('total-payment-transactions').textContent = summary.count;
+        document.getElementById('total-payment-revenue').textContent = currencySymbol + Number(summary.revenue).toFixed(2);
+        document.getElementById('cash-payments').textContent = summary.cash;
+        document.getElementById('card-payments').textContent = summary.card;
+
+        // Table
+        if (!transactions || transactions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:.8">No transactions found for the selected range.</td></tr>';
+        } else {
+          tbody.innerHTML = '';
+          transactions.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>TXN${row.id}</td>
+              <td>${row.date}</td>
+              <td>${row.method}</td>
+              <td>${currencySymbol}${Number(row.amount).toFixed(2)}</td>
+              <td>${row.products}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      })
+      .catch(err => {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#f66;">${err.message}</td></tr>`;
+      });
   };

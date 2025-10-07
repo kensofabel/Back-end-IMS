@@ -58,15 +58,15 @@ session_start();
                         <div class="cart-total">
                             <div class="total-row">
                                 <span>Subtotal:</span>
-                                <span id="subtotal">$0.00</span>
+                                <span id="subtotal">₱0.00</span>
                             </div>
                             <div class="total-row">
-                                <span>Tax (8.25%):</span>
-                                <span id="tax">$0.00</span>
+                                <span>Tax (<span id="tax-rate-label">12%</span>):</span>
+                                <span id="tax">₱0.00</span>
                             </div>
                             <div class="total-row total">
                                 <span>Total:</span>
-                                <span id="total">$0.00</span>
+                                <span id="total">₱0.00</span>
                             </div>
                         </div>
                     </div>
@@ -84,7 +84,7 @@ session_start();
                         </div>
                         <div class="change-amount">
                             <span>Change:</span>
-                            <span id="change">$0.00</span>
+                            <span id="change">₱0.00</span>
                         </div>
                         <button id="complete-sale-btn" class="complete-sale-btn">Complete Sale</button>
                         <button id="clear-cart-btn" class="clear-cart-btn">Clear Cart</button>

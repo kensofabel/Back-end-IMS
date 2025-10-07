@@ -25,44 +25,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Attach Generate Report button handler
   window.generateInventoryReport = function() {
-    // Mock data (replace with AJAX/fetch in production)
-    const mockData = [
-      { name: 'Apple', category: 'Fruits', price: 1.2, stock: 50 },
-      { name: 'Banana', category: 'Fruits', price: 0.8, stock: 10 },
-      { name: 'Milk', category: 'Dairy', price: 2.5, stock: 0 },
-      { name: 'Bread', category: 'Bakery', price: 1.5, stock: 5 },
-      { name: 'Eggs', category: 'Dairy', price: 3.0, stock: 100 },
-      { name: 'Orange', category: 'Fruits', price: 1.0, stock: 2 }
-    ];
-
-    // Calculate summary
-    const totalValue = mockData.reduce((sum, item) => sum + item.price * item.stock, 0);
-    const totalItems = mockData.length;
-    const lowStockCount = mockData.filter(item => item.stock > 0 && item.stock <= 10).length;
-    const outOfStockCount = mockData.filter(item => item.stock === 0).length;
-
-    document.getElementById('total-inventory-value').textContent = '$' + totalValue.toFixed(2);
-    document.getElementById('total-inventory-items').textContent = totalItems;
-    document.getElementById('low-stock-count').textContent = lowStockCount;
-    document.getElementById('out-of-stock-count').textContent = outOfStockCount;
-
-    // Update table
     const tbody = document.getElementById('inventory-report-table-body');
-    tbody.innerHTML = '';
-    mockData.forEach(item => {
-      const tr = document.createElement('tr');
-      let status = '';
-      if (item.stock === 0) status = '<span style="color:#f44336;font-weight:bold">Out of Stock</span>';
-      else if (item.stock <= 10) status = '<span style="color:#ff9800;font-weight:bold">Low Stock</span>';
-      else status = '<span style="color:#4caf50;font-weight:bold">In Stock</span>';
-      tr.innerHTML = `
-        <td>${item.name}</td>
-        <td>${item.category}</td>
-        <td>$${item.price.toFixed(2)}</td>
-        <td>${item.stock}</td>
-        <td>${status}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ff9800;">Loading...</td></tr>';
+
+    fetch('inventoryreport_api.php', { credentials: 'same-origin', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Network error')))
+      .then(json => {
+        if (!json || !json.success) throw new Error(json.message || 'Failed to load report');
+        const { items, summary, currencySymbol } = json;
+
+        // Summary
+        document.getElementById('total-inventory-value').textContent = currencySymbol + Number(summary.totalValue).toFixed(2);
+        document.getElementById('total-inventory-items').textContent = summary.totalItems;
+        document.getElementById('low-stock-count').textContent = summary.lowStock;
+        document.getElementById('out-of-stock-count').textContent = summary.outOfStock;
+
+        // Table
+        if (!items || items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:.8">No products found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        items.forEach(item => {
+          let status = '';
+          if (item.status === 'out') status = '<span style="color:#f44336;font-weight:bold">Out of Stock</span>';
+          else if (item.status === 'low') status = '<span style="color:#ff9800;font-weight:bold">Low Stock</span>';
+          else status = '<span style="color:#4caf50;font-weight:bold">In Stock</span>';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.category || ''}</td>
+            <td>${currencySymbol}${Number(item.price).toFixed(2)}</td>
+            <td>${item.stock}</td>
+            <td>${status}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      })
+      .catch(err => {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#f66;">${err.message}</td></tr>`;
+      });
   };
 });

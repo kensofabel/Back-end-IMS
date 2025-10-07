@@ -41,11 +41,11 @@ if (!isset($_SESSION['user_id'])) {
                             <p>Total Transactions</p>
                         </div>
                         <div class="summary-card">
-                            <h3 id="total-sales-revenue">$0.00</h3>
+                            <h3 id="total-sales-revenue">₱0.00</h3>
                             <p>Total Revenue</p>
                         </div>
                         <div class="summary-card">
-                            <h3 id="average-sale">$0.00</h3>
+                            <h3 id="average-sale">₱0.00</h3>
                             <p>Average Sale</p>
                         </div>
                         <div class="summary-card">

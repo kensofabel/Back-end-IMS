@@ -169,7 +169,7 @@ if (!isset($_SESSION['user_id'])) {
                                 <div class="setting-card">
                                     <div class="card-header">
                                         <div class="card-icon">
-                                            <i class="fas fa-dollar-sign"></i>
+                                            <i class="fas fa-peso-sign"></i>
                                         </div>
                                         <div class="card-title">
                                             <h3>Currency & Tax</h3>
@@ -188,7 +188,7 @@ if (!isset($_SESSION['user_id'])) {
                                                     <option value="EUR">EUR (€)</option>
                                                     <option value="GBP">GBP (£)</option>
                                                     <option value="CAD">CAD (C$)</option>
-                                                    <option value="PHP">PHP (₱)</option>
+                                                    <option value="PHP" selected>PHP (₱)</option>
                                                 </select>
                                             </div>
                                             <div class="input-group">

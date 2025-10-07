@@ -21,11 +21,7 @@ SET time_zone = "+00:00";
 -- Database: `black_basket_db`
 --
 
--- --------------------------------------------------------
 
---
--- Table structure for table `audit_logs`
---
 
 CREATE TABLE `audit_logs` (
   `id` int(11) NOT NULL,
@@ -40,7 +36,6 @@ CREATE TABLE `audit_logs` (
 
 -- --------------------------------------------------------
 
---
 
 CREATE TABLE `password_resets` (
   `id` int(11) NOT NULL,
@@ -52,7 +47,6 @@ CREATE TABLE `password_resets` (
 
 
 -- Before importing this SQL, run the following to remove invalid password_resets rows:
--- DELETE FROM password_resets WHERE user_id NOT IN (SELECT id FROM users);
 
 -- --------------------------------------------------------
 
@@ -64,7 +58,6 @@ CREATE TABLE `permissions` (
   `id` int(11) NOT NULL,
   `name` varchar(50) NOT NULL,
   `description` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `permissions`
@@ -72,15 +65,9 @@ CREATE TABLE `permissions` (
 
 INSERT INTO `permissions` (`id`, `name`, `description`) VALUES
 (1, 'Dashboard Access', 'Access to dashboard and statistics'),
-(2, 'Inventory Management', 'View and manage inventory'),
-(3, 'Add Products', 'Add new products to inventory'),
-(4, 'Edit Products', 'Edit existing products'),
 (5, 'Delete Products', 'Delete products from inventory'),
 (6, 'POS', 'Process sales transactions'),
 (7, 'View Sales Report', 'Access sales reports'),
-(8, 'View Inventory Report', 'Access inventory reports'),
-(9, 'Manage Roles', 'Create and manage user roles'),
-(10, 'Set Permissions', 'Assign permissions to roles'),
 (11, 'Employee Management', 'Manage employee accounts'),
 (12, 'Audit Logs Access', 'View system audit logs'),
 (13, 'Payment Report', 'Access payment reports');
@@ -206,6 +193,80 @@ ALTER TABLE `users`
 --
 -- Indexes for table `user_roles`
 --
+
+-- --------------------------------------------------------
+-- Application migrations (safe re-runnable)
+
+-- Products table (used by POS and all reports)
+CREATE TABLE IF NOT EXISTS `products` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(150) NOT NULL,
+  `sku` VARCHAR(64) DEFAULT NULL,
+  `barcode` VARCHAR(64) DEFAULT NULL,
+  `category` VARCHAR(100) DEFAULT NULL,
+  `unit_price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `description` TEXT DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_products_sku` (`sku`),
+  UNIQUE KEY `uq_products_barcode` (`barcode`),
+  KEY `idx_products_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Inventory table (supports locations; defaults to Main Warehouse)
+CREATE TABLE IF NOT EXISTS `inventory` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `product_id` INT NOT NULL,
+  `location` VARCHAR(100) NOT NULL DEFAULT 'Main Warehouse',
+  `quantity` INT NOT NULL DEFAULT 0,
+  `last_updated` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_inventory_product_location` (`product_id`,`location`),
+  KEY `idx_inventory_product` (`product_id`),
+  CONSTRAINT `fk_inventory_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Sales header table
+CREATE TABLE IF NOT EXISTS `sales` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `customer_name` VARCHAR(150) DEFAULT NULL,
+  `sale_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `payment_method` VARCHAR(32) NOT NULL DEFAULT 'cash',
+  `channel` VARCHAR(50) NOT NULL DEFAULT 'in-store',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `created_by` INT DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_sales_sale_date` (`sale_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Sales line items
+CREATE TABLE IF NOT EXISTS `sale_items` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `sale_id` INT NOT NULL,
+  `product_id` INT NOT NULL,
+  `quantity_sold` INT NOT NULL,
+  `unit_price` DECIMAL(12,2) NOT NULL,
+  `total_price` DECIMAL(12,2) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_sale_items_sale` (`sale_id`),
+  KEY `idx_sale_items_product` (`product_id`),
+  CONSTRAINT `fk_sale_items_sale` FOREIGN KEY (`sale_id`) REFERENCES `sales`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sale_items_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Enhance user_roles with metadata (if not already present)
+ALTER TABLE `user_roles`
+  ADD COLUMN IF NOT EXISTS `is_primary` TINYINT(1) NOT NULL DEFAULT 0 AFTER `role_id`,
+  ADD COLUMN IF NOT EXISTS `assigned_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS `assigned_by` INT DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `expires_at` DATETIME DEFAULT NULL,
+  ADD KEY `idx_user_roles_user_assigned` (`user_id`,`assigned_at`);
+
+-- Optional FK for assigned_by (ignore if users table missing)
+ALTER TABLE `user_roles`
+  ADD CONSTRAINT `fk_user_roles_assigned_by` FOREIGN KEY (`assigned_by`) REFERENCES `users`(`id`);
+
 ALTER TABLE `user_roles`
   ADD PRIMARY KEY (`user_id`,`role_id`),
   ADD KEY `role_id` (`role_id`);
@@ -283,4 +344,86 @@ COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+-- ===============================================
+-- Enhancements for user_roles and permissions UX
+-- ===============================================
+
+-- Add metadata and constraints to user_roles
+ALTER TABLE `user_roles`
+  ADD COLUMN `assigned_at` DATETIME DEFAULT CURRENT_TIMESTAMP AFTER `role_id`,
+  ADD COLUMN `assigned_by` INT NULL AFTER `assigned_at`,
+  ADD COLUMN `expires_at` DATETIME NULL AFTER `assigned_by`,
+  ADD COLUMN `is_primary` TINYINT(1) NOT NULL DEFAULT 0 AFTER `expires_at`;
+
+-- FK: who assigned the role
+ALTER TABLE `user_roles`
+  ADD CONSTRAINT `fk_user_roles_assigned_by` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+-- Helpful index for recency queries
+ALTER TABLE `user_roles`
+  ADD INDEX `idx_user_roles_user_assigned_at` (`user_id`, `assigned_at`);
+
+-- Enforce only one primary role per user via triggers
+DROP TRIGGER IF EXISTS `trg_user_roles_bi_primary`;
+DELIMITER //
+CREATE TRIGGER `trg_user_roles_bi_primary` BEFORE INSERT ON `user_roles`
+FOR EACH ROW
+BEGIN
+  IF NEW.is_primary = 1 THEN
+    IF EXISTS (SELECT 1 FROM user_roles WHERE user_id = NEW.user_id AND is_primary = 1) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User already has a primary role';
+    END IF;
+  END IF;
+END//
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS `trg_user_roles_bu_primary`;
+DELIMITER //
+CREATE TRIGGER `trg_user_roles_bu_primary` BEFORE UPDATE ON `user_roles`
+FOR EACH ROW
+BEGIN
+  IF NEW.is_primary = 1 AND (OLD.is_primary <> 1) THEN
+    IF EXISTS (SELECT 1 FROM user_roles WHERE user_id = NEW.user_id AND is_primary = 1 AND role_id <> NEW.role_id) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User already has a primary role';
+    END IF;
+  END IF;
+END//
+DELIMITER ;
+
+-- Enforce tenant/owner consistency: user and role must belong to same owner_id
+DROP TRIGGER IF EXISTS `trg_user_roles_bi_owner`;
+DELIMITER //
+CREATE TRIGGER `trg_user_roles_bi_owner` BEFORE INSERT ON `user_roles`
+FOR EACH ROW
+BEGIN
+  DECLARE u_owner INT; DECLARE r_owner INT;
+  SELECT owner_id INTO u_owner FROM users WHERE id = NEW.user_id;
+  SELECT owner_id INTO r_owner FROM roles WHERE id = NEW.role_id;
+  IF u_owner IS NOT NULL AND r_owner IS NOT NULL AND u_owner <> r_owner THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User and role belong to different owners';
+  END IF;
+END//
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS `trg_user_roles_bu_owner`;
+DELIMITER //
+CREATE TRIGGER `trg_user_roles_bu_owner` BEFORE UPDATE ON `user_roles`
+FOR EACH ROW
+BEGIN
+  DECLARE u_owner INT; DECLARE r_owner INT;
+  SELECT owner_id INTO u_owner FROM users WHERE id = NEW.user_id;
+  SELECT owner_id INTO r_owner FROM roles WHERE id = NEW.role_id;
+  IF u_owner IS NOT NULL AND r_owner IS NOT NULL AND u_owner <> r_owner THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User and role belong to different owners';
+  END IF;
+END//
+DELIMITER ;
+
+-- Convenience view: effective permissions per user (active roles only)
+CREATE OR REPLACE VIEW `v_user_effective_permissions` AS
+SELECT ur.user_id, rp.permission_id
+FROM user_roles ur
+JOIN roles r ON r.id = ur.role_id AND r.status = 'active'
+JOIN role_permissions rp ON rp.role_id = ur.role_id;
+
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

@@ -41,7 +41,7 @@ if (!isset($_SESSION['user_id'])) {
                             <p>Total Transactions</p>
                         </div>
                         <div class="summary-card">
-                            <h3 id="total-payment-revenue">$0.00</h3>
+                            <h3 id="total-payment-revenue">₱0.00</h3>
                             <p>Total Revenue</p>
                         </div>
                         <div class="summary-card">

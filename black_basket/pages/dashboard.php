@@ -54,10 +54,10 @@ include '../partials/header.php';
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">
-                                <i class="fas fa-dollar-sign"></i>
+                                <i class="fas fa-peso-sign"></i>
                             </div>
                             <div class="stat-info">
-                                <h3 id="total-revenue">$0.00</h3>
+                                <h3 id="total-revenue">₱0.00</h3>
                                 <p>Total Revenue</p>
                             </div>
                         </div>
