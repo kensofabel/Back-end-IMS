@@ -1,0 +1,15 @@
+/* Dashboard section header styles moved from inline */
+.dashboard-header-title {
+	margin-bottom: 18px;
+}
+#dashboard-welcome {
+	font-size: 1.7em;
+	font-weight: 600;
+	margin: 0;
+	color: #fff;
+}
+
+/* Make the business name in the welcome header white */
+#dashboard-welcome .business-name {
+	color: #fff;
+}

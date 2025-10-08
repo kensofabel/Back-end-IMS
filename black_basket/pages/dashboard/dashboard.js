@@ -6,7 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
     .then(res => res.ok ? res.json() : null)
     .then(json => {
       if (json && json.success && json.businessName) {
-        document.getElementById('dashboard-welcome').textContent = 'Welcome, ' + json.businessName;
+        const welcome = document.getElementById('dashboard-welcome');
+        const nameSpan = welcome.querySelector('.business-name');
+        if (nameSpan) {
+          nameSpan.textContent = ', ' + json.businessName;
+        }
       }
     });
   // Mock stats data
