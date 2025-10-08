@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const welcome = document.getElementById('dashboard-welcome');
         const nameSpan = welcome.querySelector('.business-name');
         if (nameSpan) {
-          nameSpan.textContent = ', ' + json.businessName;
+          nameSpan.textContent = ', ' + json.businessName ;
         }
       }
     });
