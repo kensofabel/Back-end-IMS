@@ -1,15 +1,118 @@
-/* Dashboard section header styles moved from inline */
+
+/* Improved Dashboard Layout */
 .dashboard-header-title {
-	margin-bottom: 18px;
+	margin-bottom: 32px;
+	text-align: center;
 }
 #dashboard-welcome {
-	font-size: 1.7em;
-	font-weight: 600;
+	font-size: 2.2em;
+	font-weight: 700;
 	margin: 0;
+	color: #fff;
+	letter-spacing: 1px;
+}
+#dashboard-welcome .business-name {
 	color: #fff;
 }
 
-/* Make the business name in the welcome header white */
-#dashboard-welcome .business-name {
+.stats-grid {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 32px;
+	margin-bottom: 36px;
+}
+.stat-card {
+	background: #232323;
+	border-radius: 16px;
+	box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+	padding: 32px 38px 24px 38px;
+	min-width: 210px;
+	max-width: 260px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat-card:hover {
+	box-shadow: 0 4px 24px rgba(255,152,0,0.13);
+	transform: translateY(-2px) scale(1.03);
+}
+.stat-icon {
+	font-size: 2.5em;
+	color: #ff9800;
+	margin-bottom: 12px;
+}
+.stat-info h3 {
+	font-size: 2.1em;
+	margin: 0 0 6px 0;
 	color: #fff;
+	font-weight: 700;
+	text-align: center;
+}
+.stat-info p {
+	font-size: 1.08em;
+	color: #ff9800;
+	margin: 0;
+	text-align: center;
+}
+
+.recent-activities {
+	margin: 0 auto;
+	max-width: 700px;
+	background: #232323;
+	border-radius: 14px;
+	box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+	padding: 28px 32px 24px 32px;
+}
+.recent-activities h2 {
+	color: #ff9800;
+	font-size: 1.4em;
+	margin-top: 0;
+	margin-bottom: 18px;
+	text-align: left;
+}
+.activities-list {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.activity-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	background: #181818;
+	border-radius: 8px;
+	padding: 12px 18px;
+	color: #fff;
+	font-size: 1.05em;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.activity-icon {
+	color: #ff9800;
+	font-size: 1.2em;
+}
+.activity-text {
+	flex: 1;
+}
+.activity-time {
+	color: #dbdbdb;
+	font-size: 0.98em;
+	margin-left: 8px;
+}
+
+@media (max-width: 900px) {
+	.stats-grid {
+		flex-direction: column;
+		align-items: center;
+		gap: 18px;
+	}
+	.stat-card {
+		min-width: 180px;
+		max-width: 98vw;
+		padding: 22px 10vw 18px 10vw;
+	}
+	.recent-activities {
+		padding: 18px 4vw 14px 4vw;
+	}
 }
