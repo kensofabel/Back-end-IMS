@@ -93,6 +93,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // Display products in grid
     function displayProducts(products) {
         productGrid.innerHTML = '';
+        // If no products from API, inject mock data
+        if (!products || products.length === 0) {
+            products = [
+                { id: 101, name: 'Apple', unit_price: 500.00, quantity: 20 },
+                { id: 102, name: 'Banana', unit_price: 350.00, quantity: 15 },
+                { id: 103, name: 'Milk', unit_price: 1200.00, quantity: 10 },
+                { id: 104, name: 'Bread', unit_price: 150.00, quantity: 30 },
+                { id: 105, name: 'Egg(tray)', unit_price: 100.00, quantity: 25 }
+            ];
+        }
         products.forEach(product => {
             const productCard = document.createElement('div');
             productCard.className = 'product-card';

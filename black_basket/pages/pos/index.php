@@ -35,7 +35,7 @@ session_start();
                     <div class="pos-section">
                         <h3>Product Search</h3>
                         <div class="search-box">
-                            <input type="text" id="product-search" placeholder="Scan barcode or search product...">
+                            <input type="text" id="product-search" placeholder="search product...">
                             <i class="fas fa-search"></i>
                         </div>
                     </div>
