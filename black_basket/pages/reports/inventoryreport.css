@@ -1,12 +1,11 @@
-/* inventoryreport.css - Settings Page Theme for Inventory Report */
+/* salesreport.css - Settings Page Theme for Inventory Report */
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     color: #fff;
-
 }
 
-#inventory-reports-section {
+#sales-report-section {
     max-width: 1400px;
     margin: 0 auto;
     padding: 2rem;
@@ -126,7 +125,7 @@ body {
 }
 
 /* Table Styles */
-.inventory-report-table-container {
+.sales-report-table-container {
     background: #232323;
     border-radius: 14px;
     padding: 18px 0 0 0;
@@ -134,7 +133,7 @@ body {
     overflow-x: auto;
 }
 
-.inventory-report-table {
+.sales-report-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -143,7 +142,7 @@ body {
     min-width: 700px;
 }
 
-.inventory-report-table th {
+.sales-report-table th {
     background: #232323;
     color: #ff9800;
     font-weight: 600;
@@ -155,26 +154,26 @@ body {
     z-index: 2;
 }
 
-.inventory-report-table td {
+.sales-report-table td {
     padding: 12px 10px;
     border-bottom: 1px solid #181818;
 }
 
-.inventory-report-table tr:last-child td {
+.sales-report-table tr:last-child td {
     border-bottom: none;
 }
 
-.inventory-report-table tbody tr.selected-row {
+.sales-report-table tbody tr.selected-row {
     background: #181818;
     color: #ff9800;
 }
 
 /* Scrollbar Styling */
-.inventory-report-table-container::-webkit-scrollbar {
+.sales-report-table-container::-webkit-scrollbar {
     height: 8px;
     background: #23272f;
 }
-.inventory-report-table-container::-webkit-scrollbar-thumb {
+.sales-report-table-container::-webkit-scrollbar-thumb {
     background: #353a42;
     border-radius: 8px;
 }
@@ -193,7 +192,7 @@ body {
 }
 
 @media (max-width: 600px) {
-    #inventory-reports-section {
+    #sales-report-section {
         padding: 1rem;
     }
     .summary-card {
@@ -202,7 +201,7 @@ body {
     .section-header h2 {
         font-size: 1.1rem;
     }
-    .inventory-report-table {
+    .sales-report-table {
         min-width: 400px;
         font-size: 0.95rem;
     }
