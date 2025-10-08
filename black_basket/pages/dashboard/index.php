@@ -25,6 +25,9 @@ if (!isset($_SESSION['user_id'])) {
             <div class="content-area">
                 <!-- Dashboard Section -->
                 <section id="dashboard-section" class="section active">
+                    <div class="dashboard-header-title" style="margin-bottom: 18px;">
+                        <h1 id="dashboard-welcome" style="font-size:1.7em; font-weight:600; margin:0;">Welcome</h1>
+                    </div>
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-icon">
