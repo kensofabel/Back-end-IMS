@@ -52,6 +52,29 @@ function handleSaveSettings() {
             if (lastSaved) {
                 lastSaved.textContent = 'Last saved: ' + new Date().toLocaleString();
             }
+            // Refresh input fields from server to reflect saved values
+            fetch('get_settings.php', { credentials: 'same-origin', cache: 'no-store' })
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(json => {
+                    if (!json || !json.success) return;
+                    const d = json.data || {};
+                    const map = [
+                        ['business-name', d.businessName],
+                        ['business-type', d.businessType],
+                        ['business-address', d.businessAddress],
+                        ['business-phone', d.businessPhone],
+                        ['business-email', d.businessEmail],
+                        ['currency', d.currency],
+                        ['tax-rate', d.taxRate]
+                    ];
+                    map.forEach(([id, val]) => {
+                        const el = document.getElementById(id);
+                        if (!el) return;
+                        el.value = (val ?? '').toString();
+                    });
+                    try { updateStatsFromInputs(); } catch (_) {}
+                })
+                .catch(() => {});
         } else {
             alert(res.message || 'Failed to save settings.');
         }

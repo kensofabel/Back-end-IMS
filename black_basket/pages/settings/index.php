@@ -40,9 +40,7 @@ if (!isset($_SESSION['user_id'])) {
                                     <i class="fas fa-search search-icon"></i>
                                     <input type="text" class="search-input" placeholder="Search settings..." id="settings-search">
                                 </div>
-                                <button class="hero-btn" onclick="showQuickSetup()" title="Quick Setup">
-                                    <i class="fas fa-magic"></i>
-                                </button>
+                                <!-- Quick Setup button removed -->
                             </div>
                         </div>
                         
@@ -88,10 +86,6 @@ if (!isset($_SESSION['user_id'])) {
                             <button class="nav-tab" data-tab="notifications">
                                 <i class="fas fa-bell"></i>
                                 <span>Notifications</span>
-                            </button>
-                            <button class="nav-tab" data-tab="advanced">
-                                <i class="fas fa-cog"></i>
-                                <span>Advanced</span>
                             </button>
                         </nav>
                     </div>
