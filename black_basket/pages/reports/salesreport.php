@@ -30,6 +30,9 @@ if (!isset($_SESSION['user_id'])) {
                         <div class="report-filters">
                             <input type="date" id="report-start-date">
                             <input type="date" id="report-end-date">
+                            <button class="btn btn-secondary" id="reset-sales-report">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
                             <button class="btn btn-primary" onclick="generateSalesReport()">
                                 <i class="fas fa-chart-line"></i> Generate Report
                             </button>

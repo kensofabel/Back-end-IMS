@@ -29,6 +29,9 @@ if (!isset($_SESSION['user_id'])) {
                 <div class="report-filters">
                     <input type="date" id="report-start-date">
                     <input type="date" id="report-end-date">
+                    <button class="btn btn-secondary" id="reset-payment-report">
+                        <i class="fas fa-undo"></i> Reset
+                    </button>
                     <button class="btn btn-primary" onclick="generatePaymentReport()">
                         <i class="fas fa-money-check-alt"></i> Generate Report
                     </button>
