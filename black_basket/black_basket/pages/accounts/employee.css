@@ -1,0 +1,283 @@
+/* Employee page specific styles extracted from content.css (non-destructive copy)
+   This file is loaded only on pages/accounts/employee.php to isolate page styles.
+*/
+
+/* Roles Table Section */
+.btn-add-role {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 1.5rem;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-add-role:hover {
+    background: #ff6600;
+    color: #fff;
+}
+.roles-table {
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25) !important;
+    width: 100%;
+    color: #dbdbdb;
+    background: #232323;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.roles-table th,
+.roles-table td {
+    text-align: left;
+    border-bottom: 1px solid #3f3f3f;
+    outline: none;
+}
+.roles-table th {
+    color: #ff9800;
+    font-weight: 700;
+    text-align: left;
+    padding: 15px 25px;
+}
+
+.roles-table td {
+    text-align: left;
+    padding: 25px 25px;
+    vertical-align: middle;
+    font-size: 1rem;
+}
+.roles-table td[contenteditable="true"]:focus {
+    background: #232323;
+    border: 1px solid #ff9800;
+    border-radius: 6px;
+    outline: none;
+}
+
+.roles-table tbody tr:last-child td {
+    border-bottom: none;
+    border-right: none !important;
+    border-left: none !important;
+}
+
+.roles-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.2rem;
+    width: 100%;
+    gap: 1rem;
+}
+
+.roles-header-text {
+    color: #dbdbdb;
+    font-size: 1rem;
+    flex: 1;
+    text-align: left;
+    min-width: 0;
+    white-space: normal;
+}
+
+.tab-info-bar {
+    user-select: none;
+    width: 100%;
+    max-width: 1100px;
+    margin-bottom: 18px;
+    padding: 0 25px 12px 25px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    background: #232323;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.tab-info-text {
+    color: #dbdbdb;
+    font-size: 1rem;
+    padding-top: 25px;
+}
+
+.btn-edit-role,
+.btn-save-role,
+.btn-cancel-role {
+    background: none;
+    border: none;
+    color: #ff9800;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-right: 8px;
+    transition: color 0.2s;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+.btn-save-role {
+    color: #4caf50;
+}
+.btn-cancel-role {
+    color: #ff4d4f;
+}
+.btn-edit-role:hover {
+    color: #fff;
+}
+.btn-save-role:hover {
+    color: #fff;
+    background: #4caf50;
+}
+.btn-cancel-role:hover {
+    color: #fff;
+    background: #ff4d4f;
+}
+
+.btn-select-role {
+    background: #ff9800;
+    color: #232323;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-select-role.delete {
+    background: #ff4d4f;
+    color: #fff;
+}
+.btn-select-role:hover {
+    background: #ff6600;
+    color: #fff;
+}
+
+.status-active {
+    color: #ff9800;
+    display: flex;
+    align-items: center;
+}
+.status-active i {
+    margin-right: 6px;
+}
+
+/* Permission card small helpers used in the employee page */
+.permission-card {
+    user-select: none;
+    background: #3f3f3f;
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+}
+
+.permission-card label {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    width: 100%;
+    cursor: pointer;
+    flex-direction: row;
+}
+
+.permission-texts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+/* Small responsive tweaks used on this page */
+@media (max-width: 600px) {
+    .roles-table {
+        min-width: unset;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .roles-table th,
+    .roles-table td {
+        padding: 6px 2px;
+        font-size: 0.92rem;
+    }
+    .btn-edit-role,
+    .btn-save-role,
+    .btn-cancel-role,
+    .btn-delete-role {
+        padding: 2px 4px;
+        font-size: 1.1em;
+        min-width: 28px;
+        max-width: 32px;
+    }
+    .btn-edit-role span,
+    .btn-save-role span,
+    .btn-cancel-role span,
+    .btn-delete-role span {
+        display: none;
+    }
+}
+
+/* Labels sit above inputs (non-floating). They hide when input has value via .has-value */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+     position: relative;
+}
+.form-group label {
+    color: #bdbdbd;
+    font-size: 0.95rem;
+    margin-left: 2px;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    opacity: 1;
+}
+.form-group input,
+.form-group select {
+    padding: 10px 12px;
+    border-radius: 6px;
+}
+.form-group.has-value label {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+.password-toggle {
+     position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+     cursor: pointer;
+     user-select: none;
+     font-size: 14px;
+     color: #bdbdbd;
+}
+.password-toggle.slashed::after {
+     content: '';
+}
+
+.input-with-toggle {
+    position: relative;
+}
+.input-with-toggle input {
+    padding-right: 38px; /* space for the icon */
+}
+/* Select controls: default to transparent background with white text (matches dark UI)
+   Modal selects get a slightly elevated dark background to visually match modal-content */
+.form-group select {
+    background-color: transparent;
+    color: #ffffff !important;
+    border: 1px solid #7a7a7a;
+}
+
+.modal-content .form-group select {
+    background-color: #2a2a2a !important; /* match modal-content tone */
+    color: #ffffff !important;
+    border: 1px solid #444444 !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Attempt to style option elements — support varies by browser/OS */
+.modal-content .form-group select option {
+    background-color: #2a2a2a;
+    color: #ffffff;
+}
+
