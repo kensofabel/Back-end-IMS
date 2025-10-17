@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $data = json_decode(file_get_contents('php://input'), true);
 if (!isset($data['role_id']) || !isset($data['permission_ids']) || !is_array($data['permission_ids'])) {
-    echo json_encode(['success' => false, 'message' => 'Invalid input.']);
+    echo json_encode(['success' => false, 'message' => '']);
     exit;
 }
 

@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt->close();
     } else {
-        echo json_encode(['success' => false, 'message' => 'Invalid input.']);
+        echo json_encode(['success' => false, 'message' => '']);
     }
     exit;
 }

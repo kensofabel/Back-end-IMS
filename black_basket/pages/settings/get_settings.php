@@ -9,6 +9,20 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once '../../config/db.php'; // provides $conn (mysqli)
 
+// Enforce View Settings permission for API access
+require_once __DIR__ . '/../../partials/check_permission.php';
+$stmtPerm = $conn->prepare('SELECT id FROM permissions WHERE name = ? LIMIT 1');
+if ($stmtPerm) {
+    $permName = 'View Settings';
+    $stmtPerm->bind_param('s', $permName);
+    $stmtPerm->execute();
+    $r = $stmtPerm->get_result();
+    if ($r && $row = $r->fetch_assoc()) {
+        require_permission((int)$row['id']);
+    }
+    $stmtPerm->close();
+}
+
 // Ensure settings table exists (safety)
 $createSql = "CREATE TABLE IF NOT EXISTS settings (
     id INT AUTO_INCREMENT PRIMARY KEY,

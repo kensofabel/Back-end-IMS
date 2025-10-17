@@ -559,8 +559,9 @@ body.edit-permissions-mode .permission-card:hover {
     background: #3f3f3f;
     border-radius: 8px;
     padding: 16px 20px;
-    display: flex;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 40px 1fr; /* small fixed column for checkbox */
+    align-items: center; /* vertically center checkbox and text */
     gap: 16px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.25);
 }
@@ -568,7 +569,7 @@ body.edit-permissions-mode .permission-card:hover {
 /* Permission Label and Checkbox */
 .permission-card label {
     display: flex;
-    align-items: flex-start;
+    align-items: center; /* keep checkbox and title vertically aligned */
     gap: 18px;
     width: 100%;
     cursor: pointer;
@@ -582,7 +583,18 @@ body.edit-permissions-mode .permission-card:hover {
     gap: 2px;
 }
 
+.permission-checkbox-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.permission-texts-col {
+    display: block;
+}
+
 /* Checkbox Style */
+.permission-input,
 .permissions-checkboxes input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
@@ -593,8 +605,8 @@ body.edit-permissions-mode .permission-card:hover {
     height: 20px;
     accent-color: #ff9800;
     background: #232323;
-    align-self: flex-start;
-    margin-top: 2px;
+    align-self: center; /* vertically center the checkbox */
+    margin-top: 0;
 }
 
 .permissions-checkboxes input[type="checkbox"]:checked {

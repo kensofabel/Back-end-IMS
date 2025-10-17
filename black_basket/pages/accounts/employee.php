@@ -15,6 +15,8 @@ if (!isset($_SESSION['user_id'])) {
     <title>Employee Management</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="../../assets/css/content.css">
+    <link rel="stylesheet" href="../../assets/css/employee.css">
+    <link rel="stylesheet" href="employee.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
 </head>
@@ -55,24 +57,86 @@ if (!isset($_SESSION['user_id'])) {
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Example row, replace with PHP loop for real data -->
-                        <tr data-employee-id="1">
-                            <td class="editable-cell">John Doe</td>
-                            <td class="editable-cell">john@example.com</td>
-                            <td class="editable-cell">09123456789</td>
-                            <td class="editable-cell">Admin</td>
-                            <td class="status-col">
-                                <span class="status-badge status-active status-badge-edit" style="cursor:pointer;" title="Toggle Status">
-                                    <i class="fas fa-check-circle"></i>
-                                    <span class="status-text">Active</span>
-                                </span>
-                            </td>
-                            <td class="action-col">
-                                <button class="btn-edit-role" title="Edit"><i class="fas fa-pen"></i> <span>Edit</span></button>
-                                <button class="btn-delete-role" title="Delete" style="display:none;"><i class="fas fa-trash"></i> <span>Delete</span></button>
-                            </td>
-                        </tr>
-                        <!-- Add more rows as needed -->
+                    <?php
+                    // Load employees for this owner
+                    require_once '../../config/db.php';
+                    $currentUser = intval($_SESSION['user_id']);
+                    $owner_for_query = $currentUser;
+                    $oStmt = $conn->prepare('SELECT owner_id FROM users WHERE id = ? LIMIT 1');
+                    $oStmt->bind_param('i', $currentUser);
+                    $oStmt->execute();
+                    $oStmt->bind_result($owner_id_val);
+                    $oStmt->fetch();
+                    $oStmt->close();
+                    if ($owner_id_val !== null) $owner_for_query = intval($owner_id_val);
+
+                    // Determine if current user can delete employees (owner or has Employee Management permission id=11)
+                    $can_delete = false;
+                    $actingUser = $currentUser;
+                    if ($actingUser > 0) {
+                        // owner check
+                        $ownerCheck = $conn->prepare('SELECT owner_id FROM users WHERE id = ? LIMIT 1');
+                        if ($ownerCheck) {
+                            $ownerCheck->bind_param('i', $actingUser);
+                            $ownerCheck->execute();
+                            $ownerCheck->bind_result($owner_val_check);
+                            $ownerCheck->fetch();
+                            $ownerCheck->close();
+                            if ($owner_val_check === null) {
+                                $can_delete = true;
+                            }
+                        }
+                        // permission check if not owner
+                        if (!$can_delete) {
+                            $permStmt = $conn->prepare('SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id = ur.role_id WHERE ur.user_id = ? AND rp.permission_id = 11 LIMIT 1');
+                            if ($permStmt) {
+                                $permStmt->bind_param('i', $actingUser);
+                                $permStmt->execute();
+                                $permStmt->store_result();
+                                if ($permStmt->num_rows > 0) $can_delete = true;
+                                $permStmt->close();
+                            }
+                        }
+                    }
+
+                    $stmt = $conn->prepare(
+                        'SELECT u.id, u.full_name, u.email, u.phone, u.pos_pin, (SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name FROM users u WHERE u.owner_id = ? AND u.id <> ? ORDER BY u.full_name ASC'
+                    );
+                    $stmt->bind_param('ii', $owner_for_query, $owner_for_query);
+                    if ($stmt->execute()) {
+                        $res = $stmt->get_result();
+                        while ($row = $res->fetch_assoc()) {
+                            $rid = (int)$row['id'];
+                            $rname = htmlspecialchars($row['full_name'] ?? '');
+                            $remail = htmlspecialchars($row['email'] ?? '');
+                            $rphone = htmlspecialchars($row['phone'] ?? '');
+                            $rpos = htmlspecialchars($row['pos_pin'] ?? '');
+                            $rrole = htmlspecialchars($row['role_name'] ?? '');
+                            echo "<tr data-employee-id=\"{$rid}\">\n";
+                            echo "    <td class=\"editable-cell\">{$rname}</td>\n";
+                            echo "    <td class=\"editable-cell\">{$remail}</td>\n";
+                            echo "    <td class=\"editable-cell\">{$rphone}</td>\n";
+                            echo "    <td class=\"editable-cell\">{$rrole}</td>\n";
+                            echo "    <td class=\"status-col\">\n";
+                            echo "        <span class=\"status-badge status-active status-badge-edit\" style=\"cursor:pointer;\" title=\"Toggle Status\">\n";
+                            echo "            <i class=\"fas fa-check-circle\"></i>\n";
+                            echo "            <span class=\"status-text\">Active</span>\n";
+                            echo "        </span>\n";
+                            echo "    </td>\n";
+                            echo "    <td class=\"action-col\">\n";
+                            echo "        <button class=\"btn-edit-role\" title=\"Edit\"><i class=\"fas fa-pen\"></i> <span>Edit</span></button>\n";
+                            if ($can_delete) {
+                                echo "        <button class=\"btn-delete-role\" title=\"Delete\"><i class=\"fas fa-trash\"></i> <span>Delete</span></button>\n";
+                            } else {
+                                echo "        <button class=\"btn-delete-role\" title=\"Delete\" style=\"display:none;\"><i class=\"fas fa-trash\"></i> <span>Delete</span></button>\n";
+                            }
+                            echo "    </td>\n";
+                            echo "</tr>\n";
+                        }
+                        $res->free();
+                    }
+                    $stmt->close();
+                    ?>
                     </tbody>
                 </table>
             </div>
@@ -87,7 +151,7 @@ if (!isset($_SESSION['user_id'])) {
                 <span class="close" onclick="closeEmployeeFormModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <form id="employee-form">
+                <form id="employee-form" method="post">
                     <div class="form-group">
                         <label for="employee-name">Name</label>
                         <input type="text" id="employee-name" name="name" required>
@@ -97,11 +161,17 @@ if (!isset($_SESSION['user_id'])) {
                         <input type="email" id="employee-email" name="email" required>
                     </div>
                     <div class="form-group">
+                        <label for="employee-password">Password</label>
+                        <div class="input-with-toggle">
+                            <input type="password" id="employee-password" name="password" required>
+                            <span class="password-toggle slashed" data-target="employee-password" title="Show password">👁️</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label for="employee-phone">Phone</label>
                         <input type="text" id="employee-phone" name="phone" required>
                     </div>
                     <div class="form-group">
-                        <label for="employee-role">Role</label>
                         <select id="employee-role" name="role" required>
                             <option value="">Select Role</option>
                             <option value="Admin">Admin</option>
@@ -129,7 +199,7 @@ if (!isset($_SESSION['user_id'])) {
                 <span class="close" onclick="closeEmployeeEditModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <form id="employee-edit-form">
+                <form id="employee-edit-form" method="post">
                     <div class="form-group">
                         <label for="edit-employee-name">Name</label>
                         <input type="text" id="edit-employee-name" name="name" required>
@@ -139,11 +209,17 @@ if (!isset($_SESSION['user_id'])) {
                         <input type="email" id="edit-employee-email" name="email" required>
                     </div>
                     <div class="form-group">
+                        <label for="edit-employee-password">Password</label>
+                        <div class="input-with-toggle">
+                            <input type="password" id="edit-employee-password" name="password">
+                            <span class="password-toggle slashed" data-target="edit-employee-password" title="Show password">👁️</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label for="edit-employee-phone">Phone</label>
                         <input type="text" id="edit-employee-phone" name="phone" required>
                     </div>
                     <div class="form-group">
-                        <label for="edit-employee-role">Role</label>
                         <select id="edit-employee-role" name="role" required>
                             <option value="">Select Role</option>
                             <option value="Admin">Admin</option>
@@ -154,10 +230,6 @@ if (!isset($_SESSION['user_id'])) {
                         <label for="edit-employee-pos-pin">POS Pin</label>
                         <input type="text" id="edit-employee-pos-pin" name="pos_pin" required>
                     </div>
-                    <div class="form-group">
-                        <label for="edit-employee-hire-date">Hire Date</label>
-                        <input type="date" id="edit-employee-hire-date" name="hire_date" required>
-                    </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                         <button type="button" class="btn btn-secondary" onclick="closeEmployeeEditModal()">Cancel</button>
@@ -167,69 +239,6 @@ if (!isset($_SESSION['user_id'])) {
         </div>
     </div>
 
-    <script src="../../assets/js/content.js"></script>
-    <script>
-    // Modal open/close logic
-    function openEmployeeFormModal() {
-        document.getElementById('employee-form-modal').classList.add('show');
-    }
-    function closeEmployeeFormModal() {
-        document.getElementById('employee-form-modal').classList.remove('show');
-    }
-    function openEmployeeEditModal() {
-        document.getElementById('employee-edit-modal').classList.add('show');
-    }
-    function closeEmployeeEditModal() {
-        document.getElementById('employee-edit-modal').classList.remove('show');
-    }
-
-    // Add Employee button handler
-    document.getElementById('btn-add-employee').onclick = openEmployeeFormModal;
-
-    // Edit button handler (example, should be dynamic for real data)
-    document.querySelectorAll('.btn-edit-role').forEach(function(btn) {
-        btn.onclick = function() {
-            openEmployeeEditModal();
-            // Populate modal fields with selected employee data
-            var row = btn.closest('tr');
-            document.getElementById('edit-employee-name').value = row.children[0].innerText;
-            document.getElementById('edit-employee-email').value = row.children[1].innerText;
-            document.getElementById('edit-employee-phone').value = row.children[2].innerText;
-            document.getElementById('edit-employee-role').value = row.children[3].innerText;
-            // For demo, pos pin and hire date left blank
-        };
-    });
-
-    // Status badge toggle handler
-    document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.onclick = function() {
-            var icon = badge.querySelector('i');
-            var text = badge.querySelector('.status-text');
-            if (icon.classList.contains('fa-check-circle')) {
-                icon.classList.remove('fa-check-circle');
-                icon.classList.add('fa-times-circle');
-                badge.classList.remove('status-active');
-                badge.classList.add('status-inactive');
-                text.innerText = 'Inactive';
-            } else {
-                icon.classList.remove('fa-times-circle');
-                icon.classList.add('fa-check-circle');
-                badge.classList.remove('status-inactive');
-                badge.classList.add('status-active');
-                text.innerText = 'Active';
-            }
-        };
-    });
-
-    // Delete button handler (example, should be dynamic for real data)
-    document.querySelectorAll('.btn-delete-role').forEach(function(btn) {
-        btn.onclick = function() {
-            if (confirm('Are you sure you want to delete this employee?')) {
-                var row = btn.closest('tr');
-                row.remove();
-            }
-        };
-    });
-    </script>
+    <script src="employee.js"></script>
 </body>
 </html>

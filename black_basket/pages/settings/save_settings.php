@@ -6,6 +6,20 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+require_once '../../config/db.php'; // $conn (mysqli)
+// Enforce View Settings permission
+require_once __DIR__ . '/../../partials/check_permission.php';
+$stmtPerm = $conn->prepare('SELECT id FROM permissions WHERE name = ? LIMIT 1');
+if ($stmtPerm) {
+    $permName = 'View Settings';
+    $stmtPerm->bind_param('s', $permName);
+    $stmtPerm->execute();
+    $r = $stmtPerm->get_result();
+    if ($r && $row = $r->fetch_assoc()) {
+        require_permission((int)$row['id']);
+    }
+    $stmtPerm->close();
+}
 // Example: Collect posted data (expand as you add more fields)
 $data = json_decode(file_get_contents('php://input'), true);
 

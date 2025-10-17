@@ -4,6 +4,32 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: /black_basket/index.php');
     exit();
 }
+
+// Server-side permission enforcement: View Settings
+$checkPerm = __DIR__ . '/../../partials/check_permission.php';
+if (file_exists($checkPerm)) require_once $checkPerm;
+
+$permId = null;
+$stmtp = $conn->prepare('SELECT id FROM permissions WHERE name = ? LIMIT 1');
+if ($stmtp) {
+    $pname = 'View Settings';
+    $stmtp->bind_param('s', $pname);
+    $stmtp->execute();
+    $res = $stmtp->get_result();
+    if ($res && $row = $res->fetch_assoc()) {
+        $permId = (int)$row['id'];
+    }
+    $stmtp->close();
+}
+
+$allowed = false;
+if ($permId !== null && function_exists('_get_user_permissions_cached')) {
+    $allowed = in_array($permId, _get_user_permissions_cached(), true);
+}
+if (!$allowed) {
+    header('Location: /black_basket/pages/home.php');
+    exit();
+}
 ?>
 
 <!DOCTYPE html>

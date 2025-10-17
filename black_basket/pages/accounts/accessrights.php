@@ -200,44 +200,6 @@ if (isset($_COOKIE['access_tab']) && in_array($_COOKIE['access_tab'], ['manage-r
         </div>
     </div>
 
-    <script src="../../assets/js/content.js"></script>
-    <script>
-    // Show/hide status badge toggle in edit mode
-    document.querySelectorAll('.btn-edit-role').forEach(function(editBtn) {
-        editBtn.addEventListener('click', function() {
-            var row = this.closest('tr');
-            var statusBadgeView = row.querySelector('.status-badge-view');
-            var statusBadgeEdit = row.querySelector('.status-badge-edit');
-            if (statusBadgeView && statusBadgeEdit) {
-                statusBadgeView.style.display = 'none';
-                statusBadgeEdit.style.display = 'inline-block';
-            }
-        });
-    });
-    document.querySelectorAll('.btn-cancel-role, .btn-save-role').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var row = this.closest('tr');
-            var statusBadgeView = row.querySelector('.status-badge-view');
-            var statusBadgeEdit = row.querySelector('.status-badge-edit');
-            if (statusBadgeView && statusBadgeEdit) {
-                // Update badge icon/text based on toggle
-                statusBadgeView.innerHTML = statusBadgeEdit.innerHTML;
-                statusBadgeView.style.display = '';
-                statusBadgeEdit.style.display = 'none';
-            }
-        });
-    });
-    // Toggle logic for badge in edit mode
-    document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.addEventListener('click', function() {
-            var isActive = this.innerHTML.includes('fa-check-circle');
-            if (isActive) {
-                this.innerHTML = '<i class="fas fa-times-circle" style="color:#e53e3e; margin-left: -10px;"></i><span style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">inactive</span>';
-            } else {
-                this.innerHTML = '<i class="fas fa-check-circle" style="color:#4caf50; margin-left: -10px;"></i><span style="text-transform:capitalize; font-weight:400; font-size:1rem; margin-left:4px;">active</span>';
-            }
-        });
-    });
-    </script>
+    <script src="employee.js"></script>
 </body>
 </html>

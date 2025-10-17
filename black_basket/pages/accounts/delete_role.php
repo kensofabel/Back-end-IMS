@@ -21,7 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt->close();
     } else {
-        echo json_encode(['success' => false, 'message' => 'Invalid input.']);
+        // Missing or invalid role_id
+        echo json_encode(['success' => false, 'message' => '']);
     }
     exit;
 }
