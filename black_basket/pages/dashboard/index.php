@@ -5,6 +5,47 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: /black_basket/index.php');
     exit();
 }
+
+// Server-side permission enforcement: ensure current user has 'Dashboard Access'
+// Include permission helper (provides _get_user_permissions_cached())
+$checkPerm = __DIR__ . '/../../partials/check_permission.php';
+if (file_exists($checkPerm)) {
+    require_once $checkPerm;
+}
+
+// Resolve the permission id for 'Dashboard Access' and verify
+$dashboardPermId = null;
+$stmtp = $conn->prepare('SELECT id FROM permissions WHERE name = ? LIMIT 1');
+if ($stmtp) {
+    $pname = 'Dashboard Access';
+    $stmtp->bind_param('s', $pname);
+    $stmtp->execute();
+    $pres = $stmtp->get_result();
+    if ($pres && $prow = $pres->fetch_assoc()) {
+        $dashboardPermId = (int)$prow['id'];
+    }
+    $stmtp->close();
+}
+
+// If permission exists, check the user's permissions; otherwise treat as denied for non-owners
+$hasDashboard = false;
+if ($dashboardPermId !== null && function_exists('_get_user_permissions_cached')) {
+    $effective = _get_user_permissions_cached();
+    if (in_array($dashboardPermId, $effective, true)) {
+        $hasDashboard = true;
+    }
+} else {
+    // If permission row missing, only allow owner accounts (owner_id === null)
+    if (isset($_SESSION['owner_id']) && $_SESSION['owner_id'] === null) {
+        $hasDashboard = true;
+    }
+}
+
+if (!$hasDashboard) {
+    // Redirect to neutral landing if user lacks permission
+    header('Location: /black_basket/pages/home.php');
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -26,7 +67,7 @@ if (!isset($_SESSION['user_id'])) {
                 <!-- Dashboard Section -->
                 <section id="dashboard-section" class="section active">
                     <div class="dashboard-header-title">
-                        <h1 id="dashboard-welcome">Welcome<span class="business-name"></span></h1>
+                        <h1 id="dashboard-welcome">Welcome to<span class="business-name"></span></h1>
                     </div>
                     <div class="stats-grid">
                         <div class="stat-card">
