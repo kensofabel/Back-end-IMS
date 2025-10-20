@@ -1,3 +1,105 @@
+// --- Status toggle for employees ---
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
+        badge.addEventListener('click', function(e) {
+            const empId = this.getAttribute('data-employee-id');
+            const currentStatus = this.getAttribute('data-status');
+            if (!empId) return;
+            const badgeEl = this;
+            fetch('toggle_employee_status.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'id=' + encodeURIComponent(empId)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const newStatus = data.new_status;
+                    badgeEl.setAttribute('data-status', newStatus);
+                    const icon = badgeEl.querySelector('i');
+                    const text = badgeEl.querySelector('.status-text');
+                    if (newStatus === 'active') {
+                        badgeEl.classList.add('status-active');
+                        badgeEl.classList.remove('status-inactive');
+                        if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
+                        if (text) text.textContent = 'Active';
+                    } else {
+                        badgeEl.classList.remove('status-active');
+                        badgeEl.classList.add('status-inactive');
+                        if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
+                        if (text) text.textContent = 'Inactive';
+                    }
+                } else {
+                    alert(data.message || 'Failed to toggle status');
+                }
+            })
+            .catch(() => alert('Failed to toggle status'));
+        });
+    });
+});
+// --- Employee Table Pagination Logic ---
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('employees-table');
+    const paginationBar = document.querySelector('.employee-pagination-bar');
+    if (!table || !paginationBar) return;
+    let rowsPerPage = 10;
+    let currentPage = 1;
+    function getRows() {
+        return Array.from(table.querySelectorAll('tbody tr'));
+    }
+    function getTotalPages() {
+        return Math.max(1, Math.ceil(getRows().length / rowsPerPage));
+    }
+    function updatePagination() {
+        const totalPages = getTotalPages();
+        // Update input and total
+        const pageInput = paginationBar.querySelector('.pagination-page-input');
+        const totalSpan = paginationBar.querySelector('.pagination-total-pages');
+        pageInput.value = currentPage;
+        totalSpan.textContent = totalPages;
+        // Enable/disable buttons
+        const prevBtn = paginationBar.querySelector('.pagination-prev');
+        const nextBtn = paginationBar.querySelector('.pagination-next');
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+        prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
+        nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
+    }
+    function showPage(page) {
+        const rows = getRows();
+        const totalPages = getTotalPages();
+        currentPage = Math.max(1, Math.min(page, totalPages));
+        rows.forEach((row, idx) => {
+            row.style.display = (idx >= (currentPage-1)*rowsPerPage && idx < currentPage*rowsPerPage) ? '' : 'none';
+        });
+        updatePagination();
+    }
+    // Initial display
+    showPage(1);
+    // Button handlers
+    const prevBtn = paginationBar.querySelector('.pagination-prev');
+    const nextBtn = paginationBar.querySelector('.pagination-next');
+    prevBtn.addEventListener('click', function() {
+        if (currentPage > 1) showPage(currentPage - 1);
+    });
+    nextBtn.addEventListener('click', function() {
+        if (currentPage < getTotalPages()) showPage(currentPage + 1);
+    });
+    // Page input handler
+    const pageInput = paginationBar.querySelector('.pagination-page-input');
+    pageInput.addEventListener('change', function() {
+        let val = parseInt(pageInput.value, 10);
+        if (isNaN(val) || val < 1) val = 1;
+        if (val > getTotalPages()) val = getTotalPages();
+        showPage(val);
+    });
+    // Rows per page handler
+    const rowsSelect = paginationBar.querySelector('.pagination-rows-select');
+    rowsSelect.addEventListener('change', function() {
+        rowsPerPage = parseInt(rowsSelect.value, 10) || 10;
+        showPage(1);
+    });
+});
 // Consolidated accounts JS (moved from assets/js/content.js + page inline handlers)
 // This file is loaded by pages in pages/accounts/*.php
 
@@ -1055,9 +1157,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 const phone = (document.getElementById('employee-phone') || {}).value || '';
                 const role = (document.getElementById('employee-role') || {}).value || '';
                 const pos = (document.getElementById('employee-pos-pin') || {}).value || '';
-                const tbody = document.querySelector('#employees-table tbody');
+
+                // If table doesn't exist, create it (first employee case)
+                let tbody = document.querySelector('#employees-table tbody');
+                if (!tbody) {
+                    // Remove no-employees message if present
+                    const noMsg = document.getElementById('no-employees-message');
+                    if (noMsg) noMsg.remove();
+                    // Create table structure
+                    const table = document.createElement('table');
+                    table.className = 'roles-table';
+                    table.id = 'employees-table';
+                    table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Role</th>
+                                <th class="status-col">Status</th>
+                                <th class="action-col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    `;
+                    // Insert table into the tab-content div
+                    const tabContent = document.getElementById('content-manage-employees');
+                    if (tabContent) tabContent.appendChild(table);
+                    tbody = table.querySelector('tbody');
+                }
                 if (!tbody) {
                     // Nothing to update; restore button and exit
+                    restoreSubmit();
                     return;
                 }
                 const newId = 'emp-' + Date.now();
