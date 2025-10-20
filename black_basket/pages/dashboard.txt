@@ -1,0 +1,26 @@
+<?php
+session_start();
+include '../partials/navigation.php'; // database connection
+include '../partials/header.php';
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management System</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="https://github.com/kensofabel/B2-IMS/blob/main/Inventory%20Management%20System-20250829T034006Z-1-001/Inventory%20Management%20System/Gemini_Generated_Image_lup4cylup4cylup4__1_-removebg-preview.png?raw=true">
+</head>
+<body>
+            <!-- Content Area -->
+            <div class="content-area">
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+    <script src="auth.js"></script>
+
+</body>
+</html>

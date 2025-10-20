@@ -1,0 +1,57 @@
+.access-content-area {
+    display: flex !important;
+    height: auto !important;
+	flex-direction: column;
+	align-items: center;
+    justify-content: center;
+}
+
+
+/*Header Styles */
+.section-header {
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+/* Access Rights Header Styles */
+.header-title {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	font-size: 2rem;
+	color: #ff9800;
+	margin-bottom: 0;
+	transition: color 0.2s;
+}
+
+.header-breadcrumb {
+	color: #7c7c8a;
+	font-size: 1rem;
+	font-weight: 400;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition: color 0.2s;
+}
+.header-breadcrumb .fas {
+	color: #7c7c8a;
+	transition: color 0.2s;
+}
+.header-breadcrumb:hover,
+.header-breadcrumb:hover .fas {
+	color: #ff9800;
+}
+
+/*
+<div class="section-header">
+                        <h2 class="header-title">
+                            Audit Logs
+                            <span class="header-breadcrumb">
+                                |
+                                <i class="fas fa-history"></i>
+                                - Audit Logs
+                            </span>
+                        </h2>
+                    </div>
+
+					*/
