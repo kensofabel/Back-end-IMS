@@ -5,6 +5,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 session_start();
 require_once 'config/db.php';
+require_once 'scripts/create_default_category.php'; // Include the default category creation
 $signupSuccess = false;
 $signupError = '';
 
@@ -44,6 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			if ($stmt->execute()) {
 				// Auto-login: fetch the new user and set session
 				$user_id = $stmt->insert_id;
+				// Create default category for this user
+				createDefaultCategory($user_id);
 				// Create Owner role for this owner if not exists
 				$role_name = 'Owner';
 				$role_desc = 'Full access to all features';
@@ -199,9 +202,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				</div>
 				<button type="submit" id="signupBtn" class="login-btn">Sign up</button>
 			</form>
-			<div class="signup-section">
-				<p>Already have an account? <a href="index.php" class="signup-link">Sign in</a></p>
-			</div>
 		</div>
 	</div>
 	<script src="assets/js/signup.js"></script>
