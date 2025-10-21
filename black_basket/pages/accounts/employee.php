@@ -144,7 +144,7 @@ if (count($employees) > 0) {
     echo '  <button class="pagination-btn pagination-prev" disabled title="Previous page">&#60;</button>';
     echo '  <button class="pagination-btn pagination-next" disabled title="Next page">&#62;</button>';
     echo '  <span style="color:#fff;font-size:1.04rem;margin-left:12px;">Page</span>';
-    echo '  <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #444;border-radius:4px;font-size:1.04rem;margin:0 6px;" />';
+    echo '  <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #222;border-radius:4px;font-size:1.04rem;margin:0 6px;" />';
     echo '  <span style="color:#fff;font-size:1.04rem;">of</span>';
     echo '  <span class="pagination-total-pages" style="color:#fff;font-size:1.04rem;margin:0 6px;">1</span>';
     echo '  <span style="color:#fff;font-size:1.04rem;margin-left:18px;">Rows per page:</span>';
@@ -262,3 +262,4 @@ if (count($employees) > 0) {
     <script src="employee.js"></script>
 </body>
 </html>
+
