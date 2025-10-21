@@ -1,12 +1,14 @@
 <?php
 session_start();
+require_once '../../scripts/create_default_category.php'; // Include the default category creation
 if (!isset($_SESSION['user_id'])) {
     header('Location: /black_basket/index.php');
     exit();
 }
+// Ensure default category exists for this user
+createDefaultCategory($_SESSION['user_id']);
 ?>
 
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -32,7 +34,6 @@ if (!isset($_SESSION['user_id'])) {
                 </span>
             </h2>
         </div>
-
         <div class="tabs">
             <div class="tab first-child active" id="tab-manage-inventory" onclick="showInventoryTab('manage-inventory')">Manage Inventory</div>
         </div>
@@ -43,6 +44,8 @@ if (!isset($_SESSION['user_id'])) {
             </span>
             <div id="tab-info-actions">
                 <button class="btn btn-primary" id="addProductBtn"><i class="fa fa-plus"></i> Add Item</button>
+    <!-- Modal include -->
+    <?php include 'popupmodal.php'; ?>
                 <button class="btn btn-secondary" id="wasteBtn"><i class="fa fa-trash"></i> Record Waste</button>
                 <button class="btn btn-outline" id="importBtn" title="Import"><i class="fa fa-download"></i></button>
                 <button class="btn btn-outline" id="exportBtn" title="Export"><i class="fa fa-upload"></i></button>
@@ -106,119 +109,14 @@ if (!isset($_SESSION['user_id'])) {
                         </tbody>
                     </table>
                 </div>
+                <!-- Uploaded Image Area -->
+                <div id="uploadedImageArea" style="display:none; justify-content:center; align-items:center; margin-top:20px;">
+                    <img id="uploadedImagePreview" src="" alt="Uploaded Image" style="max-width:300px; max-height:300px; border:1px solid #ccc; border-radius:8px;" />
+                </div>
     <!-- Close main content area -->
     </div>
-
-<!-- Scanner/Manual Modal (moved outside content area) -->
-<div class="modal" id="scannerModal">
-    <div class="modal-content scanner-modal">
-        <div class="modal-header">
-            <h2>Add Item</h2>
-            <!-- Tab Style Navigation -->
-            <button class="scanner-tab active" id="scanTab">SCAN</button>
-            <button class="scanner-tab" id="manualTab">MANUAL</button>
-            <span class="close" id="closeScanner">&times;</span>
-        </div>
-        <div class="modal-body">
-            
-            <!-- Scanner Mode -->
-            <div id="scannerMode" class="mode-content">
-                <!-- Camera Scanner -->
-                <div id="cameraScanner" class="scanner-section">
-                    <div class="camera-container">
-                        <video id="cameraVideo" autoplay playsinline></video>
-                        <div class="scanner-overlay">
-                            <div class="scanner-line"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Hardware Scanner -->
-                <div id="hardwareScanner" class="scanner-section" style="display:none;">
-                    <div class="loading-container">
-                        <div class="loading-spinner"></div>
-                        <h3>SCANNING VIA SCANNER...</h3>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Manual Mode -->
-            <div id="manualMode" class="mode-content" style="display:none;">
-                <div class="manual-form">
-                    <div class="form-description">
-                        <p>Enter the product's barcode or SKU to identify the item you want to add to inventory.</p>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <input type="checkbox" id="enableBarcode" class="field-checkbox">
-                        <input type="text" id="manualBarcode" required>
-                        <label for="manualBarcode">Barcode</label>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <input type="checkbox" id="enableSKU" class="field-checkbox">
-                        <input type="text" id="manualSKU" required>
-                        <label for="manualSKU">SKU</label>
-                    </div>
-                    <button class="btn btn-primary" id="nextBtn">Next</button>
-                </div>
-            </div>
-
-            
-            <!-- Product Form Mode -->
-            <div id="formMode" class="mode-content" style="display:none;">
-                <div class="form-header">
-                    <button class="go-back-btn" id="goBackBtn">
-                        <i class="fas fa-arrow-left"></i> Go Back
-                    </button>
-                </div>
-                <div class="product-form">
-                    <div class="form-group">
-                        <input type="text" id="productName" required>
-                        <label for="productName">Name</label>
-                    </div>
-                    <div class="form-group">
-                        <select id="productCategory" required>
-                            <option value="">Select Category</option>
-                            <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                            <option value="Dairy & Eggs">Dairy & Eggs</option>
-                            <option value="Meat & Poultry">Meat & Poultry</option>
-                            <option value="Bakery">Bakery</option>
-                            <option value="Beverages">Beverages</option>
-                            <option value="Snacks">Snacks</option>
-                            <option value="Frozen Foods">Frozen Foods</option>
-                            <option value="Household">Household</option>
-                        </select>
-                        <label for="productCategory">Category</label>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <input type="checkbox" id="trackStock" class="field-checkbox">
-                        <label for="trackStock" class="checkbox-label">Track Stock</label>
-                    </div>
-                    <div id="stockSection" class="stock-section" style="display:none;">
-                        <div class="form-group">
-                            <input type="number" id="inStock" min="0">
-                            <label for="inStock">In Stock</label>
-                        </div>
-                        <div class="form-group">
-                            <input type="number" id="lowStock" min="0">
-                            <label for="lowStock">Low Stock Alert</label>
-                        </div>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <input type="checkbox" id="availableInPOS" class="field-checkbox">
-                        <label for="availableInPOS" class="checkbox-label">Available in POS</label>
-                    </div>
-                    <button class="btn btn-primary" id="saveProductBtn">Save Product</button>
-                </div>
-            </div>
-            
-            <!-- Skip Option -->
-            <div class="skip-section">
-                <button class="skip-btn" id="skipBtn">Skip for now</button>
-            </div>
-        </div>
-    </div>
-</div>
-
+</body>
+</html>
 <script>
 function showInventoryTab(tab) {
     // For now, only one tab, but structure is ready for more
@@ -241,17 +139,34 @@ function checkInventoryAndToggleControls() {
     }
 }
 
+
 // Search toggle and item type toggle functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Connect Add Item button to modal
+    var addProductBtn = document.getElementById('addProductBtn');
+    var scannerModal = document.getElementById('scannerModal');
+    if (addProductBtn && scannerModal) {
+        addProductBtn.addEventListener('click', function() {
+            scannerModal.style.display = 'block';
+            // If scan tab is active, start scanner/camera
+            var scanPanel = document.getElementById('scanTabPanel');
+            if (scanPanel && scanPanel.style.display !== 'none') {
+                if (typeof startQuaggaScanner === 'function') {
+                    startQuaggaScanner();
+                }
+            }
+        });
+    }
+
     const toggleButton = document.getElementById('itemTypeToggle');
     const searchToggle = document.getElementById('searchToggle');
     const searchControls = document.getElementById('searchControls');
     const filterControls = document.getElementById('filterControls');
     const searchInput = document.getElementById('search-inventory');
-    
+
     // Check inventory on page load
     checkInventoryAndToggleControls();
-    
+
     // Observer to watch for changes in inventory table
     const inventoryTableBody = document.getElementById('inventory-table-body');
     if (inventoryTableBody) {
@@ -260,12 +175,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         observer.observe(inventoryTableBody, { childList: true, subtree: true });
     }
-    
+
     // Search toggle functionality (only for mobile devices)
     function isMobile() {
         return window.innerWidth <= 768;
     }
-    
+
     searchToggle.addEventListener('click', function() {
         if (isMobile()) {
             searchControls.classList.remove('collapsed');
@@ -276,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 100);
         }
     });
-    
+
     // Click outside or press escape to collapse search (mobile only)
     document.addEventListener('click', function(e) {
         if (isMobile() && !searchControls.contains(e.target)) {
@@ -327,8 +242,5 @@ document.addEventListener('DOMContentLoaded', function() {
         // filterInventoryByType(nextState.key);
     });
 });
-</script>
-<script src="inventory.js"></script>
-</body>
-</html>
 
+</script>
