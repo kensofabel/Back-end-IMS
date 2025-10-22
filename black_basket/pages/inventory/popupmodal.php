@@ -271,7 +271,7 @@
             <!-- Add Items/Product Tab Panel -->
             <div id="addItemsTabPanel" class="tab-panel" style="display:none;">
                 <div class="modal-header">
-                    <h2 class="modal-title">Add Items</h2>
+                    <h2 class="modal-title">Add new item</h2>
                     <button type="button" class="inline-back" id="backInlineAddItems" aria-label="Back" title="Back">&larr;</button>
                 </div>
                 <div class="modal-divider"></div>
