@@ -1,0 +1,1578 @@
+#imageUploadArea {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Modal Tabs Transition for reverse/back animation */
+.modal-tabs.slide-in-left {
+    animation: tabPanelSlideInLeft 0.25s cubic-bezier(.4,0,.2,1);
+    opacity: 1 !important;
+    display: flex !important;
+    z-index: 10 !important;
+}
+.modal-tabs.slide-out-right {
+    animation: tabPanelSlideOutRight 0.25s cubic-bezier(.4,0,.2,1);
+    opacity: 1 !important;
+    display: flex !important;
+    z-index: 10 !important;
+}
+/* Reverse tab panel transitions for going back from Add Items */
+.tab-panel.slide-out-right {
+    display: block !important;
+    opacity: 1 !important;
+    z-index: 10 !important;
+    position: absolute !important;
+    animation: tabPanelSlideOutRight 0.25s cubic-bezier(.4,0,.2,1);
+    pointer-events: none !important;
+}
+.tab-panel.slide-in-left {
+    z-index: 3;
+    animation: tabPanelSlideInLeft 0.25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes tabPanelSlideOutRight {
+    0% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(100vw); }
+}
+@keyframes tabPanelSlideInLeft {
+    0% { opacity: 0; transform: translateX(-100vw); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+.tab-panels {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.tab-panel,
+.tab-panel.slide-in,
+.tab-panel.slide-out-left,
+.tab-panel.active {
+    width: 100% !important;
+    left: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+.tab-panel.slide-out-left {
+    animation: tabPanelSlideOutLeft 0.4s cubic-bezier(.4,0,.2,1);
+}
+@keyframes tabPanelSlideOutLeft {
+    0% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(-100vw); }
+}
+/* Add Product Button Custom Padding */
+#addProductBtn {
+    padding: 10px 22px !important;
+}
+
+/* Tab Info Actions Layout */
+#tab-info-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 25px;
+    margin-bottom: 12px;
+}
+
+/* Category Autocomplete Dropdown */
+.category-autocomplete {
+    position: relative;
+    z-index: 10;
+}
+
+.category-dropdown {
+    position: fixed;
+    background: #2a2a2a;
+    border: 2px solid #444; 
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 190px;
+}
+
+/* Custom scrollbar for category dropdown */
+.category-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.category-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.category-dropdown::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.category-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+.category-dropdown.show {
+    display: block;
+}
+
+.category-option {
+    padding: 12px 16px;
+    color: #fff;
+    cursor: pointer;
+    border-bottom: 1px solid #444;
+    transition: background-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.category-option:last-child {
+    border-bottom: none;
+}
+
+.category-option:hover,
+.category-option.highlighted {
+    background: #3a3a3a;
+}
+
+.category-option.new-category {
+    background: #3a3a3a;
+    color: #fff;
+    padding: 5px 16px 10px 16px;
+}
+
+.category-option.new-category:hover {
+    background: #3a3a3a;
+}
+
+.category-helper {
+    font-size: 10px;
+    color: #9ca3af;
+    font-style: italic;
+    margin-top: 2px;
+}
+
+.category-new-indicator {
+    background: #ff9800;
+    color: white;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: bold;
+    align-self: flex-start;
+}
+
+/* Name Autocomplete Dropdown */
+.name-autocomplete {
+    position: relative;
+    z-index: 20;
+}
+
+.name-dropdown {
+    position: fixed;
+    background: #2a2a2a;
+    border: 2px solid #444; 
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 190px;
+}
+
+.name-dropdown.show {
+    display: block;
+}
+
+.name-option {
+    padding: 10px 16px;
+    color: #fff;
+    cursor: pointer;
+    border-bottom: 1px solid #444;
+    transition: background-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.name-option:last-child {
+    border-bottom: none;
+}
+
+.name-option:hover,
+.name-option.highlighted {
+    background: #2a2a2a;
+}
+
+.name-option.add-variants {
+    background: #2a2a2a;
+    color: #fff;
+    padding: 8px 16px;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-direction: row;
+}
+
+.name-option.add-variants:hover {
+    background: #2a2a2a;
+}
+
+.name-variants-indicator {
+    margin-top: 1px;
+    background: #ff9800;
+    color: white;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    align-self: flex-start;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.name-variants-indicator:hover {
+    background: #ff6600;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.name-variants-indicator:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.name-helper {
+    font-size: 10.5px;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Quantity Input with Unit Selector */
+.input-with-unit-selector {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-unit-selector input {
+    padding-right: 80px !important; /* Reserve space for unit selector */
+    flex: 1;
+}
+
+.unit-selector {
+    background: #232323;
+    position: absolute;
+    right: 8px;
+    top: 8%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.unit-selector.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.unit-prefix {
+    color: #dbdbdb;
+    font-size: 1.1rem;
+    font-weight: normal;
+    position: absolute;
+    left: 0;
+    margin-left: 5px;
+}
+
+.unit-value {
+    color: #dbdbdb;
+    font-size: 1.1rem;
+    font-weight: normal;
+    min-width: 30px;
+    width: 30px;
+    text-align: center;
+    margin-left: 12px;
+}
+
+.unit-arrows {
+    margin-top: 5px; /* Add this to move arrows down */ 
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.unit-arrow {
+    background: transparent;
+    border: transparent;
+    color: #dbdbdb;
+    font-size: 8px;
+    width: 14px;
+    height: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background-color 0.2s ease;
+}
+
+.unit-arrow:hover {
+    background: #444;
+    border-color: #666;
+}
+
+.unit-arrow:active {
+    background: #555;
+}
+
+/* Dropdown Styling */
+#categoryFilter,
+#stockAlert {
+    padding: 8px 12px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #232323;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* Search Bar Toggle Functionality */
+.search-controls {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.search-icon-btn {
+    padding: 12px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #232323;
+    color: #ff9800;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    display: none; /* Hidden on desktop by default */
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+}
+
+.search-icon-btn:hover {
+    background: #333;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Desktop: Always show search box, hide search icon */
+.search-controls .search-box {
+    display: block;
+    position: relative;
+}
+
+/* Fix search icon positioning inside search bar */
+.search-controls .search-box i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ff9800;
+    pointer-events: none;
+}
+
+/* Remove white highlight border from search input */
+
+/* Barcode results styling used by Add Items results view */
+#barcodeResultsContainer {
+    margin-top: 12px;
+}
+.barcode-result-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 100px 140px 110px;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    margin-bottom: 10px;
+}
+.barcode-result-row .result-left {
+    display: flex;
+    flex-direction: column;
+}
+.barcode-result-row .result-category {
+    font-size: 12px;
+    color: #bdbdbd;
+    margin-bottom: 4px;
+}
+.barcode-result-row .result-name {
+    font-size: 14px;
+    color: #dbdbdb; /* requested color */
+    font-weight: 600;
+}
+.barcode-result-row .small-label {
+    font-size: 12px;
+    color: #bdbdbd;
+    margin-bottom: 6px;
+}
+.barcode-result-row .instock-value {
+    font-size: 16px;
+    color: #dbdbdb;
+    font-weight: 700;
+}
+.barcode-result-row .result-status .status-value {
+    font-size: 13px;
+    color: #ffb74d;
+}
+.barcode-result-row .result-addstock {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.barcode-result-row .addstock-input {
+    width: 60px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #111;
+    border: 1px solid #333;
+    color: #fff;
+}
+.barcode-result-row .addstock-btn {
+    background: #ff9800;
+    color: #171717;
+    border: none;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 720px) {
+    .barcode-result-row {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+    }
+    .barcode-result-row .result-track,
+    .barcode-result-row .result-instock,
+    .barcode-result-row .result-status,
+    .barcode-result-row .result-addstock {
+        justify-self: start;
+    }
+}
+
+.search-controls .search-box input {
+    outline: none;
+    box-shadow: none;
+}
+
+.search-controls .search-box input:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: #333;
+}
+
+/* Mobile/Small Device Functionality */
+@media (max-width: 768px) {
+    /* Mobile layout: Search icon on rightmost side */
+    .inventory-controls {
+        flex-direction: row-reverse !important;
+        flex-wrap: nowrap !important; /* Prevent wrapping */
+        align-items: center;
+    }
+    
+    .search-controls {
+        order: 1; /* Search controls on the right */
+        flex-shrink: 0; /* Prevent shrinking */
+    }
+    
+    .filter-controls {
+        order: 2; /* Filter controls on the left */
+        flex: 1; /* Take remaining space */
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 5px; /* Reduce gap on mobile */
+        overflow-x: auto; /* Allow horizontal scrolling if needed */
+    }
+    
+    /* Mobile dropdown adjustments */
+    .filter-controls select {
+        min-width: 80px; /* Minimum width for readability */
+        max-width: 120px; /* Maximum width to fit more dropdowns */
+        font-size: 12px; /* Smaller font for mobile */
+    }
+    
+    /* Show search icon, hide search box by default on mobile */
+    .search-icon-btn {
+        display: flex;
+        flex-shrink: 0; /* Don't allow shrinking */
+    }
+    
+    .search-controls.collapsed .search-box {
+        display: none;
+    }
+    
+    .search-controls.expanded .search-icon-btn {
+        display: none;
+    }
+    
+    /* When search is expanded, keep it inline with dropdowns */
+    .search-controls.expanded {
+        flex: 1; /* Take available space */
+        max-width: 60%; /* Don't take full width */
+    }
+    
+    .search-controls.expanded .search-box {
+        display: block;
+        width: 100%;
+    }
+    
+    .search-controls.expanded .search-box input {
+        width: 100%;
+        font-size: 14px; /* Readable font size */
+    }
+    
+    /* Keep filter controls visible and inline when search expanded */
+    .search-controls.expanded ~ .filter-controls {
+        display: flex !important;
+        flex: 1;
+        max-width: 40%; /* Remaining space */
+    }
+}
+
+.single-toggle-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+/* Toggle Button States - Orange, Yellow, Gray */
+.single-toggle-btn[data-current="all"] {
+    background: #ff9800;
+    color: #fff;
+    border-color: #ff9800;
+}
+
+.single-toggle-btn[data-current="pos"] {
+    background: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+}
+
+.single-toggle-btn[data-current="stock"] {
+    background: #6c757d;
+    color: #fff;
+    border-color: #6c757d;
+}
+
+.modal-slide-left {
+    animation: modalSlideLeft 0.4s forwards;
+}
+.modal-slide-in {
+    animation: modalSlideIn 0.4s forwards;
+}
+@keyframes modalSlideLeft {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(-100vw); opacity: 0; }
+}
+@keyframes modalSlideIn {
+    0% { transform: translateX(100vw); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+
+/* Add Items modal: remove global black overlay and fade */
+/* Custom Toggle Switch - Larger size to match input fields */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 80px !important;
+    height: 40px !important;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 5px;
+    left: 0;
+    right: 0;
+    bottom: -5px;
+    background-color: #333;
+    transition: .4s;
+    border-radius: 10px;
+    border: 1.5px solid #555;
+    pointer-events: 10;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 32px !important;
+    width: 32px !important;
+    left: 3px;
+    bottom: 3px;
+    background-color: #dbdbdb;
+    transition: .4s;
+    border-radius: 25%;
+}
+
+.switch input:checked + .slider {
+    background-color: #ff9800;
+    border-color: #ff9800;
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(40px);
+    background-color: #171717;
+}
+
+/* Hover and focus effects */
+.slider:hover {
+    border-color: #777;
+}
+
+.switch input:focus + .slider {
+    border-color: #ff9800;
+    outline: none;
+}
+/* Remove .form-group animation and input transition for scanner modal and add items modal */
+.scanner-modal .form-group,
+#addItemsModal .form-group {
+    animation: none !important;
+}
+
+#addItemsModal {
+    background: transparent !important; /* No dimmed backdrop */
+    animation: none !important;        /* Disable global fadeIn */
+}
+
+/* Ensure Add Items modal content sits above and is centered when shown */
+#addItemsModal {
+    align-items: center; /* works when display:flex */
+    justify-content: center; /* works when display:flex */
+}
+
+/* Remove global pop/zoom animations on content for this modal */
+#addItemsModal .modal-content {
+    animation: none !important; /* cancel zoomIn/slideDown */
+}
+
+/* Re-apply our FB-like slide animations specifically on content */
+#addItemsModal .modal-content.modal-slide-in {
+    animation: modalSlideIn 0.4s forwards !important;
+}
+#addItemsModal .modal-content.modal-slide-left {
+    animation: modalSlideLeft 0.4s forwards !important;
+}
+
+.tab-panels {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.tab-panel {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    flex-direction: column;
+    background: #171717;
+    border-radius: 18px;
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1), opacity 0.25s cubic-bezier(.4,0,.2,1);
+}
+.tab-panel.active,
+.tab-panel.slide-in,
+.tab-panel.slide-out-left {
+    opacity: 1;
+    pointer-events: auto;
+}
+.tab-panel.active {
+    position: relative;
+    z-index: 2;
+    transform: translateX(0);
+}
+.tab-panel.slide-in {
+    z-index: 3;
+    animation: tabPanelSlideIn 0.25s cubic-bezier(.4,0,.2,1);
+}
+.tab-panel.slide-out-left {
+    z-index: 2;
+    animation: tabPanelSlideOutLeft 0.25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes tabPanelSlideIn {
+    0% { opacity: 0; transform: translateX(100vw); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+/* Compact modal header and close button alignment */
+.tab-panel .modal-header {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    height: 60px !important;
+    background: #171717;
+}
+
+.tab-panel .modal-title {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #ff9800;
+    letter-spacing: 0.5px;
+    user-select: none;
+    margin-right: 0;
+}
+
+/* Divider: block, negative margin to escape modal padding */
+.tab-panel .modal-divider {
+    display: block;
+    height: 1.5px;
+    background: #212121;
+    opacity: 0.7;
+    width: calc(100% + 80px); /* 40px left + 40px right */
+    margin: 0 -40px;
+    border-radius: 0;
+}
+
+@media (max-width: 768px) {
+    .tab-panel .modal-divider {
+        width: calc(100% + 50px); /* 25px left + 25px right */
+        margin: 0 -25px;
+    }
+}
+@media (max-width: 480px) {
+    .tab-panel .modal-divider {
+        width: calc(100% + 40px); /* 20px left + 20px right */
+        margin: 0 -20px;
+    }
+}
+
+/* Inline close button inside panel */
+.tab-panel .inline-back {
+    position: absolute;
+    left: 20px;
+    right: auto;
+    top: 15px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    line-height: 1;
+    text-align: center;
+    font-family: monospace, 'Arial', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 1.7rem !important;
+}
+.tab-panel .inline-back:hover {
+    background: #ff9800;
+    color: #171717;
+    box-shadow: 0 4px 16px rgba(255,152,0,0.25);
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s !important;
+}
+
+
+/* FB-like modal animations (zoom + slight lift) */
+/* Neutralize FB-like animations to keep no-backdrop, no-pop behavior */
+body #addItemsModal.fb-backdrop-in,
+body #addItemsModal.fb-backdrop-out {
+    animation: none !important;
+    background: transparent !important;
+}
+body #addItemsModal .modal-content.fb-modal-in,
+body #addItemsModal .modal-content.fb-modal-out {
+    animation: none !important;
+}
+
+
+/* Scanner Modal Styles - Fixed width */
+.scanner-modal {
+    position: relative !important;
+    min-width: 450px;
+    max-width: 98vw;
+    width: auto;
+    height: auto;
+    max-height: 95vh;
+    padding: 0;
+    background: #171717 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important;
+    overflow: hidden !important; /* Clip sliding children inside */
+    text-align: center !important;
+    box-sizing: border-box !important;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+/* Override scanner modal overflow when category dropdown is shown */
+.scanner-modal:has(.category-dropdown.show) {
+    overflow: visible !important;
+}
+
+/* Fallback for browsers that don't support :has() */
+.scanner-modal.category-dropdown-active {
+    overflow: visible !important;
+}
+
+/* Override overflow for Add Items modal body to show dropdown */
+#addItemsTabPanel .modal-body {
+    overflow: visible !important;
+}
+
+/* Ensure form rows don't clip dropdown */
+#addItemsTabPanel .form-row {
+    overflow: visible !important;
+}
+
+/* Make sure the product form allows dropdown overflow */
+#inlineAddItemsForm {
+    overflow: visible !important;
+}
+
+/* Responsive Scanner Modal for smaller devices */
+@media (max-width: 768px) {
+    .scanner-modal {
+        min-width: 350px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .scanner-modal {
+        min-width: 250px !important;
+    }
+}
+
+/* Camera Scanner - Fixed width */
+.camera-container {
+    position: relative;
+    width: 100% !important; /* Fixed width */
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 230px !important; /* Set container height */
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Tabs below header, centered */
+.scanner-modal .modal-tabs {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: -20px;
+    margin-top: 30px;
+}
+
+/* Tab Style Buttons - Previous Button Style */
+.scanner-tab {
+    background: #ff9800;
+    color: #171717;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 70px;
+    justify-content: center;
+    user-select: none;
+    position: relative;
+    z-index: 10;
+}
+
+.scanner-tab.active {
+    background: #ff9800;
+    color: #171717;
+    transform: scale(1.05);
+}
+
+.scanner-tab:not(.active) {
+    background: #333;
+    color: #dbdbdb;
+}
+
+.scanner-tab:hover {
+    background: #ff6600;
+    color: #171717;
+    transform: scale(1.05);
+}
+
+/* --- FLOATING LABEL: JS-ASSISTED --- */
+.manual-form .form-group.active input[type="text"] + label,
+.manual-form .form-group.active input[type="number"] + label {
+    top: -12px;
+    left: 0;
+    font-size: 0.85rem;
+    padding: 0 4px;
+    z-index: 3;
+}
+
+.manual-form .form-group input[type="text"]:focus + label,
+.manual-form .form-group input[type="number"]:focus + label,
+.manual-form .form-group input[type="text"]:not(:placeholder-shown) + label,
+.manual-form .form-group input[type="number"]:not(:placeholder-shown) + label {
+    top: -10px;
+    left: 0;
+    font-size: 0.85rem;
+    color: #ff9800 !important;
+    padding: 0 4px;
+    z-index: 3;
+}
+
+/* Mode Content */
+.mode-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+/* Form Mode Content - Same as other modes */
+#formMode.mode-content {
+    min-height: 350px;
+    height: auto;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+}
+
+#cameraVideo {
+    width: 100%;
+    height: 100% !important; /* Change from 250px to 100% */
+    object-fit: cover;
+    display: block; /* Remove any default spacing */
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid #ff9800;
+    border-radius: 12px;
+}
+
+.scanner-line {
+    position: absolute;
+    top: 50%;
+    left: 20px;
+    right: 20px;
+    height: 2px;
+    background: #ff9800;
+    animation: scanMove 2s ease-in-out infinite;
+    box-shadow: 0 0 10px #ff9800;
+}
+
+@keyframes scanMove {
+    0%, 100% { transform: translateY(-60px); opacity: 0.7; }
+    50% { transform: translateY(60px); opacity: 1; }
+}
+
+.loading-container {
+    height: 230px; /* Match camera-container height */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #dbdbdb;
+}
+
+.loading-spinner {
+    margin-top: 70px; /* Add this to lower the whole section */
+    width: 60px;
+    height: 60px;
+    border: 4px solid #333;
+    border-top: 4px solid #ff9800;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-container h3 {
+    color: #ff9800;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Manual Mode */
+.manual-form {
+    width: 390px;
+    padding: 0 20px;
+    background: #171717;   /* Optional: match modal background */
+    border-radius: 12px;   /* Optional: rounded corners for form */
+}
+
+.manual-form .form-group {
+    margin-top: 30px !important;
+    position: static !important;
+    animation: none !important;
+    display: flex;
+    flex-direction: column;
+    left: 30px;
+    user-select: none;
+    text-align: left;
+}
+
+.manual-form .form-group label {
+    margin-left: 35px !important;
+    position: static !important;
+    display: block !important;
+    color: #dbdbdb !important;
+    font-size: 1.1rem !important;
+    font-weight: 450 !important;
+    background: transparent !important;
+    pointer-events: auto !important;
+    transition: none !important;
+    z-index: auto !important;
+}
+
+/* Specific styling for checkbox-group layout */
+.manual-form .form-group.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.manual-form .checkbox-group label {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    flex: 0 0 auto;
+}
+
+/* Container for checkbox and input on same line */
+.manual-form .input-row {
+    margin-top: -5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.manual-form .input-row .field-checkbox {
+    margin: 0 !important;
+    flex-shrink: 0;
+}
+
+.manual-form .input-row input[type="text"] {
+    flex: 1;
+    margin-left: 0 !important;
+    width: auto !important;
+}
+
+.manual-form input[type="text"],
+.manual-form input[type="number"] {
+    width: 100% !important;
+    padding: 8px !important;
+    border: 1.5px solid #333 !important;
+    border-radius: 7px !important;
+    background: #232323 !important;
+    color: #dbdbdb !important;
+    font-size: 1.1rem !important;
+    margin-bottom: 0 !important;
+    box-sizing: border-box !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    outline: none !important;
+    text-indent: 0 !important;
+    font-weight: 400 !important;
+    margin-left: 5px !important;
+    text-align: left !important;
+}
+
+.manual-form input[type="text"]:focus,
+.manual-form input[type="number"]:focus {
+    border: 1.5px solid #555 !important;
+    outline: none !important;
+}
+
+.manual-form .field-checkbox:checked,
+.form-row .field-checkbox:checked {
+    background: #ff9800 !important;
+    border-color: #ff9800 !important;
+}
+
+.manual-form .field-checkbox:checked::after,
+.form-row .field-checkbox:checked::after {
+    content: '✓' !important;
+    display: block !important;
+    color: #171717 !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    position: absolute !important;
+    left: 40% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    pointer-events: none !important;
+    line-height: 1 !important;
+}
+.manual-form .field-checkbox:hover,
+.form-row .field-checkbox:checked::after {
+    border-color: #777 !important;
+}
+
+.manual-form .field-checkbox:focus,
+.form-row .field-checkbox:focus {
+    outline: none !important;
+    border-color: #ff9800 !important;
+}
+/* Checkbox Styles for Manual Form */
+.manual-form .field-checkbox,
+.form-row .field-checkbox {
+    position: relative;
+    width: 22px !important;
+    height: 20px !important;
+    padding: 0 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 4px !important;
+    border: 2px solid #555 !important;
+    background: #171717 !important;
+    cursor: pointer !important;
+    z-index: 5 !important;
+    margin-right: 10px !important;
+    margin-bottom: 10px !important;
+    outline: none !important;
+    flex-shrink: 0;
+}
+
+#nextBtn {
+    user-select: none;
+    width: 100%;
+    background: #ff9800;
+    color: #171717;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+#nextBtn:hover {
+    background: #ff6600;
+    transform: translateY(-1px);
+}
+
+#nextBtn:disabled {
+    background-color: #ccc;
+    color: #888;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Skip Section */
+.skip-section {
+    position: relative;      /* Remove absolute positioning */
+    margin-top: 10px;           /* No extra space above */
+    display: flex;
+    justify-content: center; /* Center horizontally */
+    width: 100%;
+}
+
+.skip-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+}
+
+.skip-btn:hover {
+    color: #fff;
+}
+
+.form-group.hidden-input input[type="text"] {
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    position: absolute;
+}
+.base-add-flow {
+    position: relative;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+}
+.base-add-flow.slide-out-left {
+    transform: translateX(-40px);
+    opacity: 0;
+}
+
+/* Forms */
+.product-form {
+    margin: -10px !important;
+    margin-bottom: -20px !important;
+    width: 500px;
+    background: #171717;
+    border-radius: 15px;
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 5px;
+}
+
+/* Checkbox labels should have normal styling, not floating label styling */
+.modal-footer .form-group label[for="availablePOS"],
+.modal-footer .form-group label[for="inlineAvailablePOS"] {
+    position: static !important;
+    font-size: 1.1rem !important;
+    color: #dbdbdb !important;
+    pointer-events: auto !important;
+    transition: none !important;
+    background: transparent !important;
+    z-index: auto !important;
+}
+
+
+/* Checkbox Styles for Modal Footer (Add Items Modal) */
+.modal-footer .field-checkbox:checked {
+    background: #ff9800 !important;
+    border-color: #ff9800 !important;
+}
+
+.modal-footer .field-checkbox:checked::after {
+    content: '✓' !important;
+    display: block !important;
+    color: #171717 !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    position: absolute !important;
+    left: 40% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    pointer-events: none !important;
+    line-height: 1 !important;
+}
+
+.modal-footer .field-checkbox:hover {
+    border-color: #777 !important;
+}
+
+.modal-footer .field-checkbox:focus {
+    outline: none !important;
+    border-color: #ff9800 !important;
+}
+
+.modal-footer .field-checkbox {
+    position: relative;
+    width: 23px !important;
+    height: 20px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 4px !important;
+    border: 2px solid #555 !important;
+    background: #171717 !important;
+    cursor: pointer !important;
+    z-index: 5 !important;
+    margin-right: 0 !important;
+    outline: none !important;
+}
+.modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: #171717;
+    z-index: 10;
+    display: block;
+}
+
+/* Labels above input, not floating */
+.product-form .form-group label {
+    position: static !important;
+    display: block;
+    color: #dbdbdb;
+    font-size: 1rem;
+    background: transparent;
+    pointer-events: auto;
+    transition: none;
+    z-index: 5;
+}
+/* Override global .form-group styles for product-form */
+.product-form .form-group {
+    margin-top: 0 !important;
+    margin-bottom: 18px !important;
+    position: static !important;
+    animation: none !important;
+    display: flex;
+    flex-direction: column;
+}
+.product-form .form-group label {
+    position: static !important;
+    display: block !important;
+    margin-bottom: 10px !important;
+    color: #dbdbdb !important;
+    font-size: 1.1rem !important;
+    font-weight: 450 !important;
+    background: transparent !important;
+    pointer-events: auto !important;
+    transition: none !important;
+    z-index: 5 !important;
+}
+.product-form .form-group input {
+    width: 100% !important;
+    padding: 8px !important;
+    margin-top: -15px !important;
+    border: 1.5px solid #333 !important;
+    border-radius: 7px !important;
+    background: #232323 !important;
+    color: #dbdbdb !important;
+    font-size: 1.1rem !important;
+    margin-bottom: 0 !important;
+    box-sizing: border-box !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    outline: none !important;
+    text-indent: 0 !important;
+    font-weight: 400 !important;
+}
+.product-form .form-group input:focus {
+    border: 1.5px solid #555 !important;
+    outline: none !important;
+}
+
+.stock-fields input:focus {
+    padding-right: 60px !important; /* Make space for unit selector */
+}
+
+.stock-fields input:focus::placeholder {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.cancel-secondary {
+    background: #171717;
+    color: #ff9800;
+    border: none;
+    padding: 10px 0 10px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 400;
+}
+.cancel-secondary:hover {
+    background: #444;
+    color: #ff9800;
+}
+
+/* Hide tab buttons when Add Items modal is open */
+#addItemsModal .modal-tabs {
+    display: none !important;
+}
+
+/* Variants Section Styling */
+.variants-add-btn:hover {
+    background: #ff6600 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.variants-add-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.variants-close-btn:hover {
+    background: #c82333 !important;
+    transform: translateY(-1px);
+}
+
+.variants-table input:focus {
+    border-color: #ff9800 !important;
+    outline: none;
+}
+
+.variants-table-container {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.variants-table {
+    width: 420px;
+    transition: width 0.3s ease;
+}
+
+.variants-table.with-stock {
+    width: 700px !important; /* 420px + 240px for stock columns */
+}
+
+.variants-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.variants-table-container::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.variants-table-container::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.variants-table-container::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* Remove this rule - it conflicts with unit selector spacing */
+
+/* Unit selector styling inside variants table - smaller size */
+.variants-table .unit-selector {
+    background: transparent;
+    right: 2px;
+    top: 45%;
+    transform: translateY(-50%) scale(0.8);
+}
+
+.variants-table .unit-prefix {
+    font-size: 0.9rem;
+    margin-left: 4px;
+}
+
+.variants-table .unit-value {
+    font-size: 0.9rem;
+    min-width: 25px;
+    width: 25px;
+    margin-left: 10px;
+}
+
+.variants-table .unit-arrows {
+    margin-top: 3px;
+    gap: 0px;
+}
+
+.variants-table .unit-arrow {
+    font-size: 7px;
+    width: 12px;
+    height: 8px;
+}
+
+/* Ensure variant stock inputs reserve space for unit selector */
+.variants-table .input-with-unit-selector input {
+    padding-right: 45px !important; /* Smaller space for scaled unit selector */
+}
+
+
+/* Variants Track Stock Toggle - Smaller size */
+.variants-section .switch {
+    width: 60px !important;
+    height: 30px !important;
+}
+
+.variants-section .slider:before {
+    height: 24px !important;
+    width: 24px !important;
+    left: 2px !important;
+    bottom: 2px !important;
+}
+
+.variants-section .switch input:checked + .slider:before {
+    transform: translateX(30px) !important;
+}
+
+/* Fix divider inside variants section */
+.variants-section .modal-divider {
+    width: 100% !important;
+    margin: 0 !important;
+    background: #212121;
+    height: 1.5px;
+    opacity: 0.7;
+}
+
+/* Variants Table Checkbox Styling - Bigger and Orange */
+.variants-table .variant-available {
+    width: 20px !important;
+    height: 20px !important;
+    border: 2px solid #ff9800 !important;
+    background: #171717 !important;
+    border-radius: 4px !important;
+    position: relative;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    cursor: pointer !important;
+    margin: 0 auto !important;
+    display: block !important;
+}
+
+.variants-table .variant-available:checked {
+    background: #ff9800 !important;
+    border-color: #ff9800 !important;
+}
+
+.variants-table .variant-available:checked::after {
+    content: '✓' !important;
+    display: block !important;
+    color: #171717 !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    pointer-events: none !important;
+    line-height: 1 !important;
+}
+
+.variants-table .variant-available:hover {
+    border-color: #ffb74d !important;
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.1) !important;
+}
+
+.variants-table .variant-available:focus {
+    outline: none !important;
+    border-color: #ff9800 !important;
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2) !important;
+}
