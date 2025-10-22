@@ -44,8 +44,15 @@ if (!isset($_SESSION['user_id'])) {
             <div id="tab-info-actions">
                 <button class="btn btn-primary" id="addProductBtn"><i class="fa fa-plus"></i> Add Item</button>
                 <button class="btn btn-secondary" id="wasteBtn"><i class="fa fa-trash"></i> Record Waste</button>
-                <button class="btn btn-outline" id="importBtn" title="Import"><i class="fa fa-download"></i></button>
-                <button class="btn btn-outline" id="exportBtn" title="Export"><i class="fa fa-upload"></i></button>
+                <!-- Import Button and File Input -->
+                <form id="importForm" action="import_inventory.php" method="post" enctype="multipart/form-data" style="display:inline;">
+                    <input type="file" name="import_file" id="importFile" accept=".csv" style="display:none;">
+                    <button type="button" class="btn btn-outline" id="importBtn" title="Import" onclick="document.getElementById('importFile').click();"><i class="fa fa-download"></i></button>
+                </form>
+                <!-- Export Button -->
+                <form id="exportForm" action="export_inventory.php" method="get" style="display:inline;">
+                    <button type="submit" class="btn btn-outline" id="exportBtn" title="Export"><i class="fa fa-upload"></i></button>
+                </form>
             </div>
         </div>
                 

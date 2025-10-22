@@ -1,4 +1,27 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // Search functionality
+    const searchInput = document.getElementById('search-inventory');
+    let allProducts = [];
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = searchInput.value.trim().toLowerCase();
+            const filtered = allProducts.filter(product =>
+                product.name.toLowerCase().includes(query) ||
+                product.category.toLowerCase().includes(query)
+            );
+            displayInventory(filtered);
+        });
+    }
+    // Import functionality
+    const importFileInput = document.getElementById('importFile');
+    const importForm = document.getElementById('importForm');
+    if (importFileInput && importForm) {
+        importFileInput.addEventListener('change', function() {
+            if (importFileInput.files.length > 0) {
+                importForm.submit();
+            }
+        });
+    }
     const inventoryTableBody = document.getElementById('inventory-table-body');
     const inventoryTable = document.getElementById('inventory-table');
     const paginationBar = document.querySelector('.inventory-pagination-bar');
@@ -10,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let rowsPerPage = 10;
     let currentPage = 1;
     let productsData = [];
+    // ...existing code...
 
     function renderTablePage(page) {
         const rows = Array.from(inventoryTableBody.querySelectorAll('tr'));
@@ -27,24 +51,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function displayInventory(products) {
-        productsData = products;
+    productsData = products;
         inventoryTableBody.innerHTML = '';
-        products.forEach(product => {
+        if (products.length === 0) {
             const tr = document.createElement('tr');
-            const status = product.quantity > 0 ? 'In Stock' : 'Out of Stock';
-            tr.innerHTML = `
-                <td>${product.name}</td>
-                <td>${product.category}</td>
-                <td>$${parseFloat(product.unit_price).toFixed(2)}</td>
-                <td>${product.quantity}</td>
-                <td>${status}</td>
-                <td>
-                    <button class="edit-btn" data-id="${product.id}">Edit</button>
-                    <button class="delete-btn" data-id="${product.id}">Delete</button>
-                </td>
-            `;
+            tr.innerHTML = `<td colspan="6" style="text-align:center;color:#ff9800;">No products found.</td>`;
             inventoryTableBody.appendChild(tr);
-        });
+        } else {
+            products.forEach(product => {
+                const tr = document.createElement('tr');
+                const status = product.quantity > 0 ? 'In Stock' : 'Out of Stock';
+                tr.innerHTML = `
+                    <td>${product.name}</td>
+                    <td>${product.category}</td>
+                    <td>$${parseFloat(product.unit_price).toFixed(2)}</td>
+                    <td>${product.quantity}</td>
+                    <td>${status}</td>
+                    <td>
+                        <button class="edit-btn" data-id="${product.id}">Edit</button>
+                        <button class="delete-btn" data-id="${product.id}">Delete</button>
+                    </td>
+                `;
+                inventoryTableBody.appendChild(tr);
+            });
+        }
         renderTablePage(1);
     }
 
@@ -76,7 +106,8 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('api.php')
             .then(response => response.json())
             .then(data => {
-                displayInventory(data);
+                allProducts = data;
+                displayInventory(allProducts);
             })
             .catch(error => {
                 console.error('Error fetching inventory:', error);
