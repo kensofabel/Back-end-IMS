@@ -1,5 +1,18 @@
 // --- Status toggle for employees ---
 document.addEventListener('DOMContentLoaded', function() {
+    // Employee table search functionality
+    const searchInput = document.getElementById('employee-search');
+    const table = document.getElementById('employees-table');
+    if (searchInput && table) {
+        searchInput.addEventListener('input', function() {
+            const query = searchInput.value.trim().toLowerCase();
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    }
     document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
         badge.addEventListener('click', function(e) {
             const empId = this.getAttribute('data-employee-id');

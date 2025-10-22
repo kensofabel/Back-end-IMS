@@ -42,8 +42,10 @@ require_permission(11);
             </div>
             <div class="tab-info-bar">
                 <div class="tab-info-text" id="tab-info-text">Add, edit, or remove employees as needed for your system. Click status to toggle Active/Inactive.</div>
-                <div class="tab-info-actions" id="tab-info-actions">
+                <div class="tab-info-actions" id="tab-info-actions" style="display:flex;align-items:center;gap:12px;">
                     <button class="btn-add-role" id="btn-add-employee"><i class="fas fa-user-plus"></i> Add Employee</button>
+                    <input type="text" id="employee-search" placeholder="Search employees..." style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:220px;font-size:1rem;background:#232323;color:#fff;">
+                    <i class="fas fa-search" style="color:#ff9800;"></i>
                 </div>
             </div>
             <div class="tab-content" id="content-manage-employees">
@@ -144,7 +146,7 @@ if (count($employees) > 0) {
     echo '  <button class="pagination-btn pagination-prev" disabled title="Previous page">&#60;</button>';
     echo '  <button class="pagination-btn pagination-next" disabled title="Next page">&#62;</button>';
     echo '  <span style="color:#fff;font-size:1.04rem;margin-left:12px;">Page</span>';
-    echo '  <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #222;border-radius:4px;font-size:1.04rem;margin:0 6px;" />';
+    echo '  <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #222;border-radius:4px;font-size:1.04rem;margin:0 6px;background:#232323;color:#fff;" />';
     echo '  <span style="color:#fff;font-size:1.04rem;">of</span>';
     echo '  <span class="pagination-total-pages" style="color:#fff;font-size:1.04rem;margin:0 6px;">1</span>';
     echo '  <span style="color:#fff;font-size:1.04rem;margin-left:18px;">Rows per page:</span>';
@@ -262,4 +264,3 @@ if (count($employees) > 0) {
     <script src="employee.js"></script>
 </body>
 </html>
-
