@@ -13,6 +13,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+        // Advanced filter form functionality
+        const filterForm = document.getElementById('employee-advanced-filter');
+        const resetBtn = document.getElementById('reset-employee-filters');
+        if (filterForm && table) {
+            filterForm.addEventListener('submit', function(e) {
+                // Submit as GET, reload page with filters
+                // No AJAX for now, keep system unchanged
+            });
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function() {
+                    filterForm.reset();
+                    // Reload page without any filter query string
+                    const baseUrl = window.location.pathname;
+                    window.location.href = baseUrl;
+                });
+            }
+        }
     document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
         badge.addEventListener('click', function(e) {
             const empId = this.getAttribute('data-employee-id');
