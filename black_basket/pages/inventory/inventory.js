@@ -348,6 +348,69 @@ document.addEventListener('DOMContentLoaded', function () {
                             if (instockEl) instockEl.textContent = res.new_in_stock || '—';
                             if (statusEl) statusEl.textContent = res.status || '—';
 
+                            // If server returned parent totals prefer them; otherwise recalc from DOM
+                            try {
+                                if (res && res.parent_new_in_stock && node && node.getAttribute && node.getAttribute('data-variant-id')) {
+                                    const wrapper = node.closest && node.closest('.br-row-wrapper');
+                                    if (wrapper) {
+                                        const parentNode = wrapper.querySelector('.barcode-result-row');
+                                        if (parentNode) {
+                                            const pInst = parentNode.querySelector('.br-instock-value');
+                                            const pStatus = parentNode.querySelector('.br-status');
+                                            if (pInst) pInst.textContent = res.parent_new_in_stock || '—';
+                                            if (pStatus) pStatus.textContent = res.parent_status || '—';
+                                            try { parentNode.setAttribute('data-in-stock', res.parent_new_in_stock ? String(res.parent_new_in_stock).replace(/\s+/g,'') : ''); } catch (e) {}
+                                        }
+                                    }
+                                } else {
+                                    if (node && node.getAttribute && node.getAttribute('data-variant-id')) {
+                                        const wrapper = node.closest && node.closest('.br-row-wrapper');
+                                        if (wrapper) {
+                                            // Sum variant in-stock numbers
+                                            let sum = 0;
+                                            let foundAny = false;
+                                            let unit = '';
+                                            const vRows = wrapper.querySelectorAll('.variant-list .barcode-result-row');
+                                            vRows.forEach(vRow => {
+                                                try {
+                                                    const ie = vRow.querySelector('.br-instock-value');
+                                                    const txt = ie ? String(ie.textContent || '').trim() : (vRow.getAttribute('data-in-stock') || '').trim();
+                                                    if (!txt) return;
+                                                    const m = txt.match(/^\s*([+-]?\d+(?:\.\d+)?)/);
+                                                    if (m) {
+                                                        const n = parseFloat(m[1]);
+                                                        if (!isNaN(n)) { sum += n; foundAny = true; }
+                                                    }
+                                                    if (!unit) {
+                                                        const um = txt.match(/^\s*[+-]?\d+(?:\.\d+)?\s*(.*)$/);
+                                                        if (um && um[1]) {
+                                                            const u = um[1].trim(); if (u && u !== '- -') unit = u;
+                                                        }
+                                                    }
+                                                } catch (e) { /* ignore per-row */ }
+                                            });
+                                            const parentNode = wrapper.querySelector('.barcode-result-row');
+                                            if (parentNode) {
+                                                const pInst = parentNode.querySelector('.br-instock-value');
+                                                const pStatus = parentNode.querySelector('.br-status');
+                                                if (pInst) pInst.textContent = foundAny ? (String(sum) + (unit ? ' ' + unit : '')) : '—';
+                                                let statusText = '—';
+                                                if (foundAny) {
+                                                    if (sum <= 0) statusText = 'Out of stock';
+                                                    else {
+                                                        const parentLow = parentNode.getAttribute && parentNode.getAttribute('data-low-stock') ? parentNode.getAttribute('data-low-stock') : '';
+                                                        if (parentLow && parentLow !== '' && sum <= parseFloat(parentLow)) statusText = 'Low stock';
+                                                        else statusText = 'In stock';
+                                                    }
+                                                }
+                                                if (pStatus) pStatus.textContent = statusText;
+                                                try { parentNode.setAttribute('data-in-stock', foundAny ? String(sum) : ''); } catch (e) {}
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (e) { console.error('delegated parent recalc failed', e); }
+
                             // restore row UI
                             const cols = node.querySelectorAll('.br-col');
                             cols.forEach(col => {
@@ -957,6 +1020,26 @@ document.addEventListener('DOMContentLoaded', function () {
             addVariantRow();
         }
     }
+
+    // Expose helper to reset name dropdown/variants state from other scripts
+    window.resetNameDropdownState = function() {
+        try {
+            isVariantsMode = false;
+            const nameInput = document.getElementById('inlineItemName');
+            if (nameInput) {
+                // Small delay to allow DOM changes to settle
+                setTimeout(function() {
+                    // Only trigger dropdown if the field has content
+                    if (nameInput.value && nameInput.value.trim() !== '') {
+                        nameInput.focus();
+                        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }, 60);
+            }
+        } catch (e) {
+            console.error('resetNameDropdownState error', e);
+        }
+    };
     
     function hasVariantsData() {
         const tableBody = document.getElementById('variantsTableBody');
@@ -2812,13 +2895,488 @@ document.addEventListener('DOMContentLoaded', function () {
                 const statusEl = node.querySelector('.br-status');
                 const addQty = node.querySelector('.br-add-qty');
                 const addBtn = node.querySelector('.br-add-btn');
+                // Hide status column for parent product rows
+                if (item.type === 'product') {
+                    const statusCol = node.querySelector('.br-col-status');
+                    if (statusCol) statusCol.style.display = 'none';
+                    if (statusEl) statusEl.style.display = 'none';
+                }
 
                 if (catEl) catEl.textContent = item.category || '';
-                if (nameEl) nameEl.textContent = item.type === 'variant' ? (item.variant_name + ' (of ' + item.product_name + ')') : (item.name || '');
+                if (nameEl) nameEl.textContent = item.type === 'variant' ? (item.variant_name || '') : (item.name || '');
                 // Columns that can be hidden when tracking is off
                 const instockCol = node.querySelector('.br-col-instock');
                 const statusCol = node.querySelector('.br-col-status');
                 const addCol = node.querySelector('.br-col-add');
+
+                // ...existing code for main item rendering...
+
+                // Create a wrapper for this product row so variants appended inside it
+                // cannot float beside the parent (forces vertical stacking)
+                let rowWrapper = document.createElement('div');
+                rowWrapper.className = 'br-row-wrapper';
+                // Layout is handled via CSS (.br-row-wrapper and template grid).
+                // Avoid inline display/width styles so the template's grid
+                // (defined in popupmodal.php) can control column sizes.
+                // append parent node into wrapper, then wrapper into mount
+                rowWrapper.appendChild(node);
+                mount.appendChild(rowWrapper);
+
+                // Parent row click toggles variant list visibility (override tracking)
+                try {
+                    node.addEventListener('click', function(e) {
+                        // Ignore clicks on interactive controls so they work normally
+                        if (e.target.closest && e.target.closest('input, button, a, select, textarea, .unit-selector, .br-add-btn, .br-add-qty, .br-track-toggle, .br-undo, .br-add-again')) return;
+                        const vlist = rowWrapper.querySelector('.variant-list');
+                        if (!vlist) return;
+                        const forced = vlist.getAttribute('data-forced') === '1';
+                        if (forced) {
+                            // turn off forced show -> respect tracking
+                            vlist.setAttribute('data-forced', '0');
+                            const parentTracking = parseInt(item.track_stock || 0) === 1;
+                            if (!parentTracking) vlist.classList.add('hidden');
+                            else vlist.classList.remove('hidden');
+                        } else {
+                            // force show
+                            vlist.setAttribute('data-forced', '1');
+                            vlist.classList.remove('hidden');
+                        }
+                    });
+                } catch (e) { /* ignore */ }
+
+                // Helper: recalculate parent totals from variants and update parent's in-stock and status
+                function recalcParentTotals() {
+                    try {
+                        // Sum numeric parts of each variant's in-stock value
+                        const variantRows = rowWrapper.querySelectorAll('.variant-list .barcode-result-row');
+                        let sum = 0;
+                        let foundAny     = false;
+                        let unit = '';
+                        variantRows.forEach(vRow => {
+                            try {
+                                const instEl = vRow.querySelector('.br-instock-value');
+                                let text = instEl ? String(instEl.textContent || '').trim() : (vRow.getAttribute('data-in-stock') || '').trim();
+                                if (!text) return;
+                                const m = text.match(/^\s*([+-]?\d+(?:\.\d+)?)/);
+                                if (m) {
+                                    const n = parseFloat(m[1]);
+                                    if (!isNaN(n)) { sum += n; foundAny = true; }
+                                }
+                                if (!unit) {
+                                    const um = text.match(/^\s*[+-]?\d+(?:\.\d+)?\s*(.*)$/);
+                                    if (um && um[1]) {
+                                        const u = um[1].trim();
+                                        if (u && u !== '- -') unit = u;
+                                    }
+                                }
+                            } catch (e) { /* per-row parse errors ignored */ }
+                        });
+
+                        // Update parent in-stock and status elements
+                        const parentNode = rowWrapper.querySelector('.barcode-result-row');
+                        if (!parentNode) return;
+                        const parentInstEl = parentNode.querySelector('.br-instock-value');
+                        const parentStatusEl = parentNode.querySelector('.br-status');
+
+                        if (parentInstEl) {
+                            if (!foundAny) parentInstEl.textContent = '—';
+                            else parentInstEl.textContent = String(sum) + (unit ? ' ' + unit : '');
+                        }
+
+                        // Compute status using parent item's low_stock when available
+                        let statusText = '—';
+                        if (foundAny) {
+                            if (sum <= 0) statusText = 'Out of stock';
+                            else if (item && item.low_stock && item.low_stock !== '' && sum <= parseFloat(item.low_stock)) statusText = 'Low stock';
+                            else statusText = 'In stock';
+                        }
+                        if (parentStatusEl) parentStatusEl.textContent = statusText;
+
+                        // Keep parent data-in-stock attribute in sync
+                        try { if (parentNode && foundAny) parentNode.setAttribute('data-in-stock', String(sum)); } catch (e) {}
+                    } catch (e) { console.error('recalcParentTotals error', e); }
+                }
+
+                // If item has variants, render them below the main item
+                if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
+                    // Create a container for variants as a sibling under the row wrapper
+                    let variantList = document.createElement('div');
+                    variantList.className = 'variant-list';
+                    rowWrapper.appendChild(variantList);
+                    // Hide variants list when parent product tracking is off
+                    try {
+                        const parentTracking = parseInt(item.track_stock || 0) === 1;
+                        if (!parentTracking) variantList.classList.add('hidden');
+                        else variantList.classList.remove('hidden');
+                    } catch (e) { /* ignore */ }
+
+                    // If the parent product has variants, hide the parent's add controls
+                    // and mark the add column so later toggles won't show it again.
+                    try {
+                        if (addQty) {
+                            addQty.style.display = 'none';
+                            addQty.disabled = true;
+                        }
+                        if (addBtn) {
+                            addBtn.style.display = 'none';
+                            addBtn.disabled = true;
+                        }
+                        if (addCol) {
+                            addCol.style.display = 'none';
+                            addCol.setAttribute('data-has-variants', '1');
+                        }
+                    } catch (e) { /* ignore if DOM refs missing */ }
+
+                    item.variants.forEach(variant => {
+                        let vNode;
+                        if (tpl && 'content' in tpl) {
+                            vNode = tpl.content.firstElementChild.cloneNode(true);
+                        } else {
+                            vNode = document.createElement('div');
+                            vNode.className = 'barcode-result-row';
+                        }
+                        // Fill fields for variant
+                        const vCatEl = vNode.querySelector('.br-category');
+                        const vNameEl = vNode.querySelector('.br-name');
+                        const vTrackToggle = vNode.querySelector('.br-track-toggle');
+                        const vInstockEl = vNode.querySelector('.br-instock-value');
+                        const vStatusEl = vNode.querySelector('.br-status');
+                        const vAddQty = vNode.querySelector('.br-add-qty');
+                        const vAddBtn = vNode.querySelector('.br-add-btn');
+
+                        if (vCatEl) vCatEl.textContent = item.name || '';
+                        if (vNameEl) vNameEl.textContent = variant.variant_name || '';
+
+                        // Columns that can be hidden when tracking is off
+                        const vInstockCol = vNode.querySelector('.br-col-instock');
+                        const vStatusCol = vNode.querySelector('.br-col-status');
+                        const vAddCol = vNode.querySelector('.br-col-add');
+
+                        // Copy relevant fields from variant
+                        vNode.setAttribute('data-variant-id', variant.variant_id);
+                        vNode.setAttribute('data-product-id', item.id);
+                        if (typeof variant.variant_in_stock !== 'undefined' && variant.variant_in_stock !== null) vNode.setAttribute('data-in-stock', String(variant.variant_in_stock));
+                        if (typeof variant.variant_low_stock !== 'undefined' && variant.variant_low_stock !== null) vNode.setAttribute('data-low-stock', String(variant.variant_low_stock));
+
+                        // Variants no longer render their own track-toggle button; remove it from the DOM
+                        let vTrackingVal = parseInt(item.track_stock) || 0;
+                        const vTrackingOn = vTrackingVal === 1;
+                        // Remove or hide the whole track column for variants so no toggle appears and layout stays clean
+                        try {
+                            if (vTrackToggle) {
+                                // remove the input element itself
+                                try { vTrackToggle.remove(); } catch (e) {}
+                            }
+                            const vTrackCol = vNode.querySelector('.br-col-track');
+                            if (vTrackCol) {
+                                // hide the entire column for variants (keeps header alignment intact)
+                                vTrackCol.style.display = 'none';
+                            }
+                        } catch (e) { /* ignore DOM errors */ }
+
+                        // Populate in-stock and status only when tracking is on
+                        if (vTrackingOn) {
+                            const rawInStock = variant.variant_in_stock;
+                            const instockDisplay = (rawInStock === null || typeof rawInStock === 'undefined' || rawInStock === '') ? '—' : String(rawInStock);
+                            if (vInstockEl) vInstockEl.textContent = instockDisplay;
+                            let statusText = '—';
+                            if (!(rawInStock === null || typeof rawInStock === 'undefined' || rawInStock === '')) {
+                                const inStockNum = parseFloat(rawInStock || 0);
+                                statusText = 'In stock';
+                                if (isNaN(inStockNum) || inStockNum <= 0) statusText = 'Out of stock';
+                                else if (variant.variant_low_stock && variant.variant_low_stock !== '' && inStockNum <= parseFloat(variant.variant_low_stock)) statusText = 'Low stock';
+                            }
+                            if (vStatusEl) vStatusEl.textContent = statusText;
+                        } else {
+                            if (vInstockEl) vInstockEl.textContent = '';
+                            if (vStatusEl) vStatusEl.textContent = '';
+                        }
+
+                        // Hide columns initially if tracking is off
+                        if (!vTrackingOn) {
+                            if (vInstockCol) vInstockCol.style.display = 'none';
+                            if (vStatusCol) vStatusCol.style.display = 'none';
+                            if (vAddCol) vAddCol.style.display = 'none';
+                        }
+
+                        // Wire add button for variant
+                        if (vAddBtn) {
+                            vAddBtn.addEventListener('click', function() {
+                                const rawQty = vAddQty ? vAddQty.value.trim() : '';
+                                const qty = rawQty === '' ? 0 : parseFloat(rawQty);
+                                if (!qty || isNaN(qty) || qty <= 0) {
+                                    showErrorPopup('Please enter a quantity greater than 0');
+                                    return;
+                                }
+                                let unit = '';
+                                try {
+                                    const anyUnit = vNode.querySelector('.unit-value');
+                                    if (anyUnit) unit = anyUnit.textContent.trim();
+                                } catch (e) {}
+                                // Ghost number animation
+                                try {
+                                    if (vInstockEl) {
+                                        const ghost = document.createElement('div');
+                                        ghost.className = 'ghost-add-number';
+                                        ghost.textContent = `+${qty}${(unit && unit !== '- -') ? ' ' + unit : ''}`;
+                                        vNode.appendChild(ghost);
+                                        const instRect = vInstockEl.getBoundingClientRect();
+                                        const rowRect = vNode.getBoundingClientRect();
+                                        const ghostRect = ghost.getBoundingClientRect();
+                                        const centerX = instRect.left - rowRect.left + (instRect.width / 2) - (ghostRect.width / 2) - 6;
+                                        const centerY = instRect.top - rowRect.top + (instRect.height / 2) - (ghostRect.height / 2);
+                                        ghost.style.left = (centerX > 4 ? centerX : 4) + 'px';
+                                        ghost.style.top = (centerY > 2 ? centerY : 2) + 'px';
+                                        requestAnimationFrame(() => {
+                                            ghost.style.animation = 'ghost-float 900ms ease-out forwards';
+                                        });
+                                        setTimeout(() => { try { ghost.remove(); } catch(e){} }, 1000);
+                                    }
+                                } catch (e) { console.error('ghost immediate error', e); }
+                                vAddBtn.disabled = true;
+                                vAddQty.disabled = true;
+                                const payload = { action: 'add_stock', product_id: item.id, variant_id: variant.variant_id, qty: qty };
+                                if (unit && unit !== '- -') payload.unit = unit;
+                                fetch('api.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                }).then(res => res.json())
+                                .then(resp => {
+                                    if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'Unknown error');
+                                    const newInStock = resp.new_in_stock || resp.new_in_stock === '' ? resp.new_in_stock : null;
+                                    const newStatus = resp.status || '';
+                                    if (vInstockEl) vInstockEl.textContent = newInStock !== null ? newInStock : '—';
+                                    if (vStatusEl) vStatusEl.textContent = newStatus || '—';
+                                    // If server returned authoritative parent totals, prefer them
+                                    try {
+                                        const wrapper = vNode.closest && vNode.closest('.br-row-wrapper');
+                                        if (resp && resp.parent_new_in_stock && wrapper) {
+                                            const parentNode = wrapper.querySelector('.barcode-result-row');
+                                            if (parentNode) {
+                                                const pInst = parentNode.querySelector('.br-instock-value');
+                                                const pStatus = parentNode.querySelector('.br-status');
+                                                if (pInst) pInst.textContent = resp.parent_new_in_stock || '—';
+                                                if (pStatus) pStatus.textContent = resp.parent_status || '—';
+                                                try { parentNode.setAttribute('data-in-stock', resp.parent_new_in_stock ? String(resp.parent_new_in_stock).replace(/\s+/g,'') : ''); } catch (e) {}
+                                            }
+                                        } else {
+                                            // Fallback: recalc from DOM variants
+                                            try { recalcParentTotals(); } catch (e) { console.error('parent recalc after variant add failed', e); }
+                                        }
+                                    } catch (e) { console.error('parent update error after variant add', e); }
+                                    // Also show floating ghost on parent row so user sees aggregated change
+                                    try {
+                                        const wrapper = vNode.closest && vNode.closest('.br-row-wrapper');
+                                        if (wrapper) {
+                                            const parentNode = wrapper.querySelector('.barcode-result-row');
+                                            if (parentNode) {
+                                                const parentInst = parentNode.querySelector('.br-instock-value');
+                                                if (parentInst) {
+                                                    const ghost = document.createElement('div');
+                                                    ghost.className = 'ghost-add-number';
+                                                    ghost.textContent = `+${qty}${(unit && unit !== '- -') ? ' ' + unit : ''}`;
+                                                    parentNode.appendChild(ghost);
+                                                    const instRect = parentInst.getBoundingClientRect();
+                                                    const rowRect = parentNode.getBoundingClientRect();
+                                                    const ghostRect = ghost.getBoundingClientRect();
+                                                    const centerX = instRect.left - rowRect.left + (instRect.width / 2) - (ghostRect.width / 2) - 6;
+                                                    const centerY = instRect.top - rowRect.top + (instRect.height / 2) - (ghostRect.height / 2);
+                                                    ghost.style.left = (centerX > 4 ? centerX : 4) + 'px';
+                                                    ghost.style.top = (centerY > 2 ? centerY : 2) + 'px';
+                                                    requestAnimationFrame(() => {
+                                                        ghost.style.animation = 'ghost-float 900ms ease-out forwards';
+                                                    });
+                                                    setTimeout(() => { try { ghost.remove(); } catch(e){} }, 1000);
+                                                }
+                                            }
+                                        }
+                                    } catch (e) { console.error('parent ghost error', e); }
+                                    vNode.classList.add('added');
+                                    setTimeout(() => vNode.classList.remove('added'), 900);
+                                    const successCol = vNode.querySelector('.br-col-success');
+                                    const successMsg = vNode.querySelector('.br-success-message');
+                                    const successAgainBtn = vNode.querySelector('.br-add-again');
+                                    setTimeout(() => {
+                                        try {
+                                            const cols = vNode.querySelectorAll('.br-col');
+                                            cols.forEach(col => {
+                                                if (!col.classList.contains('br-col-success')) {
+                                                    col.style.display = 'none';
+                                                }
+                                            });
+                                            const nameText = vNameEl ? vNameEl.textContent.trim() : '';
+                                            const categoryText = vCatEl ? vCatEl.textContent.trim() : '';
+                                            let displayUnit = (unit && unit !== '- -') ? unit : '';
+                                            const totalTextRaw = (newInStock !== null) ? String(newInStock) : '';
+                                            if (!displayUnit && totalTextRaw) {
+                                                const m = totalTextRaw.match(/^[0-9]+(?:\.[0-9]+)?\s*(.*)$/);
+                                                if (m && m[1]) displayUnit = m[1].trim();
+                                            }
+                                            const addedQtyDisplay = `${qty}${displayUnit || ''}`;
+                                            const totalText = totalTextRaw || '';
+                                            const totalDisplay = totalText ? totalText.replace(/\s+/g, '') : '—';
+                                            let statusTextNow = (newStatus || '').trim();
+                                            if (!statusTextNow) statusTextNow = '—';
+                                            else if (statusTextNow.toLowerCase().includes('with')) statusTextNow = 'With stock';
+                                            else if (statusTextNow.toLowerCase().includes('low')) statusTextNow = 'Low stock';
+                                            else if (statusTextNow.toLowerCase().includes('out')) statusTextNow = 'Out of stock';
+                                            if (successMsg) {
+                                                successMsg.textContent = `You've successfully added ${addedQtyDisplay} of ${nameText || ''} under ${categoryText || 'No Category'} with a total of ${totalDisplay} (${statusTextNow})`;
+                                            }
+                                            try { vNode._lastAdded = { qty: qty, unit: displayUnit || unit || '' }; } catch (e) {}
+                                            if (successCol) successCol.style.display = '';
+                                            if (successAgainBtn) {
+                                                successAgainBtn.onclick = function() {
+                                                    const cols = vNode.querySelectorAll('.br-col');
+                                                    cols.forEach(col => {
+                                                        if (!col.classList.contains('br-col-success')) {
+                                                            // Hide track-toggle for variants (never show)
+                                                            if (col.classList.contains('br-col-track')) {
+                                                                col.style.display = 'none';
+                                                            } else {
+                                                                col.style.display = '';
+                                                            }
+                                                        }
+                                                    });
+                                                    if (successCol) successCol.style.display = 'none';
+                                                    if (vAddQty) vAddQty.value = '';
+                                                    if (vAddBtn) {
+                                                        vAddBtn.disabled = false;
+                                                        vAddQty.disabled = false;
+                                                        try { vAddQty.focus(); } catch (e) {}
+                                                    }
+                                                };
+                                            }
+                                            const undoBtn = vNode.querySelector('.br-undo');
+                                            if (undoBtn) {
+                                                undoBtn.onclick = function() {
+                                                    const last = vNode._lastAdded || { qty: qty, unit: displayUnit || unit || '' };
+                                                    const prevText = undoBtn.textContent;
+                                                    try { undoBtn.textContent = 'Undoing...'; } catch (e) {}
+                                                    const undoQty = -Math.abs(parseFloat(last.qty) || -qty);
+                                                    const adjustPayload = { action: 'adjust_stock', product_id: item.id, variant_id: variant.variant_id, qty: undoQty };
+                                                    if (last.unit && last.unit !== '- -') adjustPayload.unit = last.unit;
+                                                    undoBtn.disabled = true;
+                                                    fetch('api.php', {
+                                                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(adjustPayload)
+                                                    }).then(r => r.json()).then(res => {
+                                                        if (!res || !res.success) throw new Error(res && res.error ? res.error : 'Unknown error');
+                                                        if (vInstockEl) vInstockEl.textContent = res.new_in_stock !== null ? res.new_in_stock : '—';
+                                                        if (vStatusEl) vStatusEl.textContent = res.status || '—';
+                                                        // If server returned parent totals prefer them, otherwise recalc
+                                                        try {
+                                                            const wrapper = vNode.closest && vNode.closest('.br-row-wrapper');
+                                                            if (res && res.parent_new_in_stock && wrapper) {
+                                                                const parentNode = wrapper.querySelector('.barcode-result-row');
+                                                                if (parentNode) {
+                                                                    const pInst = parentNode.querySelector('.br-instock-value');
+                                                                    const pStatus = parentNode.querySelector('.br-status');
+                                                                    if (pInst) pInst.textContent = res.parent_new_in_stock || '—';
+                                                                    if (pStatus) pStatus.textContent = res.parent_status || '—';
+                                                                    try { parentNode.setAttribute('data-in-stock', res.parent_new_in_stock ? String(res.parent_new_in_stock).replace(/\s+/g,'') : ''); } catch (e) {}
+                                                                }
+                                                            } else {
+                                                                try { recalcParentTotals(); } catch (e) { console.error('parent recalc after variant undo failed', e); }
+                                                            }
+                                                        } catch (e) { console.error('parent update error after variant undo', e); }
+                                                        // Restore and focus the variant add input so user can add again quickly
+                                                        // Show all columns except success, hide success message
+                                                        const cols = vNode.querySelectorAll('.br-col');
+                                                        cols.forEach(col => {
+                                                            if (!col.classList.contains('br-col-success')) {
+                                                                // Hide track-toggle for variants (never show)
+                                                                if (col.classList.contains('br-col-track')) {
+                                                                    col.style.display = 'none';
+                                                                } else {
+                                                                    col.style.display = '';
+                                                                }
+                                                            } else {
+                                                                col.style.display = 'none';
+                                                            }
+                                                        });
+                                                        try { if (vAddQty) { vAddQty.style.display = ''; vAddQty.disabled = false; vAddQty.value = ''; vAddQty.focus(); } } catch (e) {}
+                                                        try { if (vAddBtn) { vAddBtn.style.display = ''; vAddBtn.disabled = false; } } catch (e) {}
+                                                        undoBtn.textContent = prevText;
+                                                        undoBtn.disabled = false;
+                                                    }).catch(err => {
+                                                        undoBtn.textContent = prevText;
+                                                        undoBtn.disabled = false;
+                                                        showErrorPopup('Failed to undo: ' + (err.message || err));
+                                                    });
+                                                };
+                                            }
+                                        } catch (e) {
+                                            console.error('replace row content error', e);
+                                        }
+                                    }, 750);
+                                }).catch(err => {
+                                    console.error('add_stock error', err);
+                                    showErrorPopup('Failed to add stock: ' + (err.message || err));
+                                    vAddBtn.disabled = false;
+                                    vAddQty.disabled = false;
+                                });
+                            });
+                        }
+
+                        // Recommendation tooltip for variant
+                        if (vAddQty) {
+                            vAddQty.addEventListener('focus', function() {
+                                try {
+                                    const curText = vInstockEl ? vInstockEl.textContent.trim() : (vNode.getAttribute('data-in-stock') || '');
+                                    const lowText = vNode.getAttribute('data-low-stock') || '';
+                                    const parseNum = s => { const m = String(s || '').match(/^\s*([0-9]+(?:\.[0-9]+)?)/); return m ? parseFloat(m[1]) : null; };
+                                    const curNum = parseNum(curText);
+                                    const lowNum = parseNum(lowText);
+                                    if (lowNum !== null && (curNum === null || curNum <= lowNum)) {
+                                        const need = Math.max(1, Math.ceil((lowNum - (curNum || 0)) + 1));
+                                        let msg = vNode.querySelector('.br-recommend-msg');
+                                        if (!msg) {
+                                            msg = document.createElement('div');
+                                            msg.className = 'br-recommend-msg';
+                                            msg.setAttribute('role','status');
+                                            msg.style.visibility = 'hidden';
+                                            vNode.appendChild(msg);
+                                        }
+                                        msg.textContent = `We recommend you adding ${need} or more to exceed low stock`;
+                                        const rowRect = vNode.getBoundingClientRect();
+                                        const inputRect = vAddQty.getBoundingClientRect();
+                                        const inner = vNode.closest('.barcode-results-inner') || vNode.parentElement;
+                                        const innerRect = inner ? inner.getBoundingClientRect() : rowRect;
+                                        msg.style.display = '';
+                                        const ttWidth = Math.min((msg.offsetWidth || 160), Math.max(80, innerRect.width - 12));
+                                        const ttHeight = msg.offsetHeight || 28;
+                                        let left = (inputRect.right - rowRect.left) - ttWidth;
+                                        let top = (inputRect.top - rowRect.top) - ttHeight - 6;
+                                        const minLeft = 6;
+                                        const maxLeft = Math.max(6, rowRect.width - ttWidth - 6);
+                                        if (left < minLeft) left = minLeft;
+                                        if (left > maxLeft) left = maxLeft;
+                                        const minTop = -ttHeight - 6;
+                                        if (top < minTop) top = minTop;
+                                        msg.style.left = Math.round(left) + 'px';
+                                        msg.style.top = Math.round(top) + 'px';
+                                        msg.style.visibility = 'visible';
+                                    }
+                                } catch (e) { console.error('recommend focus error', e); }
+                            });
+                            vAddQty.addEventListener('blur', function() {
+                                try {
+                                    const msg = vNode.querySelector('.br-recommend-msg');
+                                    if (msg) msg.style.display = 'none';
+                                } catch (e) {}
+                            });
+                            vAddQty.addEventListener('input', function() {
+                                try {
+                                    const msg = vNode.querySelector('.br-recommend-msg');
+                                    if (msg) msg.style.display = 'none';
+                                } catch (e) {}
+                            });
+                        }
+
+                        variantList.appendChild(vNode);
+                    });
+                }
 
                 // Determine tracking state from DB (1 => on, 0 => off)
                 let trackingVal = 0;
@@ -2852,7 +3410,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Show/hide columns
                         if (instockCol) instockCol.style.display = on ? '' : 'none';
                         if (statusCol) statusCol.style.display = on ? '' : 'none';
-                        if (addCol) addCol.style.display = on ? '' : 'none';
+                        if (addCol) {
+                            // Do not show parent add column when this product has variants
+                            if (addCol.getAttribute && addCol.getAttribute('data-has-variants') === '1') {
+                                addCol.style.display = 'none';
+                            } else {
+                                addCol.style.display = on ? '' : 'none';
+                            }
+                        }
 
                         // Update values when turned on
                             if (on) {
@@ -2865,7 +3430,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 let statusTextNow = '—';
                                 if (!(rawInStock === null || typeof rawInStock === 'undefined' || rawInStock === '')) {
                                     const inStockNumNow = parseFloat(rawInStock || 0);
-                                    statusTextNow = 'With stocks';
+                                    statusTextNow = 'In stock';
                                     if (isNaN(inStockNumNow) || inStockNumNow <= 0) statusTextNow = 'Out of stock';
                                     else if (item.type === 'product' ? (item.low_stock && item.low_stock !== '' && inStockNumNow <= parseFloat(item.low_stock)) : (item.variant_low_stock && item.variant_low_stock !== '' && inStockNumNow <= parseFloat(item.variant_low_stock))) statusTextNow = 'Low stock';
                                 }
@@ -2876,6 +3441,53 @@ document.addEventListener('DOMContentLoaded', function () {
                             }
 
                         this.setAttribute('aria-checked', on ? 'true' : 'false');
+
+                        // Also toggle variant rows (if any) so the main product's toggle controls all variants
+                        try {
+                            const variantListEl = rowWrapper ? rowWrapper.querySelector('.variant-list') : null;
+                            if (variantListEl) {
+                                // Show/hide the entire variant list when parent tracking toggles
+                                try {
+                                    if (on) variantListEl.classList.remove('hidden');
+                                    else variantListEl.classList.add('hidden');
+                                } catch (e) {}
+                                
+                                const vRows = variantListEl.querySelectorAll('.barcode-result-row');
+                                vRows.forEach(vRow => {
+                                    try {
+                                        const vInstCol = vRow.querySelector('.br-col-instock');
+                                        const vStatusCol = vRow.querySelector('.br-col-status');
+                                        const vAddCol = vRow.querySelector('.br-col-add');
+                                        if (vInstCol) vInstCol.style.display = on ? '' : 'none';
+                                        if (vStatusCol) vStatusCol.style.display = on ? '' : 'none';
+                                        if (vAddCol) vAddCol.style.display = on ? '' : 'none';
+
+                                        // Update displayed values when turning on
+                                        if (on) {
+                                            const rawIn = vRow.getAttribute('data-in-stock');
+                                            const rawLow = vRow.getAttribute('data-low-stock');
+                                            const vInstEl = vRow.querySelector('.br-instock-value');
+                                            const vStatusEl = vRow.querySelector('.br-status');
+                                            const instockDisplay = (rawIn === null || typeof rawIn === 'undefined' || rawIn === '') ? '—' : String(rawIn);
+                                            if (vInstEl) vInstEl.textContent = instockDisplay;
+                                            let statusTextNow = '—';
+                                            if (!(rawIn === null || typeof rawIn === 'undefined' || rawIn === '')) {
+                                                const inNum = parseFloat(rawIn || 0);
+                                                statusTextNow = 'In stock';
+                                                if (isNaN(inNum) || inNum <= 0) statusTextNow = 'Out of stock';
+                                                else if (rawLow && rawLow !== '' && inNum <= parseFloat(rawLow)) statusTextNow = 'Low stock';
+                                            }
+                                            if (vStatusEl) vStatusEl.textContent = statusTextNow;
+                                        } else {
+                                            const vInstEl = vRow.querySelector('.br-instock-value');
+                                            const vStatusEl = vRow.querySelector('.br-status');
+                                            if (vInstEl) vInstEl.textContent = '';
+                                            if (vStatusEl) vStatusEl.textContent = '';
+                                        }
+                                    } catch (e) { /* per-row error should not break loop */ }
+                                });
+                            }
+                        } catch (e) { console.error('toggle variants error', e); }
 
                         // Persist the product-level tracking change to server (optimistic)
                         try {
@@ -2914,7 +3526,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     let statusText = '—';
                     if (!(rawInStock === null || typeof rawInStock === 'undefined' || rawInStock === '')) {
                         const inStockNum = parseFloat(rawInStock || 0);
-                        statusText = 'With stocks';
+                        statusText = 'In stock';
                         if (isNaN(inStockNum) || inStockNum <= 0) statusText = 'Out of stock';
                         else if (item.type === 'product' ? (item.low_stock && item.low_stock !== '' && inStockNum <= parseFloat(item.low_stock)) : (item.variant_low_stock && item.variant_low_stock !== '' && inStockNum <= parseFloat(item.variant_low_stock))) statusText = 'Low stock';
                     }
@@ -3190,7 +3802,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 }
 
-                mount.appendChild(node);
+                // parent already appended inside rowWrapper earlier; no-op here
             });
 
             // Add a CTA to create new item with same barcode below results (only for pure barcode searches)

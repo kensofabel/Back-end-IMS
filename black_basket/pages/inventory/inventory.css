@@ -1,3 +1,93 @@
+#barcodeResultsMount, .barcode-results-inner {
+    display: block !important; /* Stack rows vertically */
+}
+
+/* Variant lists should stack vertically; keep .barcode-result-row layout
+   controlled by the template (it uses grid for column sizing). */
+.variant-list {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    display: block !important;
+}
+
+/* Helper class to allow JS to hide variant lists even when base CSS uses !important.
+   Use `.variant-list.hidden` to fully hide the variant list. */
+.variant-list.hidden {
+    display: none !important;
+}
+
+/* Ensure header and row cells share the same inline layout and minimum
+   sizing so columns align precisely. Applies to header cells and row cells. */
+.barcode-results-header > .br-col,
+.barcode-result-row > .br-col {
+    display: inline-flex;
+    align-items: center;
+    min-width: 120px;
+    padding-right: 8px;
+    box-sizing: border-box;
+    /* Remove overflow hidden so buttons are visible */
+    /* overflow: visible; */
+    text-overflow: ellipsis;
+}
+
+/* Indent and visually group variants under their parent */
+.variant-list {
+    display: block !important;
+    /* avoid shifting the element outside the parent width using margin;
+       use padding to create the visual indent while keeping width:100% */
+    padding-left: 0;
+    padding-left: 48px; /* Indent the border to the right, no overflow. Adjust value as needed. */
+    /* The border is now indented 24px from the left edge. Adjust padding-left for more/less indent. */
+    margin-top: 8px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Ensure variants match the horizontal padding of parent rows and don't overflow */
+.variant-list {
+    box-sizing: border-box; /* include padding in width calculations */
+    width: 100%;
+    overflow-x: hidden; /* prevent horizontal overflow */
+    /* allow vertical stacking but keep within parent width */
+    max-width: 100%;
+}
+
+/* Draw border at a specific position using ::before, without affecting content */
+.variant-list::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 20px; /* Adjust this value to move the border horizontally */
+    width: 2px;
+    height: 95%;
+    background: #444;
+    z-index: 1;
+    bottom: 8px;
+}
+
+/* Wrapper that groups a parent row and its variant-list sibling. Keep
+   this a block so the template grid on .barcode-result-row can apply. */
+.br-row-wrapper {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    clear: both;
+}
+
+.variant-list .barcode-result-row {
+    background: rgba(255,255,255,0.04);
+    margin-bottom: 4px;
+    border-radius: 4px;
+}
+
+.barcode-result-row {
+    /* Let the modal/template control layout (grid). Do not force flex here. */
+    width: 100%;
+    margin-bottom: 0;
+    overflow: visible !important;
+}
+
 #imageUploadArea {
   cursor: pointer;
   pointer-events: auto;
@@ -555,6 +645,22 @@
         flex: 1;
         max-width: 40%; /* Remaining space */
     }
+}
+
+/* Single Toggle Button */
+.single-toggle-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    display: center;
+    align-items: center;
+    gap: 6px;
 }
 
 .single-toggle-btn:hover {
@@ -1512,6 +1618,15 @@ body #addItemsModal .modal-content.fb-modal-out {
     height: 30px !important;
 }
 
+/* Make variant stock inputs underline-only (no full box) to match design */
+.variants-table input.variant-stock,
+.variants-table input.variant-low-stock,
+.variants-table .input-with-unit-selector input.variant-stock,
+.variants-table .input-with-unit-selector input.variant-low-stock {
+    border: none !important;
+    border-bottom: 1px solid #555 !important;
+}
+
 .variants-section .slider:before {
     height: 24px !important;
     width: 24px !important;
@@ -1575,4 +1690,5 @@ body #addItemsModal .modal-content.fb-modal-out {
     outline: none !important;
     border-color: #ff9800 !important;
     box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2) !important;
+    position: relative;
 }

@@ -31,16 +31,28 @@ switch ($method) {
             }
 
             if ($type === 'sku') {
-                // Keep legacy behavior for SKU: return single product
+                // New behavior: for SKU, return product and its variants (like barcode)
                 $sql = "SELECT p.*, c.name AS category FROM products p LEFT JOIN categories c ON p.category_id=c.id WHERE p.sku='" . $conn->real_escape_string($value) . "' LIMIT 1";
                 $res = $conn->query($sql);
                 if ($res && $res->num_rows > 0) {
-                    echo json_encode(['found' => true, 'product' => $res->fetch_assoc()]);
+                    $row = $res->fetch_assoc();
+                    $row['type'] = 'product';
+                    // Fetch variants for this product
+                    $variants = [];
+                    $var_sql = "SELECT pv.id AS variant_id, pv.product_id, pv.name AS variant_name, pv.sku, pv.barcode, pv.in_stock AS variant_in_stock, pv.low_stock AS variant_low_stock, pv.pos_available FROM product_variants pv WHERE pv.product_id=" . intval($row['id']);
+                    $var_res = $conn->query($var_sql);
+                    if ($var_res && $var_res->num_rows > 0) {
+                        while ($vrow = $var_res->fetch_assoc()) {
+                            $variants[] = $vrow;
+                        }
+                    }
+                    $row['variants'] = $variants;
+                    echo json_encode(['found' => true, 'results' => [$row], 'product' => $row]);
                 } else {
                     echo json_encode(['found' => false]);
                 }
             } else if ($type === 'barcode') {
-                // For barcode searches, return ALL matching products and variants
+                // For barcode searches, return products with this barcode and group their variants
                 $val = $conn->real_escape_string($value);
                 $results = [];
 
@@ -50,12 +62,22 @@ switch ($method) {
                 if ($prod_res && $prod_res->num_rows > 0) {
                     while ($row = $prod_res->fetch_assoc()) {
                         $row['type'] = 'product';
+                        // Fetch variants for this product
+                        $variants = [];
+                        $var_sql = "SELECT pv.id AS variant_id, pv.product_id, pv.name AS variant_name, pv.sku, pv.barcode, pv.in_stock AS variant_in_stock, pv.low_stock AS variant_low_stock, pv.pos_available FROM product_variants pv WHERE pv.product_id=" . intval($row['id']);
+                        $var_res = $conn->query($var_sql);
+                        if ($var_res && $var_res->num_rows > 0) {
+                            while ($vrow = $var_res->fetch_assoc()) {
+                                $variants[] = $vrow;
+                            }
+                        }
+                        $row['variants'] = $variants;
                         $results[] = $row;
                     }
                 }
 
-                // Variants that have this barcode (include parent product info)
-                $var_sql = "SELECT pv.id AS variant_id, pv.product_id, pv.name AS variant_name, pv.sku, pv.barcode, pv.in_stock AS variant_in_stock, pv.low_stock AS variant_low_stock, pv.pos_available, p.name AS product_name, p.track_stock AS product_track_stock, c.name AS category FROM product_variants pv LEFT JOIN products p ON pv.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE pv.barcode='" . $val . "'";
+                // Variants that have this barcode but whose parent product does NOT have this barcode
+                $var_sql = "SELECT pv.id AS variant_id, pv.product_id, pv.name AS variant_name, pv.sku, pv.barcode, pv.in_stock AS variant_in_stock, pv.low_stock AS variant_low_stock, pv.pos_available, p.name AS product_name, p.track_stock AS product_track_stock, c.name AS category FROM product_variants pv LEFT JOIN products p ON pv.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE pv.barcode='" . $val . "' AND (p.barcode IS NULL OR p.barcode != '" . $val . "')";
                 $var_res = $conn->query($var_sql);
                 if ($var_res && $var_res->num_rows > 0) {
                     while ($row = $var_res->fetch_assoc()) {
@@ -65,7 +87,7 @@ switch ($method) {
                 }
 
                 if (count($results) > 0) {
-                    // Keep backward compatibility: if exactly one result and it's a product, include 'product'
+                    // If exactly one result and it's a product, include 'product' for backward compatibility
                     $singleProduct = (count($results) === 1 && $results[0]['type'] === 'product') ? $results[0] : null;
                     echo json_encode(['found' => true, 'results' => $results, 'product' => $singleProduct]);
                 } else {
@@ -179,11 +201,54 @@ switch ($method) {
                     if ($unitToUse) $new_in_stock .= ' ' . $conn->real_escape_string($unitToUse);
                     $upd = "UPDATE product_variants SET in_stock='" . $conn->real_escape_string($new_in_stock) . "' WHERE id=" . $variant_id;
                     if (!$conn->query($upd)) throw new Exception($conn->error);
-                    // Determine status
-                    $status = 'With stocks';
+                    // Determine status for variant
+                    $status = 'In stock';
                     if ($newNum <= 0) $status = 'Out of stock';
                     else if ($lowNum > 0 && $newNum <= $lowNum) $status = 'Low stock';
-                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status]);
+
+                    // Recalculate parent product total by summing numeric parts of variants
+                    $pv_res = $conn->query("SELECT in_stock FROM product_variants WHERE product_id=" . intval($product_id));
+                    $parentSum = 0.0;
+                    $parentUnit = '';
+                    if ($pv_res) {
+                        while ($pv_row = $pv_res->fetch_assoc()) {
+                            $txt = trim((string)$pv_row['in_stock']);
+                            if ($txt === '') continue;
+                            if (preg_match('/^([0-9]+(?:\.[0-9]+)?)(?:\s*(.*))?$/', $txt, $mm)) {
+                                $n = floatval($mm[1]);
+                                $u = isset($mm[2]) ? trim($mm[2]) : '';
+                                $parentSum += $n;
+                                if ($parentUnit === '' && $u !== '' && $u !== '- -') $parentUnit = $u;
+                            }
+                        }
+                    }
+                    // Format parent new_in_stock
+                    $parentNew = ($parentSum == floor($parentSum)) ? (string)intval($parentSum) : (string)round($parentSum, 2);
+                    if ($parentUnit) $parentNew .= ' ' . $conn->real_escape_string($parentUnit);
+                    // Persist to products table
+                    $upd2 = "UPDATE products SET in_stock='" . $conn->real_escape_string($parentNew) . "' WHERE id=" . intval($product_id);
+                    if (!$conn->query($upd2)) {
+                        // If parent update fails, continue but include error info
+                        // Do not throw to avoid losing variant update
+                        $parentUpdateError = $conn->error;
+                    } else {
+                        $parentUpdateError = null;
+                    }
+                    // Determine parent status using products.low_stock when available
+                    $parentLow = '';
+                    $p_sel = $conn->query("SELECT low_stock FROM products WHERE id=" . intval($product_id) . " LIMIT 1");
+                    if ($p_sel && $p_sel->num_rows > 0) {
+                        $p_row = $p_sel->fetch_assoc();
+                        $parentLow = trim((string)$p_row['low_stock']);
+                    }
+                    $parentStatus = '—';
+                    if ($parentSum !== 0.0 || $parentSum === 0.0) {
+                        if ($parentSum <= 0) $parentStatus = 'Out of stock';
+                        else if ($parentLow !== '' && floatval($parentLow) > 0 && $parentSum <= floatval($parentLow)) $parentStatus = 'Low stock';
+                        else $parentStatus = 'In stock';
+                    }
+
+                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'parent_new_in_stock' => $parentNew, 'parent_status' => $parentStatus, 'parent_update_error' => $parentUpdateError]);
                     exit;
                 } else {
                     // Update product-level
@@ -202,7 +267,7 @@ switch ($method) {
                     if ($unitToUse) $new_in_stock .= ' ' . $conn->real_escape_string($unitToUse);
                     $upd = "UPDATE products SET in_stock='" . $conn->real_escape_string($new_in_stock) . "' WHERE id=" . $product_id;
                     if (!$conn->query($upd)) throw new Exception($conn->error);
-                    $status = 'With stocks';
+                    $status = 'In stock';
                     if ($newNum <= 0) $status = 'Out of stock';
                     else if ($lowNum > 0 && $newNum <= $lowNum) $status = 'Low stock';
                     echo json_encode(['success' => true, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status]);
@@ -216,7 +281,7 @@ switch ($method) {
         }
         // If this POST is NOT a lightweight action, treat it as product creation
         if (!isset($data['action']) || $data['action'] === '') {
-        	$name = isset($data['name']) ? $conn->real_escape_string($data['name']) : '';
+         	$name = isset($data['name']) ? $conn->real_escape_string($data['name']) : '';
         	if ($name === '') {
         		http_response_code(400);
         		echo json_encode(['error' => 'Name is required']);
@@ -267,11 +332,40 @@ switch ($method) {
                     $upd = "UPDATE product_variants SET in_stock='" . $conn->real_escape_string($new_in_stock) . "' WHERE id=" . $variant_id;
                     if (!$conn->query($upd)) throw new Exception($conn->error);
 
-                    $status = 'With stocks';
+                    $status = 'In stock';
                     if ($newNum <= 0) $status = 'Out of stock';
                     else if ($lowNum > 0 && $newNum <= $lowNum) $status = 'Low stock';
 
-                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status]);
+                    // Recalculate and persist parent total
+                    $pv_res = $conn->query("SELECT in_stock FROM product_variants WHERE product_id=" . intval($product_id));
+                    $parentSum = 0.0; $parentUnit = '';
+                    if ($pv_res) {
+                        while ($pv_row = $pv_res->fetch_assoc()) {
+                            $txt = trim((string)$pv_row['in_stock']);
+                            if ($txt === '') continue;
+                            if (preg_match('/^([0-9]+(?:\.[0-9]+)?)(?:\s*(.*))?$/', $txt, $mm)) {
+                                $n = floatval($mm[1]);
+                                $u = isset($mm[2]) ? trim($mm[2]) : '';
+                                $parentSum += $n;
+                                if ($parentUnit === '' && $u !== '' && $u !== '- -') $parentUnit = $u;
+                            }
+                        }
+                    }
+                    $parentNew = ($parentSum == floor($parentSum)) ? (string)intval($parentSum) : (string)round($parentSum, 2);
+                    if ($parentUnit) $parentNew .= ' ' . $conn->real_escape_string($parentUnit);
+                    $upd2 = "UPDATE products SET in_stock='" . $conn->real_escape_string($parentNew) . "' WHERE id=" . intval($product_id);
+                    if (!$conn->query($upd2)) { $parentUpdateError = $conn->error; } else { $parentUpdateError = null; }
+                    $p_sel = $conn->query("SELECT low_stock FROM products WHERE id=" . intval($product_id) . " LIMIT 1");
+                    $parentLow = '';
+                    if ($p_sel && $p_sel->num_rows > 0) { $parentLow = trim((string)$p_sel->fetch_assoc()['low_stock']); }
+                    $parentStatus = '—';
+                    if ($parentSum !== 0.0 || $parentSum === 0.0) {
+                        if ($parentSum <= 0) $parentStatus = 'Out of stock';
+                        else if ($parentLow !== '' && floatval($parentLow) > 0 && $parentSum <= floatval($parentLow)) $parentStatus = 'Low stock';
+                        else $parentStatus = 'In stock';
+                    }
+
+                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'parent_new_in_stock' => $parentNew, 'parent_status' => $parentStatus, 'parent_update_error' => $parentUpdateError]);
                     exit;
                 } else {
                     $sel = $conn->query("SELECT in_stock, low_stock FROM products WHERE id=" . $product_id . " LIMIT 1");
@@ -300,7 +394,7 @@ switch ($method) {
                     $upd = "UPDATE products SET in_stock='" . $conn->real_escape_string($new_in_stock) . "' WHERE id=" . $product_id;
                     if (!$conn->query($upd)) throw new Exception($conn->error);
 
-                    $status = 'With stocks';
+                    $status = 'In stock';
                     if ($newNum <= 0) $status = 'Out of stock';
                     else if ($lowNum > 0 && $newNum <= $lowNum) $status = 'Low stock';
 
@@ -335,7 +429,13 @@ switch ($method) {
             $price = null;
         }
         $cost = isset($data['cost']) && $data['cost'] !== '' ? floatval($data['cost']) : null;
-    $track_stock = isset($data['track_stock']) ? intval($data['track_stock']) : 0;
+        $track_stock = isset($data['track_stock']) ? intval($data['track_stock']) : 0;
+        // If variantsTrackStock is provided, consider it when deciding product-level tracking.
+        $variantsTrackStock = isset($data['variantsTrackStock']) ? intval($data['variantsTrackStock']) : 0;
+        // Ensure product.track_stock is enabled if either the main toggle or the variants toggle requests tracking.
+        if ($variantsTrackStock === 1) {
+            $track_stock = 1;
+        }
     // Accept in_stock and low_stock as VARCHAR (with unit suffix)
     // Behavior: empty or sentinel -> NULL (no data). Explicit '0' is preserved.
     $in_stock = isset($data['in_stock']) ? trim($data['in_stock']) : null;
@@ -436,6 +536,36 @@ switch ($method) {
                     . $vbarcode . "', "
                     . $vpos_available . ")";
                 if (!$conn->query($var_sql)) throw new Exception($conn->error);
+            }
+
+            // If variants were provided, calculate parent in_stock as the sum of variant in_stock numeric parts
+            try {
+                if (!empty($variants)) {
+                    $pv_res = $conn->query("SELECT in_stock FROM product_variants WHERE product_id=" . intval($product_id));
+                    $parentSum = 0.0;
+                    $parentUnit = '';
+                    if ($pv_res) {
+                        while ($pv_row = $pv_res->fetch_assoc()) {
+                            $txt = trim((string)$pv_row['in_stock']);
+                            if ($txt === '') continue;
+                            if (preg_match('/^([0-9]+(?:\.[0-9]+)?)(?:\s*(.*))?$/', $txt, $mm)) {
+                                $n = floatval($mm[1]);
+                                $u = isset($mm[2]) ? trim($mm[2]) : '';
+                                $parentSum += $n;
+                                if ($parentUnit === '' && $u !== '' && $u !== '- -') $parentUnit = $u;
+                            }
+                        }
+                    }
+                    // Format parent new_in_stock
+                    $parentNew = ($parentSum == floor($parentSum)) ? (string)intval($parentSum) : (string)round($parentSum, 2);
+                    if ($parentUnit) $parentNew .= ' ' . $conn->real_escape_string($parentUnit);
+                    // Persist aggregated parent in_stock
+                    $updParent = "UPDATE products SET in_stock='" . $conn->real_escape_string($parentNew) . "' WHERE id=" . intval($product_id);
+                    if (!$conn->query($updParent)) throw new Exception($conn->error);
+                }
+            } catch (Exception $e) {
+                // If parent update fails, rollback to avoid partial state
+                throw $e;
             }
 
             $conn->commit();

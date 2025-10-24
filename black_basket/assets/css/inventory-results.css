@@ -1,0 +1,17 @@
+/* Ensure .variant-list and .barcode-result-row align columns with main item */
+.variant-list {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+.variant-list .barcode-result-row {
+	display: flex;
+	align-items: stretch;
+	width: 100%;
+}
+.barcode-result-row > .br-col {
+	flex: 1 1 0;
+	min-width: 0;
+	/* You can set max-width or width for each column if needed for strict alignment */
+}

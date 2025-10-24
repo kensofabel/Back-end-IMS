@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -41,38 +42,11 @@ require_permission(11);
             </div>
             <div class="tab-info-bar">
                 <div class="tab-info-text" id="tab-info-text">Add, edit, or remove employees as needed for your system. Click status to toggle Active/Inactive.</div>
-                <div class="tab-info-actions" id="tab-info-actions" style="display:flex;align-items:center;gap:12px;">
+                <div class="tab-info-actions" id="tab-info-actions">
                     <button class="btn-add-role" id="btn-add-employee"><i class="fas fa-user-plus"></i> Add Employee</button>
-                    <div class="searchbox" style="position:relative;display:inline-block;">
-                        <input type="text" id="employee-search" placeholder="Search employees..." style="padding:7px 38px 7px 14px;border-radius:6px;border:1px solid #333;width:220px;font-size:1rem;background:#232323;color:#fff;">
-                        <i class="fas fa-search" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#ff9800;font-size:1.1em;"></i>
-                    </div>
                 </div>
             </div>
             <div class="tab-content" id="content-manage-employees">
-<!-- Advanced Filter UI -->
-<form id="employee-advanced-filter" class="employee-advanced-filter" method="get" style="margin-bottom:18px;background:#232323;padding:16px 18px;border-radius:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
-    <?php
-    $filter_role = $_GET['filter_role'] ?? '';
-    $filter_status = $_GET['filter_status'] ?? '';
-    $filter_date_from = $_GET['filter_date_from'] ?? '';
-    $filter_date_to = $_GET['filter_date_to'] ?? '';
-    ?>
-    <select name="filter_role" id="filter_role" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:140px;font-size:1rem;background:#232323;color:#fff;">
-        <option value="" <?php echo ($filter_role == '') ? 'selected' : ''; ?>>All Roles</option>
-        <option value="Admin" <?php echo ($filter_role == 'Admin') ? 'selected' : ''; ?>>Admin</option>
-        <option value="Staff" <?php echo ($filter_role == 'Staff') ? 'selected' : ''; ?>>Staff</option>
-    </select>
-    <select name="filter_status" id="filter_status" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:140px;font-size:1rem;background:#232323;color:#fff;">
-        <option value="" <?php echo ($filter_status == '') ? 'selected' : ''; ?>>All Status</option>
-        <option value="active" <?php echo ($filter_status == 'active') ? 'selected' : ''; ?>>Active</option>
-        <option value="inactive" <?php echo ($filter_status == 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-    </select>
-    <input type="date" name="filter_date_from" id="filter_date_from" value="<?php echo htmlspecialchars($filter_date_from); ?>" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:150px;font-size:1rem;background:#232323;color:#fff;" placeholder="Date Joined From">
-    <input type="date" name="filter_date_to" id="filter_date_to" value="<?php echo htmlspecialchars($filter_date_to); ?>" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:150px;font-size:1rem;background:#232323;color:#fff;" placeholder="Date Joined To">
-    <button type="submit" class="btn btn-primary" style="padding:7px 18px;border-radius:6px;background:#ff9800;color:#fff;border:none;font-size:1rem;">Filter</button>
-    <button type="button" id="reset-employee-filters" class="btn btn-secondary" style="padding:7px 18px;border-radius:6px;background:#444;color:#fff;border:none;font-size:1rem;">Reset</button>
-</form>
 <?php
 require_once '../../config/db.php';
 $currentUser = intval($_SESSION['user_id']);
@@ -85,53 +59,19 @@ $oStmt->fetch();
 $oStmt->close();
 if ($owner_id_val !== null) $owner_for_query = intval($owner_id_val);
 
-// Filtering logic
-$filter_role = trim($_GET['filter_role'] ?? '');
-$filter_status = trim($_GET['filter_status'] ?? '');
-$filter_date_from = trim($_GET['filter_date_from'] ?? '');
-$filter_date_to = trim($_GET['filter_date_to'] ?? '');
-
-$query = 'SELECT u.id, u.full_name, u.email, u.phone, u.pos_pin, u.status, u.date_joined, (SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name FROM users u WHERE u.owner_id = ? AND u.id <> ?';
-$params = [$owner_for_query, $currentUser];
-$types = 'ii';
-if ($filter_role !== '') {
-    $query .= ' AND (SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) = ?';
-    $params[] = $filter_role;
-    $types .= 's';
-}
-if ($filter_status !== '') {
-    $query .= ' AND u.status = ?';
-    $params[] = $filter_status;
-    $types .= 's';
-}
-if ($filter_date_from !== '') {
-    $query .= ' AND u.date_joined >= ?';
-    $params[] = $filter_date_from;
-    $types .= 's';
-}
-if ($filter_date_to !== '') {
-    $query .= ' AND u.date_joined <= ?';
-    $params[] = $filter_date_to;
-    $types .= 's';
-}
-$query .= ' ORDER BY u.full_name ASC';
-
-$stmt = $conn->prepare($query);
-if ($stmt === false) {
-    echo '<div style="color:red;">Error preparing query: ' . htmlspecialchars($conn->error) . '</div>';
-    $employees = [];
-} else {
-    $stmt->bind_param($types, ...$params);
-    $employees = [];
-    if ($stmt->execute()) {
-        $res = $stmt->get_result();
-        while ($row = $res->fetch_assoc()) {
-            $employees[] = $row;
-        }
-        $res->free();
+$stmt = $conn->prepare(
+    'SELECT u.id, u.full_name, u.email, u.phone, u.pos_pin, u.status, (SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name FROM users u WHERE u.owner_id = ? AND u.id <> ? ORDER BY u.full_name ASC'
+);
+$stmt->bind_param('ii', $owner_for_query, $currentUser);
+$employees = [];
+if ($stmt->execute()) {
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $employees[] = $row;
     }
-    $stmt->close();
+    $res->free();
 }
+$stmt->close();
 if (count($employees) > 0) {
     echo '<table class="roles-table" id="employees-table">';
     echo '<thead><tr>';
@@ -204,7 +144,7 @@ if (count($employees) > 0) {
     echo '  <button class="pagination-btn pagination-prev" disabled title="Previous page">&#60;</button>';
     echo '  <button class="pagination-btn pagination-next" disabled title="Next page">&#62;</button>';
     echo '  <span style="color:#fff;font-size:1.04rem;margin-left:12px;">Page</span>';
-    echo '  <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #222;border-radius:4px;font-size:1.04rem;margin:0 6px;background:#232323;color:#fff;" />';
+    echo '  <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #222;border-radius:4px;font-size:1.04rem;margin:0 6px;" />';
     echo '  <span style="color:#fff;font-size:1.04rem;">of</span>';
     echo '  <span class="pagination-total-pages" style="color:#fff;font-size:1.04rem;margin:0 6px;">1</span>';
     echo '  <span style="color:#fff;font-size:1.04rem;margin-left:18px;">Rows per page:</span>';
@@ -216,10 +156,10 @@ if (count($employees) > 0) {
     echo '  </select>';
     echo '</div>';
 } else {
-    echo '<div id="no-employees-message" style="text-align:center; color:#aaa; padding:40px 0;">No employees found</div>';
+    echo '<div id="no-employees-message" style="text-align:center; color:#aaa; padding:40px 0;">No employees found. Add an employee to get started.</div>';
 }
 ?>
-            </div>                                                                      
+            </div>
         </div>
     </div>
 
@@ -252,25 +192,23 @@ if (count($employees) > 0) {
                         <input type="text" id="employee-phone" name="phone" required>
                     </div>
                     <div class="form-group">
-                <?php // Move filter UI below info bar, above table ?>
-                <?php ob_start(); ?>
-                <form id="employee-advanced-filter" class="employee-advanced-filter" method="get" style="margin-bottom:18px;background:#232323;padding:16px 18px;border-radius:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
-                    <select name="filter_role" id="filter_role" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:140px;font-size:1rem;background:#232323;color:#fff;">
-                        <option value="">All Roles</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Staff">Staff</option>
-                    </select>
-                    <select name="filter_status" id="filter_status" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:140px;font-size:1rem;background:#232323;color:#fff;">
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                    <input type="date" name="filter_date_from" id="filter_date_from" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:150px;font-size:1rem;background:#232323;color:#fff;" placeholder="Date Joined From">
-                    <input type="date" name="filter_date_to" id="filter_date_to" style="padding:7px 14px;border-radius:6px;border:1px solid #333;width:150px;font-size:1rem;background:#232323;color:#fff;" placeholder="Date Joined To">
-                    <button type="submit" class="btn btn-primary" style="padding:7px 18px;border-radius:6px;background:#ff9800;color:#fff;border:none;font-size:1rem;">Filter</button>
-                    <button type="button" id="reset-employee-filters" class="btn btn-secondary" style="padding:7px 18px;border-radius:6px;background:#444;color:#fff;border:none;font-size:1rem;">Reset</button>
+                        <select id="employee-role" name="role" required>
+                            <option value="">Select Role</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Staff">Staff</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee-pos-pin">POS Pin</label>
+                        <input type="text" id="employee-pos-pin" name="pos_pin" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Employee</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEmployeeFormModal()">Cancel</button>
+                    </div>
                 </form>
-                <?php $filterUI = ob_get_clean(); ?>
+            </div>
+        </div>
     </div>
 
     <!-- Edit Employee Modal -->
@@ -324,3 +262,4 @@ if (count($employees) > 0) {
     <script src="employee.js"></script>
 </body>
 </html>
+

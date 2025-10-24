@@ -46,7 +46,6 @@ createDefaultCategory($_SESSION['user_id']);
                 <button class="btn btn-primary" id="addProductBtn"><i class="fa fa-plus"></i> Add Item</button>
     <!-- Modal include -->
     <?php include 'popupmodal.php'; ?>
-                <button class="btn btn-secondary" id="wasteBtn"><i class="fa fa-trash"></i> Record Waste</button>
                 <button class="btn btn-outline" id="importBtn" title="Import"><i class="fa fa-download"></i></button>
                 <button class="btn btn-outline" id="exportBtn" title="Export"><i class="fa fa-upload"></i></button>
             </div>
@@ -69,33 +68,45 @@ createDefaultCategory($_SESSION['user_id']);
                     </div>
                     
                     <!-- Right Side: Filter Controls -->
-                    <div class="filter-controls" id="filterControls">
-                        <button class="single-toggle-btn" id="itemTypeToggle" data-current="all">
-                            <i class="fas fa-boxes"></i> All Items
-                        </button>
-                        <select id="categoryFilter">
-                            <option value="">All Categories</option>
-                            <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                            <option value="Dairy & Eggs">Dairy & Eggs</option>
-                            <option value="Meat & Poultry">Meat & Poultry</option>
-                            <option value="Bakery">Bakery</option>
-                            <option value="Beverages">Beverages</option>
-                            <option value="Snacks">Snacks</option>
-                            <option value="Frozen Foods">Frozen Foods</option>
-                            <option value="Household">Household</option>
-                        </select>
-                        <select id="stockAlert">
-                            <option value="">All Stock</option>
-                            <option value="low">Low Stock</option>
-                            <option value="out">Out of Stock</option>
-                            <option value="in">In Stock</option>
-                        </select>
-                    </div>
+                        <div class="filter-controls" id="filterControls">
+                            <button class="single-toggle-btn" id="itemTypeToggle" data-current="all">
+                                <i class="fas fa-boxes"></i> All Items
+                            </button>
+                            <select id="categoryFilter">
+                                <option value="">All Categories</option>
+                                <?php
+                                // Fetch categories from database
+                                require_once '../../config/db.php';
+                                $categories = [];
+                                $catSql = "SELECT id, name FROM categories ORDER BY name ASC";
+                                if ($result = $conn->query($catSql)) {
+                                    while ($row = $result->fetch_assoc()) {
+                                        $categories[$row['id']] = $row['name'];
+                                        $safeName = htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8');
+                                        echo "<option value=\"" . $safeName . "\">" . $safeName . "</option>\n";
+                                    }
+                                    $result->free();
+                                }
+                                ?>
+                            </select>
+                            <select id="stockAlert">
+                                <option value="">All Stock</option>
+                                <option value="low">Low Stock</option>
+                                <option value="out">Out of Stock</option>
+                                <option value="in">In Stock</option>
+                            </select>
+                        </div>
                 </div>
                 <div class="inventory-table-container">
                     <table class="inventory-table">
                         <thead>
                             <tr>
+                                <th style="width:40px; text-align:center;">
+                                    <label class="permission-checkbox table-checkbox" style="margin:0;">
+                                        <input type="checkbox" id="selectAllItems" title="Select all" />
+                                        <span class="checkmark"></span>
+                                    </label>
+                                </th>
                                 <th>Item Name</th>
                                 <th>Category</th>
                                 <th>Price</th>
@@ -105,15 +116,149 @@ createDefaultCategory($_SESSION['user_id']);
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body">
-                            <!-- Inventory data will be populated by JavaScript -->
+                            <?php
+                            // Query products and their variants. We'll display variants as separate rows and products without variants as single rows.
+                            $prodSql = "SELECT p.id AS product_id, p.name AS product_name, p.price AS product_price, p.cost AS product_cost, p.in_stock AS product_stock, p.low_stock AS low_stock, p.pos_available, p.track_stock AS track_stock, p.category_id, p.type, p.color, p.shape, p.image_url
+                                        FROM products p ORDER BY p.name ASC";
+
+                            if ($prodResult = $conn->query($prodSql)) {
+                                while ($p = $prodResult->fetch_assoc()) {
+                                    // Fetch variants for this product
+                                    $variants = [];
+                                    $vSql = "SELECT id, name, sku, barcode, price, cost, in_stock, low_stock, pos_available FROM product_variants WHERE product_id = " . (int)$p['product_id'] . " ORDER BY name ASC";
+                                    if ($vResult = $conn->query($vSql)) {
+                                        while ($v = $vResult->fetch_assoc()) {
+                                            $variants[] = $v;
+                                        }
+                                        $vResult->free();
+                                    }
+
+                                    // If there are variants, show each
+                                    if (!empty($variants)) {
+                                        foreach ($variants as $v) {
+                                            $itemName = htmlspecialchars($p['product_name'] . ' - ' . $v['name'], ENT_QUOTES, 'UTF-8');
+                                            $categoryName = isset($categories[$p['category_id']]) ? htmlspecialchars($categories[$p['category_id']], ENT_QUOTES, 'UTF-8') : '';
+                                            $price = is_null($v['price']) || $v['price'] === '' ? ($p['product_price'] ?? '') : $v['price'];
+                                            $cost = is_null($v['cost']) || $v['cost'] === '' ? ($p['product_cost'] ?? '') : $v['cost'];
+                                            // Preserve textual values like 'variable'. Compute margin only when numeric.
+                                            $stock = (int)$v['in_stock'];
+                                            $low = (int) ($v['low_stock'] ?? 0);
+                                            $isPriceNumeric = is_numeric($price);
+                                            $isCostNumeric = is_numeric($cost);
+                                            if ($isPriceNumeric) {
+                                                $displayPrice = '₱' . number_format((float)$price, 2);
+                                            } else {
+                                                $rawPrice = trim((string)$price);
+                                                if (strcasecmp($rawPrice, 'variable') === 0) {
+                                                    $displayPrice = 'Variable';
+                                                } else {
+                                                    $displayPrice = htmlspecialchars($rawPrice, ENT_QUOTES, 'UTF-8');
+                                                }
+                                            }
+                                            $displayCost = $isCostNumeric ? '₱' . number_format((float)$cost, 2) : htmlspecialchars((string)$cost, ENT_QUOTES, 'UTF-8');
+                                            if ($isPriceNumeric && $isCostNumeric && (float)$price != 0.0) {
+                                                $margin = round((((float)$price - (float)$cost) / (float)$price) * 100, 2);
+                                            } else {
+                                                $margin = '-';
+                                            }
+                                            // Determine stock status per your rule: in when stock > low, low when 0 < stock <= low, out when stock == 0
+                                            if ($stock === 0) {
+                                                $stockStatus = 'out';
+                                            } elseif ($stock <= $low) {
+                                                $stockStatus = 'low';
+                                            } else {
+                                                $stockStatus = 'in';
+                                            }
+                                            $posAttr = isset($v['pos_available']) && $v['pos_available'] ? '1' : '0';
+                                            // variants don't have track_stock in schema; fall back to product
+                                            $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
+                                            echo "<tr data-category=\"" . $categoryName . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                            // checkbox cell (styled using permission-checkbox pattern)
+                                            echo "<td style=\"text-align:center;\">";
+                                            echo "<label class='permission-checkbox table-checkbox' style='margin:0;display:inline-flex;justify-content:center;'>";
+                                            echo "<input type='checkbox' class='row-select-checkbox' />";
+                                            echo "<span class='checkmark'></span>";
+                                            echo "</label>";
+                                            echo "</td>";
+                                            echo "<td>" . $itemName . "</td>";
+                                            echo "<td>" . $categoryName . "</td>";
+                                            echo "<td>" . $displayPrice . "</td>";
+                                            echo "<td>" . $displayCost . "</td>";
+                                            echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
+                                            echo "<td>" . $stock . "</td>";
+                                            echo "</tr>\n";
+                                        }
+                                    } else {
+                                        // No variants: show product row
+                                        $itemName = htmlspecialchars($p['product_name'], ENT_QUOTES, 'UTF-8');
+                                        $categoryName = isset($categories[$p['category_id']]) ? htmlspecialchars($categories[$p['category_id']], ENT_QUOTES, 'UTF-8') : '';
+                                        // Preserve textual values like 'variable'. Compute margin only when numeric.
+                                        $stock = (int)$p['product_stock'];
+                                        $low = (int) ($p['low_stock'] ?? 0);
+                                        $isPriceNumeric = is_numeric($p['product_price']);
+                                        $isCostNumeric = is_numeric($p['product_cost']);
+                                        if ($isPriceNumeric) {
+                                            $displayPrice = '₱' . number_format((float)$p['product_price'], 2);
+                                        } else {
+                                            $rawPrice = trim((string)$p['product_price']);
+                                            if (strcasecmp($rawPrice, 'variable') === 0) {
+                                                $displayPrice = 'Variable';
+                                            } else {
+                                                $displayPrice = htmlspecialchars($rawPrice, ENT_QUOTES, 'UTF-8');
+                                            }
+                                        }
+                                        $displayCost = $isCostNumeric ? '₱' . number_format((float)$p['product_cost'], 2) : htmlspecialchars((string)$p['product_cost'], ENT_QUOTES, 'UTF-8');
+                                        if ($isPriceNumeric && $isCostNumeric && (float)$p['product_price'] != 0.0) {
+                                            $margin = round((((float)$p['product_price'] - (float)$p['product_cost']) / (float)$p['product_price']) * 100, 2);
+                                        } else {
+                                            $margin = '-';
+                                        }
+                                        if ($stock === 0) {
+                                            $stockStatus = 'out';
+                                        } elseif ($stock <= $low) {
+                                            $stockStatus = 'low';
+                                        } else {
+                                            $stockStatus = 'in';
+                                        }
+                                        $posAttr = isset($p['pos_available']) && $p['pos_available'] ? '1' : '0';
+                                        $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
+                                        echo "<tr data-category=\"" . $categoryName . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                        echo "<td style=\"text-align:center;\">";
+                                        echo "<label class='permission-checkbox table-checkbox' style='margin:0;display:inline-flex;justify-content:center;'>";
+                                        echo "<input type='checkbox' class='row-select-checkbox' />";
+                                        echo "<span class='checkmark'></span>";
+                                        echo "</label>";
+                                        echo "</td>";
+                                        echo "<td>" . $itemName . "</td>";
+                                        echo "<td>" . $categoryName . "</td>";
+                                        echo "<td>" . $displayPrice . "</td>";
+                                        echo "<td>" . $displayCost . "</td>";
+                                        echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
+                                        echo "<td>" . $stock . "</td>";
+                                        echo "</tr>\n";
+                                    }
+                                }
+                                $prodResult->free();
+                            }
+                            ?>
                         </tbody>
                     </table>
+                    <div class="inventory-pagination-bar dark-theme-pagination" style="display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:12px 16px;margin-top:0;background:#181818;border-top:1px solid #333;border-bottom-left-radius:12px;border-bottom-right-radius:12px;">
+                        <button class="pagination-btn pagination-prev" disabled title="Previous page" style="background:#232323;border:none;color:#fff;padding:0 8px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.95rem;transition:background 0.2s; margin-left: 6px;">&#60;</button>
+                        <button class="pagination-btn pagination-next" disabled title="Next page" style="background:#232323;border:none;color:#fff;padding:0 8px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.95rem;transition:background 0.2s;">&#62;</button>
+                        <span style="color:#fff;font-size:0.95rem;margin-left:6px;">Page</span>
+                        <input type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:0 6px;border:1px solid #222;border-radius:4px;font-size:0.95rem;margin:0 6px;background:#232323;color:#fff;height:32px;" />
+                        <span style="color:#fff;font-size:1rem;">of</span>
+                        <span class="pagination-total-pages" style="color:#fff;font-size:0.95rem;margin:0 6px;">1</span>
+                        <span style="color:#fff;font-size:0.95rem;margin-left:10px;">Rows per page:</span>
+                        <select class="pagination-rows-select" style="padding:4px 8px;border-radius:4px;border:1px solid #444;font-size:0.95rem;margin-left:8px;background:#232323;color:#fff;height:32px;">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
                 </div>
-                <!-- Uploaded Image Area -->
-                <div id="uploadedImageArea" style="display:none; justify-content:center; align-items:center; margin-top:20px;">
-                    <img id="uploadedImagePreview" src="" alt="Uploaded Image" style="max-width:300px; max-height:300px; border:1px solid #ccc; border-radius:8px;" />
-                </div>
-    <!-- Close main content area -->
     </div>
 </body>
 </html>
@@ -180,12 +325,12 @@ document.addEventListener('DOMContentLoaded', function() {
     checkInventoryAndToggleControls();
 
     // Observer to watch for changes in inventory table
-    const inventoryTableBody = document.getElementById('inventory-table-body');
-    if (inventoryTableBody) {
+    const inventoryTableBodyObserverEl = document.getElementById('inventory-table-body');
+    if (inventoryTableBodyObserverEl) {
         const observer = new MutationObserver(function() {
             checkInventoryAndToggleControls();
         });
-        observer.observe(inventoryTableBody, { childList: true, subtree: true });
+        observer.observe(inventoryTableBodyObserverEl, { childList: true, subtree: true });
     }
 
     // Search toggle functionality (only for mobile devices)
@@ -242,17 +387,178 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentIndex = states.findIndex(state => state.key === currentState);
         const nextIndex = (currentIndex + 1) % states.length;
         const nextState = states[nextIndex];
-        
+
         // Update button
         this.setAttribute('data-current', nextState.key);
         this.innerHTML = `<i class="${nextState.icon}"></i> ${nextState.label}`;
-        
+
         // Log the selected type
         console.log('Selected item type:', nextState.key);
-        
-        // TODO: Add filtering logic for inventory table
-        // filterInventoryByType(nextState.key);
+
+        // Re-run filters so the new state is applied
+        filterRows();
     });
+
+    // Client-side filtering: category, stock status, search and pagination
+    const categoryFilter = document.getElementById('categoryFilter');
+    const stockFilter = document.getElementById('stockAlert');
+
+    // Pagination elements and state
+    const inventoryTableBody = document.getElementById('inventory-table-body');
+    const inventoryTable = document.querySelector('.inventory-table');
+    const paginationBar = document.querySelector('.inventory-pagination-bar');
+    const pageInput = paginationBar ? paginationBar.querySelector('.pagination-page-input') : null;
+    const totalSpan = paginationBar ? paginationBar.querySelector('.pagination-total-pages') : null;
+    const prevBtn = paginationBar ? paginationBar.querySelector('.pagination-prev') : null;
+    const paginationNextBtn = paginationBar ? paginationBar.querySelector('.pagination-next') : null;
+    const rowsSelect = paginationBar ? paginationBar.querySelector('.pagination-rows-select') : null;
+    let rowsPerPage = rowsSelect ? parseInt(rowsSelect.value, 10) || 10 : 10;
+    let currentPage = 1;
+
+    function filterRows() {
+        const rows = Array.from(document.querySelectorAll('#inventory-table-body tr'));
+        const catVal = categoryFilter ? categoryFilter.value.trim().toLowerCase() : '';
+        const stockVal = stockFilter ? stockFilter.value : '';
+        const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const typeState = toggleButton ? toggleButton.getAttribute('data-current') : 'all';
+
+        rows.forEach(row => {
+            let show = true;
+            const rowCat = (row.getAttribute('data-category') || '').toLowerCase();
+            const rowStock = row.getAttribute('data-stock') || '';
+            const rowLow = row.getAttribute('data-low') || '';
+            const text = row.textContent.toLowerCase();
+
+            if (catVal && rowCat !== catVal) show = false;
+
+            if (stockVal) {
+                if (stockVal === 'low' && rowLow !== 'low') show = false;
+                if (stockVal === 'out' && rowStock !== 'out') show = false;
+                if (stockVal === 'in' && rowStock !== 'in') show = false;
+            }
+
+            if (q && !text.includes(q)) show = false;
+
+            // itemTypeToggle enforcement
+            if (typeState === 'pos') {
+                // show only rows that have data-pos='1'
+                if (row.getAttribute('data-pos') !== '1') show = false;
+            } else if (typeState === 'stock') {
+                // show only rows where product tracks stock (data-track='1') and also must be in stock status
+                if (row.getAttribute('data-track') !== '1') show = false;
+                if (rowStock !== 'in') show = false;
+            }
+
+            // Mark row as filtered or not. We'll let renderTablePage control actual visibility per page.
+            if (show) {
+                row.removeAttribute('data-filtered');
+            } else {
+                row.setAttribute('data-filtered', '1');
+            }
+        });
+
+        // After filtering, run pagination so only the filtered items are paged
+        renderTablePage(1);
+    }
+
+    if (categoryFilter) categoryFilter.addEventListener('change', filterRows);
+    if (stockFilter) stockFilter.addEventListener('change', filterRows);
+    if (searchInput) searchInput.addEventListener('input', function() {
+        // debounce simple
+        clearTimeout(this._filterTimer);
+        this._filterTimer = setTimeout(filterRows, 150);
+    });
+
+    // Pagination helper: renders only the visible (filtered) rows for the requested page
+    function renderTablePage(page) {
+        if (!inventoryTableBody) return;
+        const allRows = Array.from(inventoryTableBody.querySelectorAll('tr'));
+    // Consider only rows that are currently visible by filter (not marked data-filtered)
+    const visibleRows = allRows.filter(r => !r.hasAttribute('data-filtered'));
+        const totalPages = Math.max(1, Math.ceil(visibleRows.length / rowsPerPage));
+        currentPage = Math.max(1, Math.min(page, totalPages));
+
+        // First, hide all rows. We'll re-show only those belonging to the current page.
+    allRows.forEach(r => r.style.display = 'none');
+
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = currentPage * rowsPerPage;
+        visibleRows.forEach((row, idx) => {
+            if (idx >= start && idx < end) {
+                row.style.display = '';
+            }
+        });
+
+        if (pageInput) pageInput.value = currentPage;
+        if (totalSpan) totalSpan.textContent = totalPages;
+        if (prevBtn) prevBtn.disabled = currentPage === 1;
+        if (paginationNextBtn) paginationNextBtn.disabled = currentPage === totalPages;
+        if (prevBtn) prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
+        if (paginationNextBtn) paginationNextBtn.style.cursor = paginationNextBtn.disabled ? 'not-allowed' : 'pointer';
+    }
+
+    // Wire pagination controls
+    if (prevBtn) prevBtn.addEventListener('click', function() { renderTablePage(currentPage - 1); });
+    if (paginationNextBtn) paginationNextBtn.addEventListener('click', function() { renderTablePage(currentPage + 1); });
+    if (pageInput) pageInput.addEventListener('change', function() { const p = parseInt(this.value, 10) || 1; renderTablePage(p); });
+    if (rowsSelect) rowsSelect.addEventListener('change', function() { rowsPerPage = parseInt(this.value, 10) || 10; renderTablePage(1); });
+
+    // initial filter pass (this will call renderTablePage via filterRows)
+    filterRows();
 });
 
+</script>
+<script>
+// Checkbox select-all behavior
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAllItems');
+    const tableBody = document.getElementById('inventory-table-body');
+
+    function updateSelectAllState() {
+        const checkboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+        if (!checkboxes.length) {
+            if (selectAll) selectAll.checked = false;
+            return;
+        }
+        const allChecked = checkboxes.every(cb => cb.checked);
+        const someChecked = checkboxes.some(cb => cb.checked);
+        if (selectAll) {
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = !allChecked && someChecked;
+        }
+    }
+
+    // When header checkbox toggled, set all visible (non-filtered) rows
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            const checkboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+            // Only toggle checkboxes for rows that are currently visible (not data-filtered)
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                if (row && !row.hasAttribute('data-filtered')) {
+                    cb.checked = selectAll.checked;
+                }
+            });
+        });
+    }
+
+    // Delegate clicks on row checkboxes to update header state
+    if (tableBody) {
+        tableBody.addEventListener('change', function(e) {
+            if (e.target && e.target.classList && e.target.classList.contains('row-select-checkbox')) {
+                updateSelectAllState();
+            }
+        });
+    }
+
+    // Observe DOM changes (pagination or filtering) to refresh select-all state
+    if (tableBody) {
+        const obs = new MutationObserver(function() {
+            // small timeout to allow inputs to render
+            setTimeout(updateSelectAllState, 50);
+        });
+        obs.observe(tableBody, { childList: true, subtree: true, attributes: true });
+    }
+
+});
 </script>

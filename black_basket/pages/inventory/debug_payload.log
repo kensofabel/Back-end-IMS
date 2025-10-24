@@ -1,0 +1,252 @@
+2025-10-24 07:33:02
+Array
+(
+    [name] => asfas
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 0
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10032
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => asafa
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 
+                    [low_stock] => 
+                    [sku] => 10032
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+
+2025-10-24 07:35:30
+Array
+(
+    [name] => asfasfvv
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 0
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10033
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => safsss
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 11
+                    [low_stock] => 
+                    [sku] => 10033
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+
+2025-10-24 07:39:07
+Array
+(
+    [name] => sfass1111a ca
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 0
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10034
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => vvc
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 
+                    [low_stock] => 
+                    [sku] => 10034
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+
+2025-10-24 07:42:02
+Array
+(
+    [name] => assaf
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 0
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10035
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => assa
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 
+                    [low_stock] => 
+                    [sku] => 10035
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+
+2025-10-24 07:43:36
+Array
+(
+    [name] => asasf
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 1
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10036
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => aasd
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 
+                    [low_stock] => 
+                    [sku] => 10036
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+
+2025-10-24 07:50:21
+Array
+(
+    [name] => asfasf
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 0
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10037
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => safasf
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 
+                    [low_stock] => 
+                    [sku] => 10037
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+
+2025-10-24 07:53:22
+Array
+(
+    [name] => asfsaf
+    [category] => No Category
+    [price] => variable
+    [cost] => 0.00
+    [track_stock] => 0
+    [in_stock] => 
+    [low_stock] => 
+    [pos_available] => 1
+    [type] => color_shape
+    [color] => gray
+    [shape] => square
+    [image_url] => 
+    [sku] => 10038
+    [barcode] => 
+    [variants] => Array
+        (
+            [0] => Array
+                (
+                    [name] => assfasfa
+                    [price] => variable
+                    [cost] => 
+                    [in_stock] => 
+                    [low_stock] => 
+                    [sku] => 10038
+                    [barcode] => 
+                    [pos_available] => 1
+                )
+
+        )
+
+)
+
+

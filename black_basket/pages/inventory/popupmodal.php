@@ -97,7 +97,7 @@
                 .barcode-results-header,
                 .barcode-result-row {
                     display: grid;
-                    grid-template-columns: .8fr .6fr .5fr .7fr 1.2fr;
+                    grid-template-columns: .8fr .6fr .5fr .7fr 1.3fr;
                     gap: 8px;
                     align-items: center;
                     padding: 10px 10px;
@@ -155,6 +155,62 @@
                     max-width: 80px;
                 }
                 .br-col { display: flex; flex-direction: column; gap: 4px; }
+                /* Row wrapper and variant list styling to preserve grid columns (use template grid) */
+                .br-row-wrapper {
+                    display: block;
+                    width: 100%;
+                    box-sizing: border-box;
+                    clear: both;
+                }
+                /* Ensure header and rows' column cells share the same inline-flex sizing so grid fr units control layout.
+                   Use padding-right instead of external margins so cells don't cause horizontal overflow. */
+                .barcode-results-header > .br-col,
+                .barcode-result-row > .br-col {
+                    display: inline-flex;
+                    align-items: center;
+                    padding-right: 12px;
+                    min-width: 0; /* allow ellipsis inside flex/grid */
+                    box-sizing: border-box;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+                /* Slightly smaller internal spacing for variant rows */
+                .variant-list .barcode-result-row > .br-col {
+                    padding-right: 8px;
+                }
+                /* Give variant rows their own grid template so you can adjust column widths separately.
+                   Default is a slightly different proportion — override by setting --variant-grid-columns
+                   on .variant-list or via this selector. */
+                .variant-list .barcode-result-row {
+                    display: grid;
+                    /* Adjustable via CSS variable; change to suit your layout */
+                    grid-template-columns: var(--variant-grid-columns, 1.1fr .5fr .7fr 1.3fr);
+                    gap: 8px;
+                    align-items: center;
+                    padding: 8px 8px 6px 8px;
+                    background: transparent;
+                }
+                /* Last header column (No. of stock) should be left-aligned and use flex layout
+                   instead of centered — target only the header's last .br-col */
+                .barcode-results-header > .br-col:last-child {
+                    display: flex;
+                    justify-content: flex-start;
+                    align-items: flex-start;
+                    padding-right: 12px;
+                }
+
+                /* Keep the first grid column centered horizontally, but align its inner content to the top-left.
+                   This keeps the column centered in the grid while the category/name stack starts at the top-left. */
+                .barcode-result-row > .br-col:first-child {
+                    padding-left: 8px;
+                    /* center the cell within the grid column */
+                    justify-content: center;
+                    /* stack children from the top and left */
+                    align-items: flex-start;
+                    text-align: left;
+                }
+
                 @media (max-width: 720px) {
                     .barcode-results-header,
                     .barcode-result-row {
@@ -184,6 +240,10 @@
                     padding: 8px 8px;
                     border-radius: 6px;
                 }
+                .barcode-result-row input.br-add-qty:focus {
+                    border: 1px solid #ff9800; /* or #333 for consistent color */
+                    outline: none;
+                }
                 /* WebKit number input spinner styling */
                 .barcode-result-row input[type=number]::-webkit-outer-spin-button,
                 .barcode-result-row input[type=number]::-webkit-inner-spin-button {
@@ -200,9 +260,6 @@
                     padding: 0;
                     border-radius: 4px;
                     font-size: 11px;
-                }
-                .barcode-result-row .unit-arrows .unit-arrow:hover {
-                    background: #262626;
                 }
     </style>
 </head>
@@ -417,7 +474,7 @@
                         <!-- First row: Checkbox -->
                         <div style="display: flex; align-items: center; justify-content: flex-start; width: 100%;">
                           <div class="form-group" style="display: flex; align-items: center; gap: 30px; position: relative;">
-                            <input type="checkbox" id="availablePOS" name="availablePOS" class="field-checkbox">
+                            <input type="checkbox" id="availablePOS" name="availablePOS" class="field-checkbox" checked>
                             <label for="availablePOS" style="cursor: pointer;">This item is available in POS</label>
                           </div>
                           <span id="posToggleChevron" style="font-size: 18px; cursor: pointer; user-select: none; transition: transform 0.3s; color: #fff; display: none; margin-left: auto; align-self: flex-start;">
@@ -543,7 +600,7 @@
                             <div class="barcode-results-header" role="row">
                                 <div class="br-col br-col-main header">Category / Item</div>
                                 <div class="br-col br-col-track header">Track stock</div>
-                                <div class="br-col br-col-instock header">In stock</div>
+                                <div class="br-col br-col-instock header">Stock</div>
                                 <div class="br-col br-col-status header">Status</div>
                                 <div class="br-col br-col-add header">No. of stock</div>
                             </div>
@@ -580,7 +637,7 @@
                             <!-- Success area (hidden by default) -->
                             <div class="br-col br-col-success" style="display:none; grid-column: 1 / -1;">
                                 <div class="br-success-inner" style="display:flex; width:100%; gap:12px; align-items:center;">
-                                    <div class="br-success-message" aria-live="polite" style="flex:1;"></div>
+                                    <div class="br-success-message" aria-live="polite" style="flex:10 1 400px;"></div>
                                     <div class="br-success-undo" style="width:110px; text-align:center;">
                                         <button type="button" class="br-undo btn" style="width:100%;">Undo</button>
                                     </div>
@@ -592,6 +649,27 @@
                         </div>
                     </template>
                     <style>
+                        /* Success column: message wraps, buttons stay right */
+                        .br-col-success {
+                            display: flex;
+                            flex-direction: row;
+                            flex-wrap: wrap;
+                            align-items: center;
+                            justify-content: flex-end;
+                            gap: 8px;
+                            min-width: 0;
+                        }
+
+                        .br-success-message {
+                            flex: 10 1 400px;
+                            min-width: 0;
+                            max-width: 100%;
+                            white-space: normal;
+                            word-break: break-word;
+                            font-size: 16px;
+                            line-height: 1.4;
+                        }
+
                         /* Small animation when stock is added */
                         .barcode-result-row.added {
                             animation: br-added 700ms ease-in-out;
@@ -727,6 +805,24 @@ document.addEventListener('DOMContentLoaded', function() {
             var image_url = null;
             var imageInput = document.getElementById('productImageUrl') || document.querySelector('input[name="productImageUrl"]') || document.querySelector('.product-image-url input');
             if (imageInput) image_url = imageInput.value.trim();
+            // If POS is checked but no representation chosen (no color, no shape, no image), prompt the POS options first.
+            var productFormEl = document.querySelector('.product-form');
+            var posOptionsEl = document.getElementById('posOptionsContainer');
+            var representationPrompted = productFormEl && productFormEl.dataset && productFormEl.dataset.representationPrompted === '1';
+            if (posAvailable && !lastSelectedColor && !lastSelectedShape && (!image_url || image_url === '') && !representationPrompted) {
+                if (posOptionsEl) {
+                    posOptionsEl.classList.add('slide-up');
+                    posOptionsEl.style.display = 'block';
+                }
+                if (productFormEl) productFormEl.classList.add('pos-options-active');
+                if (productFormEl) productFormEl.dataset.representationPrompted = '1';
+                var posChevron = document.getElementById('posToggleChevron');
+                if (posChevron) posChevron.style.display = 'inline-block';
+                if (posOptionsEl && typeof posOptionsEl.scrollIntoView === 'function') {
+                    posOptionsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                return; // stop submit to let user pick representation or submit again to accept defaults
+            }
             // Product SKU/Barcode
             var skuInput = document.getElementById('inlineItemSKU') || document.querySelector('input[name="itemSKU"]') || document.querySelector('.product-sku input');
             var barcodeInput = document.getElementById('inlineItemBarcode') || document.querySelector('input[name="itemBarcode"]') || document.querySelector('.product-barcode input');
@@ -840,6 +936,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         price,
                         cost,
                         track_stock: trackStock,
+                            variantsTrackStock: (document.getElementById('variantsTrackStockToggle') && document.getElementById('variantsTrackStockToggle').checked) ? 1 : 0,
                         in_stock: payloadInStock,
                         low_stock: payloadLowStock,
                         pos_available: posAvailable,
@@ -926,12 +1023,68 @@ document.addEventListener('DOMContentLoaded', function() {
                         var posCheckbox = document.getElementById('availablePOS');
                         var posOptions = document.getElementById('posOptionsContainer');
                         var productForm = document.querySelector('.product-form');
-                        if (posCheckbox) posCheckbox.checked = false;
+                        if (posCheckbox) posCheckbox.checked = true;
                         if (posOptions) {
                             posOptions.classList.remove('slide-up');
                             posOptions.style.display = 'none';
                         }
-                        if (productForm) productForm.classList.remove('pos-options-active');
+                        if (productForm) {
+                            productForm.classList.remove('pos-options-active');
+                            productForm.removeAttribute('data-representation-prompted');
+                        }
+                        // Ensure variants panel is closed and cleared so next add starts fresh
+                        var variantsSection = document.getElementById('variantsSection');
+                        var variantsTableBody = document.getElementById('variantsTableBody');
+                        var variantsTrackStockToggle = document.getElementById('variantsTrackStockToggle');
+                        var closeVariantsBtn = document.getElementById('closeVariantsBtn');
+                        var variantsAddBtn = document.querySelector('.variants-add-btn');
+                        if (variantsSection) {
+                            variantsSection.style.display = 'none';
+                        }
+                        if (variantsTableBody) {
+                            // remove all variant rows
+                            variantsTableBody.innerHTML = '';
+                        }
+                        if (variantsTrackStockToggle) {
+                            variantsTrackStockToggle.checked = false;
+                        }
+                        if (closeVariantsBtn) {
+                            // ensure Close button is not focused or active
+                            closeVariantsBtn.blur();
+                        }
+                        if (variantsAddBtn) {
+                            // ensure the Add Variant button is enabled for next use
+                            variantsAddBtn.disabled = false;
+                        }
+                        // Also try to call the page-level hideVariantsSection() to fully reset state
+                        try {
+                            if (typeof hideVariantsSection === 'function') {
+                                hideVariantsSection();
+                            }
+                        } catch (e) {
+                            // ignore if function isn't available
+                        }
+                        // Reset global flag if present
+                        try {
+                            if (typeof isVariantsMode !== 'undefined') {
+                                isVariantsMode = false;
+                            }
+                        } catch (e) {}
+                        // Also request the inventory page to reset its name dropdown state if available
+                        try {
+                            if (typeof window !== 'undefined' && typeof window.resetNameDropdownState === 'function') {
+                                window.resetNameDropdownState();
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                        // Reset price and cost to defaults and ensure the price row is visible
+                        var inlinePrice = document.getElementById('inlineItemPrice');
+                        var inlineCost = document.getElementById('inlineItemCost');
+                        var priceRow = document.getElementById('priceRow');
+                        if (inlinePrice) inlinePrice.value = '';
+                        if (inlineCost) inlineCost.value = '₱0.00';
+                        if (priceRow) priceRow.style.display = 'flex';
                         var skuErrorMsg = document.getElementById('skuErrorMsg');
                         if (skuErrorMsg) {
                             skuErrorMsg.style.display = 'none';
