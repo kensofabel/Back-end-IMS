@@ -95,7 +95,7 @@ if (count($employees) > 0) {
     }
     echo '    </select>';
     echo '    <select id="employee-status-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
-    echo '      <option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>';
+    echo '      <option value="">All status</option><option value="active">Active</option><option value="inactive">Inactive</option>';
     echo '    </select>';
     echo '    <button id="employee-clear-filters" class="btn-add-role" style="padding:8px 14px;margin-left:6px;">Clear</button>';
     echo '  </div>';
@@ -290,4 +290,5 @@ if (count($employees) > 0) {
     <script src="employee.js"></script>
 </body>
 </html>
+
 
