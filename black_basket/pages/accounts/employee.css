@@ -138,6 +138,87 @@
     outline: none;
 }
 
+/* Alignment improvements: headers, cells, status and action columns */
+.roles-table thead th {
+    vertical-align: middle;
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.03);
+}
+.roles-table tbody td {
+    vertical-align: middle;
+}
+.roles-table th.status-col,
+.roles-table td.status-col {
+    text-align: center;
+    width: 120px;
+}
+.roles-table td.status-col .status-badge,
+.roles-table td.status-col .status-badge-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.roles-table td.action-col button,
+.roles-table td.action-col .btn-edit-role,
+.roles-table td.action-col .btn-delete-role {
+    padding: 6px 10px;
+    font-size: 0.98rem;
+}
+.roles-table td.action-col > * {
+    vertical-align: middle;
+}
+
+/* Make the search expand and right group keep compact controls */
+.employee-filters-left {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+}
+
+/* Slightly tighter pagination bar spacing to match table */
+.employee-pagination-bar.dark-theme-pagination {
+    padding: 12px 12px;
+    gap: 12px;
+    align-items: center;
+}
+.employee-pagination-bar .pagination-btn {
+    min-width: 40px;
+    padding: 6px 10px;
+}
+
+/* Prevent very long values from pushing layout; allow wrapping inside cells where appropriate */
+.roles-table th:first-child,
+.roles-table td:first-child {
+    max-width: 260px;
+}
+.roles-table td {
+    word-break: break-word;
+}
+
+/* Responsive adjustments */
+@media (max-width: 720px) {
+    .roles-table th.action-col,
+    .roles-table td.action-col {
+        width: 100px;
+    }
+    .employee-filters-right {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .employee-filters-left {
+        width: 100%;
+    }
+    .employee-pagination-bar.dark-theme-pagination {
+        padding: 8px;
+        gap: 8px;
+    }
+}
+
 .roles-table tbody tr:last-child td {
     border-bottom: none;
     border-right: none !important;
@@ -383,7 +464,14 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    justify-content: space-between;
     margin-bottom: 6px; /* even tighter spacing above table */
+}
+.employee-filters-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
 }
 .employee-filters input[type="search"],
 .employee-filters select {
@@ -400,6 +488,25 @@
     padding: 8px 10px;
     border-radius: 6px;
     cursor: pointer;
+}
+
+/* Responsive: stack filters vertically on small screens */
+@media (max-width: 720px) {
+    .employee-filters {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .employee-filters-right {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+    .employee-filters-right select,
+    .employee-filters-right button {
+        width: auto;
+    }
 }
 
 .modal-content .form-group select {
