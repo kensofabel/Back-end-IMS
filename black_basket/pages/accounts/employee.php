@@ -81,19 +81,24 @@ $roles = array_values(array_unique($roles));
 
 if (count($employees) > 0) {
     // Render client-side filter controls
-    echo '<div class="employee-filters" style="margin:14px 0 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">';
-    echo '<input type="search" id="employee-search" placeholder="Search employees (name, email, phone, role)" style="padding:8px 12px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;min-width:260px;" />';
-    echo '<select id="employee-role-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
-    echo '<option value="">All roles</option>';
+    // Filters: left = search, right = role/status/clear
+    echo '<div class="employee-filters" style="margin:14px 0 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;">';
+    echo '  <div class="employee-filters-left" style="display:flex; gap:10px; align-items:center; min-width:0;">';
+    echo '    <input type="search" id="employee-search" placeholder="Search employees (name, email, phone, role)" style="padding:8px 12px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;min-width:260px;" />';
+    echo '  </div>';
+    echo '  <div class="employee-filters-right" style="display:flex; gap:10px; align-items:center; margin-left:auto;">';
+    echo '    <select id="employee-role-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
+    echo '      <option value="">All roles</option>';
     foreach ($roles as $r) {
         $rEsc = htmlspecialchars($r);
-        echo "<option value=\"{$rEsc}\">{$rEsc}</option>";
+        echo "      <option value=\"{$rEsc}\">{$rEsc}</option>";
     }
-    echo '</select>';
-    echo '<select id="employee-status-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
-    echo '<option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>';
-    echo '</select>';
-    echo '<button id="employee-clear-filters" class="btn-add-role" style="padding:8px 14px;margin-left:6px;">Clear</button>';
+    echo '    </select>';
+    echo '    <select id="employee-status-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
+    echo '      <option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>';
+    echo '    </select>';
+    echo '    <button id="employee-clear-filters" class="btn-add-role" style="padding:8px 14px;margin-left:6px;">Clear</button>';
+    echo '  </div>';
     echo '</div>';
 
     echo '<table class="roles-table" id="employees-table">';
