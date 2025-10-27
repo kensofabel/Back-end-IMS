@@ -44,11 +44,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!table || !paginationBar) return;
     let rowsPerPage = 10;
     let currentPage = 1;
-    function getRows() {
+    // Helper: get all rows and manage filtered state via class 'filtered-out'
+    function getAllRows() {
         return Array.from(table.querySelectorAll('tbody tr'));
     }
+    function getVisibleRows() {
+        return getAllRows().filter(r => !r.classList.contains('filtered-out'));
+    }
     function getTotalPages() {
-        return Math.max(1, Math.ceil(getRows().length / rowsPerPage));
+        return Math.max(1, Math.ceil(getVisibleRows().length / rowsPerPage));
     }
     function updatePagination() {
         const totalPages = getTotalPages();
@@ -66,11 +70,22 @@ document.addEventListener('DOMContentLoaded', function() {
         nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
     }
     function showPage(page) {
-        const rows = getRows();
+        const all = getAllRows();
+        const visible = getVisibleRows();
         const totalPages = getTotalPages();
         currentPage = Math.max(1, Math.min(page, totalPages));
-        rows.forEach((row, idx) => {
-            row.style.display = (idx >= (currentPage-1)*rowsPerPage && idx < currentPage*rowsPerPage) ? '' : 'none';
+        // For each row, if it's filtered-out keep hidden. Otherwise determine its index in visible set.
+        all.forEach(row => {
+            if (row.classList.contains('filtered-out')) {
+                row.style.display = 'none';
+                return;
+            }
+            const visIndex = visible.indexOf(row);
+            if (visIndex === -1) {
+                row.style.display = 'none';
+            } else {
+                row.style.display = (visIndex >= (currentPage-1)*rowsPerPage && visIndex < currentPage*rowsPerPage) ? '' : 'none';
+            }
         });
         updatePagination();
     }
@@ -80,16 +95,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const prevBtn = paginationBar.querySelector('.pagination-prev');
     const nextBtn = paginationBar.querySelector('.pagination-next');
     prevBtn.addEventListener('click', function() {
-        if (currentPage > 1) showPage(currentPage - 1);
+        if (typeof serverMode !== 'undefined' && serverMode) {
+            // server-driven pagination: ask server for previous page
+            const pageInputEl = paginationBar.querySelector('.pagination-page-input');
+            let page = parseInt((pageInputEl && pageInputEl.value) || '1', 10) || 1;
+            if (page > 1) loadEmployeesServer(page - 1);
+        } else {
+            if (currentPage > 1) showPage(currentPage - 1);
+        }
     });
     nextBtn.addEventListener('click', function() {
-        if (currentPage < getTotalPages()) showPage(currentPage + 1);
+        if (typeof serverMode !== 'undefined' && serverMode) {
+            // server-driven pagination: ask server for next page
+            const pageInputEl = paginationBar.querySelector('.pagination-page-input');
+            const totalSpan = paginationBar.querySelector('.pagination-total-pages');
+            let page = parseInt((pageInputEl && pageInputEl.value) || '1', 10) || 1;
+            const total = parseInt((totalSpan && totalSpan.textContent) || '1', 10) || 1;
+            if (page < total) loadEmployeesServer(page + 1);
+        } else {
+            if (currentPage < getTotalPages()) showPage(currentPage + 1);
+        }
     });
     // Page input handler
     const pageInput = paginationBar.querySelector('.pagination-page-input');
     pageInput.addEventListener('change', function() {
         let val = parseInt(pageInput.value, 10);
         if (isNaN(val) || val < 1) val = 1;
+        if (typeof serverMode !== 'undefined' && serverMode) {
+            // When server-mode, ask the server for the requested page
+            loadEmployeesServer(val);
+            return;
+        }
         if (val > getTotalPages()) val = getTotalPages();
         showPage(val);
     });
@@ -97,8 +133,287 @@ document.addEventListener('DOMContentLoaded', function() {
     const rowsSelect = paginationBar.querySelector('.pagination-rows-select');
     rowsSelect.addEventListener('change', function() {
         rowsPerPage = parseInt(rowsSelect.value, 10) || 10;
-        showPage(1);
+        if (typeof serverMode !== 'undefined' && serverMode) {
+            loadEmployeesServer(1);
+        } else {
+            showPage(1);
+        }
     });
+    // --- Filtering logic (server-backed with client-side fallback) ---
+    function debounce(fn, wait) {
+        let t;
+        return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); };
+    }
+
+    // client-side apply (fallback)
+    function applyFilters() {
+        const q = (document.getElementById('employee-search') || {}).value || '';
+        const role = (document.getElementById('employee-role-filter') || {}).value || '';
+        const status = (document.getElementById('employee-status-filter') || {}).value || '';
+        const lq = q.trim().toLowerCase();
+        getAllRows().forEach(row => {
+            const name = (row.children[0] && row.children[0].innerText || '').toLowerCase();
+            const email = (row.children[1] && row.children[1].innerText || '').toLowerCase();
+            const phone = (row.children[2] && row.children[2].innerText || '').toLowerCase();
+            const roleCell = (row.children[3] && row.children[3].innerText || '').toLowerCase();
+            const badge = row.querySelector('.status-badge') || row.querySelector('.status-badge-edit');
+            let rowStatus = '';
+            if (badge) {
+                const ds = badge.getAttribute('data-status');
+                if (ds) rowStatus = ds.toLowerCase();
+                else rowStatus = badge.classList.contains('status-active') ? 'active' : (badge.classList.contains('status-inactive') ? 'inactive' : 'active');
+            }
+            let matches = true;
+            if (lq) {
+                matches = name.indexOf(lq) !== -1 || email.indexOf(lq) !== -1 || phone.indexOf(lq) !== -1 || roleCell.indexOf(lq) !== -1;
+            }
+            if (matches && role) matches = roleCell === role.toLowerCase();
+            if (matches && status) matches = rowStatus === status.toLowerCase();
+            if (!matches) row.classList.add('filtered-out'); else row.classList.remove('filtered-out');
+        });
+        const tableEl = document.getElementById('employees-table');
+        if (tableEl) {
+            const visibleCount = getVisibleRows().length;
+            let noMsg = document.getElementById('no-employees-filter-message');
+            if (!noMsg) {
+                noMsg = document.createElement('div');
+                noMsg.id = 'no-employees-filter-message';
+                noMsg.style.textAlign = 'center';
+                noMsg.style.color = '#aaa';
+                noMsg.style.padding = '20px 0';
+                noMsg.innerText = 'No matching employees found.';
+                tableEl.parentNode.insertBefore(noMsg, tableEl.nextSibling);
+            }
+            noMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+        showPage(1);
+    }
+
+    // server-mode: load rows via API and render
+    let serverMode = false;
+    function renderRowsFromServer(rows) {
+        let table = document.getElementById('employees-table');
+        let tbody;
+        if (!table) {
+            table = document.createElement('table');
+            table.className = 'roles-table';
+            table.id = 'employees-table';
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th class="status-col">Status</th>
+                        <th class="action-col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>`;
+            const tabContent = document.getElementById('content-manage-employees');
+            if (tabContent) tabContent.insertBefore(table, tabContent.querySelector('.employee-pagination-bar'));
+        }
+        tbody = table.querySelector('tbody');
+        tbody.innerHTML = '';
+        rows.forEach(r => {
+            const id = r.id;
+            const name = (r.full_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const email = (r.email || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const phone = (r.phone || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const role = (r.role_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const status = (r.status || 'active');
+            const isActive = status === 'active';
+            const badgeClass = isActive ? 'status-active' : 'status-inactive';
+            const iconClass = isActive ? 'fa-check-circle' : 'fa-times-circle';
+            const statusText = isActive ? 'Active' : 'Inactive';
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-employee-id', id);
+            tr.innerHTML = `
+                <td class="editable-cell">${name}</td>
+                <td class="editable-cell">${email}</td>
+                <td class="editable-cell">${phone}</td>
+                <td class="editable-cell">${role}</td>
+                <td class="status-col">
+                    <span class="status-badge ${badgeClass} status-badge-edit" style="cursor:pointer;" title="Toggle Status" data-employee-id="${id}" data-status="${status}">
+                        <i class="fas ${iconClass}"></i>
+                        <span class="status-text">${statusText}</span>
+                    </span>
+                </td>
+                <td class="action-col">
+                    <button class="btn-edit-role" title="Edit"><i class="fas fa-pen"></i> <span>Edit</span></button>
+                    <button class="btn-delete-role" title="Delete"><i class="fas fa-trash"></i> <span>Delete</span></button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+        attachDynamicRowHandlers();
+        // set tooltips for truncated content
+        setCellTooltips();
+    }
+
+    function attachDynamicRowHandlers() {
+        document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
+            if (badge._hasHandler) return; badge._hasHandler = true;
+            badge.addEventListener('click', function(e) {
+                const empId = this.getAttribute('data-employee-id');
+                if (!empId) return;
+                const badgeEl = this;
+                fetch('toggle_employee_status.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'id=' + encodeURIComponent(empId)
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const newStatus = data.new_status;
+                        badgeEl.setAttribute('data-status', newStatus);
+                        const icon = badgeEl.querySelector('i');
+                        const text = badgeEl.querySelector('.status-text');
+                        if (newStatus === 'active') {
+                            badgeEl.classList.add('status-active');
+                            badgeEl.classList.remove('status-inactive');
+                            if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
+                            if (text) text.textContent = 'Active';
+                        } else {
+                            badgeEl.classList.remove('status-active');
+                            badgeEl.classList.add('status-inactive');
+                            if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
+                            if (text) text.textContent = 'Inactive';
+                        }
+                    } else {
+                        alert(data.message || 'Failed to toggle status');
+                    }
+                })
+                .catch(() => alert('Failed to toggle status'));
+            });
+        });
+
+        document.querySelectorAll('.btn-delete-role').forEach(function(btn) {
+            if (btn._hasHandler) return; btn._hasHandler = true;
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (!confirm('Are you sure you want to delete this employee?')) return;
+                const row = this.closest('tr');
+                const empId = row && (row.getAttribute('data-employee-id') || '');
+                if (empId && /^\d+$/.test(empId)) {
+                    fetch('delete_employee.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `employee_id=${encodeURIComponent(empId)}`
+                    }).then(r => r.json()).then(data => {
+                        if (data && data.success) {
+                            if (row && row.parentNode) row.parentNode.removeChild(row);
+                        } else {
+                            alert(data.message || 'Failed to delete employee');
+                        }
+                    }).catch(() => {
+                        if (confirm('Could not contact server to delete account. Remove locally from the table instead?')) {
+                            if (row && row.parentNode) row.parentNode.removeChild(row);
+                        }
+                    });
+                } else {
+                    if (row && row.parentNode) row.parentNode.removeChild(row);
+                }
+            });
+        });
+
+        document.querySelectorAll('.btn-edit-role').forEach(function(btn) {
+            if (btn._hasHandler) return; btn._hasHandler = true;
+            btn.addEventListener('click', function() {
+                openEmployeeEditModal();
+                var row = this.closest('tr');
+                window.currentEditingEmployeeRow = row;
+                if (!row) return;
+                var nameEl = document.getElementById('edit-employee-name');
+                var emailEl = document.getElementById('edit-employee-email');
+                var phoneEl = document.getElementById('edit-employee-phone');
+                var roleEl = document.getElementById('edit-employee-role');
+                if (nameEl) nameEl.value = row.children[0].innerText;
+                if (emailEl) emailEl.value = row.children[1].innerText;
+                if (phoneEl) phoneEl.value = row.children[2].innerText;
+                if (roleEl) roleEl.value = row.children[3].innerText;
+                try { if (typeof updateFormGroupState === 'function') { if (nameEl) updateFormGroupState(nameEl); if (emailEl) updateFormGroupState(emailEl); if (phoneEl) updateFormGroupState(phoneEl); if (roleEl) updateFormGroupState(roleEl); } } catch (err) {}
+            });
+        });
+    }
+
+    // Add tooltips for truncated table cells (only if text is overflowing)
+    function setCellTooltips() {
+        const selector = '#employees-table tbody tr td:nth-child(1), #employees-table tbody tr td:nth-child(2), #employees-table tbody tr td:nth-child(3), #employees-table tbody tr td:nth-child(4)';
+        document.querySelectorAll(selector).forEach(td => {
+            // clear previous title
+            td.removeAttribute('title');
+            // use timeout to ensure rendered widths are calculated after DOM changes
+            try {
+                if (td.scrollWidth > td.clientWidth + 1) {
+                    td.setAttribute('title', td.innerText.trim());
+                }
+            } catch (e) {
+                // ignore
+            }
+        });
+    }
+    // update tooltips on window resize and after dynamic row changes
+    window.addEventListener('resize', function() { setTimeout(setCellTooltips, 120); });
+
+    function loadEmployeesServer(pageNum) {
+        pageNum = pageNum || 1;
+        const q = (document.getElementById('employee-search') || {}).value || '';
+        const role = (document.getElementById('employee-role-filter') || {}).value || '';
+        const status = (document.getElementById('employee-status-filter') || {}).value || '';
+        const perPage = parseInt((document.querySelector('.pagination-rows-select') || {}).value || 10, 10);
+        const params = new URLSearchParams({ q: q, role: role, status: status, page: pageNum, per_page: perPage });
+        fetch('employees_api.php?' + params.toString(), { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.success) {
+                    serverMode = true;
+                    // keep client-side currentPage in sync so other UI code reads the right value
+                    try { currentPage = parseInt(data.page || pageNum, 10) || 1; } catch (e) { currentPage = pageNum; }
+                    renderRowsFromServer(data.rows || []);
+                    const totalPages = data.total_pages || 1;
+                    const pageInput = paginationBar.querySelector('.pagination-page-input');
+                    const totalSpan = paginationBar.querySelector('.pagination-total-pages');
+                    const prevBtn = paginationBar.querySelector('.pagination-prev');
+                    const nextBtn = paginationBar.querySelector('.pagination-next');
+                    pageInput.value = data.page || 1;
+                    totalSpan.textContent = totalPages;
+                    prevBtn.disabled = (data.page || 1) <= 1;
+                    nextBtn.disabled = (data.page || 1) >= totalPages;
+                    prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
+                    nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
+                } else {
+                    serverMode = false;
+                    applyFilters();
+                }
+            })
+            .catch(() => { serverMode = false; applyFilters(); });
+    }
+
+    const debouncedApply = debounce(applyFilters, 250);
+    const searchEl = document.getElementById('employee-search');
+    if (searchEl) searchEl.addEventListener('input', function() { if (serverMode) { debouncedApply(); loadEmployeesServer(1); } else debouncedApply(); });
+    const roleFilter = document.getElementById('employee-role-filter');
+    if (roleFilter) roleFilter.addEventListener('change', function() { if (serverMode) loadEmployeesServer(1); else applyFilters(); });
+    const statusFilter = document.getElementById('employee-status-filter');
+    if (statusFilter) statusFilter.addEventListener('change', function() { if (serverMode) loadEmployeesServer(1); else applyFilters(); });
+    const clearBtn = document.getElementById('employee-clear-filters');
+    if (clearBtn) clearBtn.addEventListener('click', function() {
+        if (searchEl) searchEl.value = '';
+        if (roleFilter) roleFilter.value = '';
+        if (statusFilter) statusFilter.value = '';
+        if (serverMode) loadEmployeesServer(1); else {
+            getAllRows().forEach(r => r.classList.remove('filtered-out'));
+            const noMsg = document.getElementById('no-employees-filter-message'); if (noMsg) noMsg.style.display = 'none';
+            showPage(1);
+        }
+    });
+
+    // Try server on initial load; if it fails, fallback to client-side
+    try { loadEmployeesServer(1); } catch (err) { /* ignore */ }
+
+    // Ensure tooltips are set for the initial client-side table too
+    setTimeout(setCellTooltips, 200);
 });
 // Consolidated accounts JS (moved from assets/js/content.js + page inline handlers)
 // This file is loaded by pages in pages/accounts/*.php

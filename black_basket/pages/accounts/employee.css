@@ -29,6 +29,25 @@
     background: #444;
     color: #ffb300;
 }
+/* Make the page number input and rows-per-page select match the dark system background */
+.employee-pagination-bar .pagination-page-input,
+.employee-pagination-bar .pagination-rows-select {
+    background: transparent; /* let the bar background show through */
+    color: #ffffff;
+    border: 1px solid #333;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+.employee-pagination-bar .pagination-page-input::-webkit-outer-spin-button,
+.employee-pagination-bar .pagination-page-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.employee-pagination-bar .pagination-page-input:focus,
+.employee-pagination-bar .pagination-rows-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255,185,0,0.08);
+}
 .employee-pagination-bar .pagination-current-page {
     color: #ffb300;
     font-weight: 600;
@@ -89,14 +108,14 @@
     color: #ff9800;
     font-weight: 700;
     text-align: left;
-    padding: 15px 25px;
+    padding: 10px 12px; /* tightened header padding */
 }
 
 .roles-table td {
     text-align: left;
-    padding: 25px 25px;
+    padding: 12px 12px; /* tightened row padding for denser table */
     vertical-align: middle;
-    font-size: 1rem;
+    font-size: 0.98rem;
 }
 .roles-table td[contenteditable="true"]:focus {
     background: #232323;
@@ -291,6 +310,32 @@
     transform: translateY(-4px);
 }
 
+/* Modal-specific: override floating-label styles from global CSS so labels sit above inputs
+   This fixes label/input overlap in the Add/Edit Employee modals. */
+.modal-content .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px; /* very tight gap between label and control */
+}
+.modal-content .form-group label {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    opacity: 1 !important;
+    margin-bottom: 2px !important; /* minimal label bottom margin */
+    background: transparent !important;
+    pointer-events: auto !important;
+    font-size: 0.9rem !important;
+    color: #bdbdbd !important;
+}
+.modal-content .form-group input,
+.modal-content .form-group select {
+    padding: 8px 10px !important; /* tighter control padding for density */
+    font-size: 13px !important;
+}
+
+
 .password-toggle {
      position: absolute;
     right: 12px;
@@ -319,6 +364,30 @@
     border: 1px solid #7a7a7a;
 }
 
+/* Employee filters bar */
+.employee-filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px; /* even tighter spacing above table */
+}
+.employee-filters input[type="search"],
+.employee-filters select {
+    background: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 6px;
+}
+.employee-filters #employee-clear-filters {
+    background: transparent;
+    border: 1px solid #444;
+    color: #ff9800;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
 .modal-content .form-group select {
     background-color: #2a2a2a !important; /* match modal-content tone */
     color: #ffffff !important;
@@ -333,4 +402,54 @@
     background-color: #2a2a2a;
     color: #ffffff;
 }
+
+/* Page-scoped modal tweaks: reduce width and increase input padding so long values don't touch labels */
+#employee-form-modal .modal-content, #employee-edit-modal .modal-content {
+    max-width: 520px; /* narrower modal width per user request */
+    padding: 8px 10px; /* slightly tighter inner padding */
+    max-height: 95vh; /* keep the modal within the viewport */
+}
+#employee-form-modal .modal-content .modal-body,
+#employee-edit-modal .modal-content .modal-body {
+    padding: 6px 6px; /* denser modal body padding */
+    max-height: none; /* allow body to expand; remove internal scroll */
+    overflow: visible; /* no internal scrollbar */
+}
+#employee-form-modal .modal-content .form-group input,
+#employee-edit-modal .modal-content .form-group input,
+#employee-form-modal .modal-content .form-group select,
+#employee-edit-modal .modal-content .form-group select {
+    padding: 6px 8px !important; /* tighter control padding to conserve vertical space */
+    font-size: 13px;
+    line-height: 1.15;
+}
+#employee-form-modal .modal-content .input-with-toggle input,
+#employee-edit-modal .modal-content .input-with-toggle input {
+    padding-right: 36px !important; /* room for the password toggle */
+}
+
+/* Make employee modals slightly taller and scrollable to avoid vertical clipping on small screens */
+#employee-form-modal .modal-content, #employee-edit-modal .modal-content {
+    /* allow modal to size naturally up to the viewport height; avoid internal scroll */
+    display: flex;
+    flex-direction: column;
+}
+#employee-form-modal .modal-content .modal-body,
+#employee-edit-modal .modal-content .modal-body {
+    overflow: visible; /* ensure no inner scroll */
+    max-height: none;
+    padding-right: 6px;
+}
+
+/* Truncate long table cell content with ellipsis and allow tooltip for full text */
+.roles-table td:nth-child(1),
+.roles-table td:nth-child(2),
+.roles-table td:nth-child(3),
+.roles-table td:nth-child(4) {
+    max-width: 160px; /* narrower truncated width to save horizontal space */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 
