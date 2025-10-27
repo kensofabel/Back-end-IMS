@@ -104,6 +104,20 @@
     border-bottom: 1px solid #3f3f3f;
     outline: none;
 }
+
+/* Center the Actions column content */
+.roles-table th.action-col,
+.roles-table td.action-col {
+    text-align: center;
+    white-space: nowrap;
+    width: 140px; /* reserve a fixed width so layout doesn't jump */
+}
+.roles-table td.action-col > * {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+}
 .roles-table th {
     color: #ff9800;
     font-weight: 700;
