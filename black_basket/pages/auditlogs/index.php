@@ -81,6 +81,24 @@ $result = $conn->query($sql);
                                 </tbody>
                             </table>
                         </div>
+                        <!-- Employee-style pagination bar (dark theme) copied into Audit Logs -->
+                        <div class="employee-pagination-bar dark-theme-pagination" style="display:flex;align-items:center;gap:8px;margin-top:12px;justify-content:space-between;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <button id="prev-page" class="pagination-btn pagination-prev btn btn-secondary" disabled title="Previous page">&#60;</button>
+                                <button id="next-page" class="pagination-btn pagination-next btn btn-secondary" disabled title="Next page">&#62;</button>
+                                <span style="color:#fff;font-size:1.04rem;margin-left:12px;">Page</span>
+                                <input id="pagination-page-input" type="number" class="pagination-page-input" min="1" value="1" style="width:44px;text-align:center;padding:4px 0;border:1px solid #222;border-radius:4px;font-size:1.04rem;margin:0 6px;" />
+                                <span style="color:#fff;font-size:1.04rem;">of</span>
+                                <span id="pagination-total-pages" class="pagination-total-pages" style="color:#fff;font-size:1.04rem;margin:0 6px;">1</span>
+                                <span style="color:#fff;font-size:1.04rem;margin-left:18px;">Rows per page:</span>
+                                <select id="rows-per-page" class="pagination-rows-select" style="padding:4px 8px;border-radius:4px;border:1px solid #444;font-size:1.04rem;margin-left:6px;background:#232323;color:#fff;">
+                                    <option value="10" selected>10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>

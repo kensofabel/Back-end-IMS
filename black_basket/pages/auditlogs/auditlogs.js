@@ -1,8 +1,13 @@
-// Global variables for real-time functionality
+// Global variables for real-time functionality and pagination
 let lastLogCount = 0;
 let isConnected = false;
 let fetchInterval = null;
 let previousLogs = '';
+
+// Pagination state
+let currentPage = 1;
+let perPage = 10;
+let totalPages = 1;
 
 // Realtime Audit Logs Fetcher with Filtering and Visual Indicators
 function fetchAuditLogs(showNewIndicator = false) {
@@ -15,7 +20,9 @@ function fetchAuditLogs(showNewIndicator = false) {
         action,
         date_from: dateFrom,
         date_to: dateTo,
-        search
+        search,
+        page: currentPage,
+        per_page: perPage
     });
 
     updateConnectionStatus('connecting');
@@ -25,32 +32,54 @@ function fetchAuditLogs(showNewIndicator = false) {
     
     xhr.onload = function() {
         if (xhr.status === 200) {
-            const currentLogs = xhr.responseText;
+            const rawResponse = xhr.responseText;
             const tbody = document.getElementById('audit-logs-table-body');
-            
-            // Check if content has changed
-            if (currentLogs !== previousLogs) {
+
+            // Extract pagination metadata comment if present: <!-- PAGINATION: {...} -->
+            let paginationMeta = null;
+            const paginationMatch = rawResponse.match(/<!--\s*PAGINATION:\s*(\{[\s\S]*?\})\s*-->/);
+            if (paginationMatch && paginationMatch[1]) {
+                try {
+                    paginationMeta = JSON.parse(paginationMatch[1]);
+                } catch (e) {
+                    paginationMeta = null;
+                }
+            }
+
+            // Remove HTML comments (including the pagination meta and Last Updated comments)
+            const rowsHtml = rawResponse.replace(/<!--([\s\S]*?)-->/g, '').trim();
+
+            // Check if content has changed (compare only the rows HTML to avoid meta noise)
+            if (rowsHtml !== previousLogs) {
                 // Flash new content indicator if this isn't the initial load
                 if (previousLogs !== '' && showNewIndicator) {
                     flashNewLogsIndicator();
                 }
-                
-                tbody.innerHTML = currentLogs;
-                previousLogs = currentLogs;
-                
+
+                tbody.innerHTML = rowsHtml;
+                previousLogs = rowsHtml;
+
                 // Update timestamps immediately after loading content
                 updateTimestamps();
-                
+
                 // Count current logs
                 const logRows = tbody.querySelectorAll('tr');
                 const currentLogCount = logRows.length;
-                
+
                 // Highlight new logs if count increased
                 if (currentLogCount > lastLogCount && lastLogCount > 0) {
                     highlightNewLogs(currentLogCount - lastLogCount);
                 }
-                
+
                 lastLogCount = currentLogCount;
+            }
+
+            // If pagination meta provided, update UI state
+            if (paginationMeta) {
+                currentPage = parseInt(paginationMeta.page || currentPage, 10);
+                perPage = parseInt(paginationMeta.per_page || perPage, 10);
+                totalPages = parseInt(paginationMeta.pages || totalPages, 10);
+                updatePaginationUI();
             }
             
             updateConnectionStatus('connected');
@@ -100,6 +129,24 @@ function updateConnectionStatus(status) {
             statusText.textContent = 'Timeout';
             break;
     }
+}
+
+// Update pagination controls UI (supports both id/class based elements)
+function updatePaginationUI() {
+    // page display text (legacy) and page input/total elements (employee-style)
+    const pageDisplay = document.getElementById('page-display');
+    const pageInput = document.getElementById('pagination-page-input') || document.querySelector('.pagination-page-input');
+    const totalPagesEl = document.getElementById('pagination-total-pages') || document.querySelector('.pagination-total-pages');
+    const prevBtn = document.getElementById('prev-page') || document.querySelector('.pagination-prev');
+    const nextBtn = document.getElementById('next-page') || document.querySelector('.pagination-next');
+    const rowsSelect = document.getElementById('rows-per-page') || document.querySelector('.pagination-rows-select');
+
+    if (pageDisplay) pageDisplay.textContent = `Page ${currentPage} of ${totalPages}`;
+    if (pageInput) pageInput.value = currentPage;
+    if (totalPagesEl) totalPagesEl.textContent = totalPages;
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+    if (rowsSelect) rowsSelect.value = String(perPage);
 }
 
 // Flash indicator when new logs arrive
@@ -215,7 +262,7 @@ function formatTimestamp(timestamp) {
 ['audit-log-filter', 'audit-log-date-from', 'audit-log-date-to'].forEach(id => {
     const element = document.getElementById(id);
     if (element) {
-        element.addEventListener('input', () => fetchAuditLogs(false));
+        element.addEventListener('input', () => { currentPage = 1; fetchAuditLogs(false); });
     }
 });
 
@@ -226,7 +273,7 @@ if (searchInput) {
     searchInput.addEventListener('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
-            fetchAuditLogs(false);
+            currentPage = 1; fetchAuditLogs(false);
         }, 300); // 300ms debounce
     });
 }
@@ -277,6 +324,45 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial timestamp update
     setTimeout(updateTimestamps, 100);
+    
+    // Hook pagination controls (support both ids and employee classes)
+    const prevBtn = document.getElementById('prev-page') || document.querySelector('.pagination-prev');
+    const nextBtn = document.getElementById('next-page') || document.querySelector('.pagination-next');
+    const rowsSelect = document.getElementById('rows-per-page') || document.querySelector('.pagination-rows-select');
+    const pageInput = document.getElementById('pagination-page-input') || document.querySelector('.pagination-page-input');
+
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage = Math.max(1, currentPage - 1);
+            fetchAuditLogs(false);
+        }
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+            currentPage = Math.min(totalPages, currentPage + 1);
+            fetchAuditLogs(false);
+        }
+    });
+    if (rowsSelect) rowsSelect.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value, 10) || 10;
+        perPage = val;
+        currentPage = 1;
+        fetchAuditLogs(false);
+    });
+    if (pageInput) {
+        pageInput.addEventListener('change', (e) => {
+            let v = parseInt(e.target.value, 10) || 1;
+            v = Math.max(1, Math.min(v, totalPages || 1));
+            currentPage = v;
+            fetchAuditLogs(false);
+        });
+        pageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                pageInput.dispatchEvent(new Event('change'));
+            }
+        });
+    }
 });
 
 // Manual refresh function

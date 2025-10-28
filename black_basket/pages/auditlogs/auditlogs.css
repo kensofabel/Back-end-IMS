@@ -176,3 +176,70 @@ body {
         border-radius: 8px;
     }
 }
+
+/* Employee-style dark pagination (copied look from screenshot) */
+.employee-pagination-bar.dark-theme-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    background: transparent;
+}
+.employee-pagination-bar.dark-theme-pagination .pagination-btn,
+.employee-pagination-bar.dark-theme-pagination .btn {
+    background: #121212; /* dark button interior */
+    color: #ffffff; /* icon/text color */
+    border: 1px solid #333; /* neutral dark border (no orange) */
+    padding: 8px 10px;
+    border-radius: 8px;
+    min-width: 36px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.employee-pagination-bar.dark-theme-pagination .pagination-btn:hover,
+.employee-pagination-bar.dark-theme-pagination .btn:hover {
+    /* Keep hover consistent with the dark theme instead of orange */
+    background: #2a2a2a; /* slightly lighter dark on hover */
+    color: #ffffff; /* keep icon/text white */
+    border-color: #444; /* subtle darker border on hover */
+    box-shadow: none;
+}
+.employee-pagination-bar.dark-theme-pagination .pagination-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.employee-pagination-bar.dark-theme-pagination .pagination-page-input,
+.employee-pagination-bar.dark-theme-pagination .pagination-rows-select,
+.employee-pagination-bar.dark-theme-pagination #rows-per-page {
+    background: #1b1b1b;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.employee-pagination-bar.dark-theme-pagination .pagination-total-pages,
+.employee-pagination-bar.dark-theme-pagination span,
+.employee-pagination-bar.dark-theme-pagination label {
+    color: #fff;
+    font-size: 1rem;
+}
+
+/* Ensure icons inherit the button color */
+.employee-pagination-bar.dark-theme-pagination .pagination-btn i {
+    color: inherit;
+}
+
+/* Small responsive tweak: stack controls on very narrow screens */
+@media (max-width: 420px) {
+    .employee-pagination-bar.dark-theme-pagination {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: 10px;
+    }
+}
