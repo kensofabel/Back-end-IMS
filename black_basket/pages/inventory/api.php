@@ -156,6 +156,54 @@ switch ($method) {
             }
             exit;
         }
+        // Lightweight action: update product category
+        if (isset($data['action']) && $data['action'] === 'update_category') {
+            $product_id = isset($data['product_id']) ? intval($data['product_id']) : 0;
+            // category_id may be null (unset) or integer
+            $category_id = array_key_exists('category_id', $data) ? $data['category_id'] : null;
+            if ($product_id <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid product id']);
+                exit;
+            }
+
+            try {
+                if ($category_id === null || $category_id === '') {
+                    // Clear category
+                    $upd = "UPDATE products SET category_id = NULL WHERE id = " . $product_id;
+                    if ($conn->query($upd)) {
+                        echo json_encode(['success' => true, 'product_id' => $product_id, 'category_id' => null, 'category_name' => '']);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(['error' => $conn->error]);
+                    }
+                    exit;
+                } else {
+                    $cat_id = intval($category_id);
+                    // Validate category exists
+                    $cres = $conn->query("SELECT name FROM categories WHERE id = " . $cat_id . " LIMIT 1");
+                    if (!$cres || $cres->num_rows === 0) {
+                        http_response_code(404);
+                        echo json_encode(['error' => 'Category not found']);
+                        exit;
+                    }
+                    $cat_row = $cres->fetch_assoc();
+                    $cat_name = $cat_row['name'];
+                    $upd = "UPDATE products SET category_id = " . $cat_id . " WHERE id = " . $product_id;
+                    if ($conn->query($upd)) {
+                        echo json_encode(['success' => true, 'product_id' => $product_id, 'category_id' => $cat_id, 'category_name' => $cat_name]);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(['error' => $conn->error]);
+                    }
+                    exit;
+                }
+            } catch (Exception $e) {
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+        }
         // Lightweight action: add stock to product or variant
         if (isset($data['action']) && $data['action'] === 'add_stock') {
             $product_id = isset($data['product_id']) ? intval($data['product_id']) : 0;

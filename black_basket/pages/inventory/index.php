@@ -172,7 +172,8 @@ createDefaultCategory($_SESSION['user_id']);
                                             $posAttr = isset($v['pos_available']) && $v['pos_available'] ? '1' : '0';
                                             // variants don't have track_stock in schema; fall back to product
                                             $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
-                                            echo "<tr data-category=\"" . $categoryName . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                            $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
+                                            echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
                                             // checkbox cell (styled using permission-checkbox pattern)
                                             echo "<td style=\"text-align:center;\">";
                                             echo "<label class='permission-checkbox table-checkbox' style='margin:0;display:inline-flex;justify-content:center;'>";
@@ -181,7 +182,17 @@ createDefaultCategory($_SESSION['user_id']);
                                             echo "</label>";
                                             echo "</td>";
                                             echo "<td>" . $itemName . "</td>";
-                                            echo "<td>" . $categoryName . "</td>";
+                                            // Category dropdown (editable)
+                                            echo "<td>";
+                                            echo "<select class='category-select' data-product-id='" . (int)$p['product_id'] . "' data-variant-id='" . (int)$v['id'] . "'>";
+                                            echo "<option value=''>No Category</option>";
+                                            foreach ($categories as $cid => $cname) {
+                                                $safeName = htmlspecialchars($cname, ENT_QUOTES, 'UTF-8');
+                                                $selected = ($cid == $p['category_id']) ? ' selected' : '';
+                                                echo "<option value=\"" . (int)$cid . "\"" . $selected . ">" . $safeName . "</option>\n";
+                                            }
+                                            echo "</select>";
+                                            echo "</td>";
                                             echo "<td>" . $displayPrice . "</td>";
                                             echo "<td>" . $displayCost . "</td>";
                                             echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
@@ -222,7 +233,8 @@ createDefaultCategory($_SESSION['user_id']);
                                         }
                                         $posAttr = isset($p['pos_available']) && $p['pos_available'] ? '1' : '0';
                                         $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
-                                        echo "<tr data-category=\"" . $categoryName . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                        $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
+                                        echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
                                         echo "<td style=\"text-align:center;\">";
                                         echo "<label class='permission-checkbox table-checkbox' style='margin:0;display:inline-flex;justify-content:center;'>";
                                         echo "<input type='checkbox' class='row-select-checkbox' />";
@@ -230,7 +242,17 @@ createDefaultCategory($_SESSION['user_id']);
                                         echo "</label>";
                                         echo "</td>";
                                         echo "<td>" . $itemName . "</td>";
-                                        echo "<td>" . $categoryName . "</td>";
+                                        // Category dropdown (editable)
+                                        echo "<td>";
+                                        echo "<select class='category-select' data-product-id='" . (int)$p['product_id'] . "'>";
+                                        echo "<option value=''>No Category</option>";
+                                        foreach ($categories as $cid => $cname) {
+                                            $safeName = htmlspecialchars($cname, ENT_QUOTES, 'UTF-8');
+                                            $selected = ($cid == $p['category_id']) ? ' selected' : '';
+                                            echo "<option value=\"" . (int)$cid . "\"" . $selected . ">" . $safeName . "</option>\n";
+                                        }
+                                        echo "</select>";
+                                        echo "</td>";
                                         echo "<td>" . $displayPrice . "</td>";
                                         echo "<td>" . $displayCost . "</td>";
                                         echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
@@ -505,6 +527,183 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // initial filter pass (this will call renderTablePage via filterRows)
     filterRows();
+
+    // Make category <select> editable: delegate change handling to the table body
+    if (inventoryTableBody) {
+        inventoryTableBody.addEventListener('change', function(e) {
+            const target = e.target;
+            if (!target || !target.classList || !target.classList.contains('category-select')) return;
+            const prodId = parseInt(target.getAttribute('data-product-id') || 0, 10);
+            const variantId = target.getAttribute('data-variant-id') ? parseInt(target.getAttribute('data-variant-id'), 10) : null;
+            const catVal = target.value === '' ? null : parseInt(target.value, 10);
+
+            // optimistic UI: disable while saving
+            target.disabled = true;
+
+            fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_category', product_id: prodId, category_id: catVal })
+            }).then(resp => resp.json()).then(res => {
+                if (res && res.success) {
+                    const row = target.closest('tr');
+                    if (row) {
+                        const name = res.category_name ? res.category_name : (target.options[target.selectedIndex] ? target.options[target.selectedIndex].text : '');
+                        row.setAttribute('data-category', name);
+                        row.setAttribute('data-category-id', catVal ? String(catVal) : '');
+                    }
+                } else {
+                    alert('Failed to update category: ' + (res && res.error ? res.error : 'Unknown error'));
+                }
+            }).catch(err => {
+                console.error('update_category error', err);
+                alert('Failed to update category');
+            }).finally(() => { target.disabled = false; });
+        });
+    }
+
+    // Initialize styled dropdowns that mirror .category-select
+    function initStyledSelects(root) {
+        root = root || document;
+        const selects = root.querySelectorAll && root.querySelectorAll('.category-select');
+        if (!selects || !selects.length) return;
+
+        selects.forEach(function(select) {
+            // Avoid double-init
+            if (select._styledInit) return;
+            select._styledInit = true;
+
+            // Create wrapper
+            const wrapper = document.createElement('div');
+            wrapper.className = 'styled-select';
+            // Keep select but hide it visually while keeping it in DOM for form semantics.
+            // Disable pointer events so the native browser dropdown doesn't appear on click.
+            select.style.position = 'absolute';
+            select.style.opacity = '0';
+            select.style.left = '0';
+            select.style.top = '0';
+            select.style.width = '100%';
+            select.style.height = '100%';
+            select.style.margin = '0';
+            select.style.zIndex = '0';
+            select.style.pointerEvents = 'none';
+
+            // Build display element
+            const display = document.createElement('div');
+            display.className = 'styled-display';
+            const label = document.createElement('div');
+            label.className = 'label';
+            const chev = document.createElement('div');
+            chev.className = 'chev';
+            // Use a filled downward-pointing triangle (keeps the same visual size as the previous 12x12 chevron)
+            chev.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="6,8 18,8 12,16" fill="currentColor"/></svg>';
+            display.appendChild(label);
+            display.appendChild(chev);
+
+            // Build options menu
+            const menu = document.createElement('div');
+            menu.className = 'styled-menu';
+
+            // Populate menu from select options
+            function rebuildMenu() {
+                menu.innerHTML = '';
+                Array.from(select.options).forEach(function(opt, idx) {
+                    const o = document.createElement('div');
+                    o.className = 'styled-option';
+                    o.setAttribute('data-value', opt.value);
+                    o.setAttribute('data-index', String(idx));
+                    o.textContent = opt.textContent || opt.innerText || opt.value;
+                    if (opt.classList && opt.classList.contains('new-category')) o.classList.add('new-category');
+                    if (select.value === opt.value) o.classList.add('active');
+                    o.addEventListener('click', function(e) {
+                        // set native select and trigger change
+                        select.value = opt.value;
+                        const ev = new Event('change', { bubbles: true });
+                        select.dispatchEvent(ev);
+                        closeMenu();
+                    });
+                    menu.appendChild(o);
+                });
+            }
+
+            function openMenu() {
+                // close other menus and wrappers so only the current one appears "open"
+                document.querySelectorAll('.styled-select .styled-menu.show').forEach(m => m.classList.remove('show'));
+                document.querySelectorAll('.styled-select.open').forEach(w => w.classList.remove('open'));
+                menu.classList.add('show');
+                wrapper.classList.add('open');
+            }
+            function closeMenu() {
+                menu.classList.remove('show');
+                wrapper.classList.remove('open');
+            }
+
+            // Show selected label
+            function refreshLabel() {
+                const opt = select.options[select.selectedIndex];
+                label.textContent = opt ? opt.textContent : 'No Category';
+                // update active option in menu
+                const opts = menu.querySelectorAll('.styled-option');
+                opts.forEach(el => el.classList.remove('active'));
+                const active = menu.querySelector('.styled-option[data-value="' + (select.value || '') + '"]');
+                if (active) active.classList.add('active');
+            }
+
+            // Compose DOM: wrapper contains display + hidden select (absolute) + menu
+            // We'll place wrapper where select currently is
+            const parent = select.parentNode;
+            parent.insertBefore(wrapper, select);
+            wrapper.appendChild(display);
+            wrapper.appendChild(select);
+            wrapper.appendChild(menu);
+
+            // Initialize
+            rebuildMenu();
+            refreshLabel();
+
+            // Events
+            // Make the visible display focusable and toggleable via keyboard
+            display.tabIndex = 0;
+            display.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (menu.classList.contains('show')) closeMenu(); else openMenu();
+            });
+            display.addEventListener('keydown', function(e) {
+                // Enter or Space toggles
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (menu.classList.contains('show')) closeMenu(); else openMenu();
+                } else if (e.key === 'Escape') {
+                    closeMenu();
+                }
+            });
+
+            // Toggle-only behavior: click to open/close. Hover open disabled to avoid accidental menus on touch/hover.
+
+            // Keep native select changes in sync (e.g., when changed programmatically or by keyboard)
+            select.addEventListener('change', function() {
+                refreshLabel();
+            });
+
+            // Close on outside click
+            document.addEventListener('click', function docClick(ev) {
+                if (!wrapper.contains(ev.target)) {
+                    closeMenu();
+                }
+            });
+
+            // Rebuild menu if options change (rare, but good to support)
+            const obs = new MutationObserver(function() { rebuildMenu(); refreshLabel(); });
+            obs.observe(select, { childList: true, subtree: false });
+        });
+    }
+
+    // Initialize styled selects now and whenever inventory rows change
+    initStyledSelects(document);
+    if (inventoryTableBody) {
+        const mo = new MutationObserver(function() { initStyledSelects(inventoryTableBody); });
+        mo.observe(inventoryTableBody, { childList: true, subtree: true });
+    }
 });
 
 </script>

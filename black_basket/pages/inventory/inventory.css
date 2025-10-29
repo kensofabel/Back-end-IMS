@@ -437,6 +437,167 @@
     transition: all 0.3s ease;
 }
 
+/* Category select used inside the inventory table rows - keep visual style consistent */
+.inventory-table .category-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 6px 10px;
+    border: 1.5px solid #333;
+    background: #232323;
+    color: #dbdbdb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    min-width: 140px;
+    max-width: 260px;
+    height: 34px;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.inventory-table .category-select:focus {
+    outline: none;
+    border-color: #555;
+    box-shadow: 0 0 0 3px rgba(85,85,85,0.12);
+}
+.inventory-table .category-select[disabled] {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.inventory-table td {
+    padding: 6px 10px; /* smaller vertical padding */
+    vertical-align: middle;
+}
+
+.inventory-table th:first-child {
+    border-top-left-radius: 15px;
+}
+
+.inventory-table th:last-child {
+    border-top-right-radius: 15px;
+}
+
+/* Custom styled select wrapper that mirrors native <select> but allows a styled option list */
+.styled-select {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    width: 100%;
+    max-width: 260px;
+}
+.styled-select .styled-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    /* reduced vertical padding and min-height to shrink top/bottom whitespace */
+    padding: 4px 10px; /* small vertical padding keeps content centered */
+    background: #232323;
+    border: none;
+    border-radius: 8px;
+    color: #dbdbdb;
+    cursor: pointer;
+    height: 40px; /* match typical native select height (34px) */
+    box-sizing: border-box;
+}
+
+.styled-select:hover .styled-display,
+.styled-select.open .styled-display {
+    background: #444;
+    border-color: #555;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    color: #fff;
+}
+
+.styled-select .styled-display .label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.95rem;
+}
+.styled-select .styled-display .chev {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #bdbdbd;
+}
+.styled-select .styled-menu {
+    position: absolute;
+    z-index: 10001;
+    left: 0;
+    right: 0;
+    margin-top: 6px;
+    background: #2a2a2a;
+    border: 2px solid #444;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    display: none;
+}
+.styled-select .styled-menu.show {
+    display: block;
+}
+.styled-select .styled-option {
+    padding: 10px 12px;
+    color: #fff;
+    cursor: pointer;
+    border-bottom: 1px solid #373737;
+}
+.styled-select .styled-option:last-child { border-bottom: none; }
+.styled-select .styled-option:hover,
+.styled-select .styled-option.active {
+    background: #3a3a3a;
+}
+.styled-select .styled-option.new-category {
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+/* Transparent scrollbar track for styled menus and inventory scroll containers */
+.styled-select .styled-menu::-webkit-scrollbar {
+    width: 8px;
+}
+.styled-select .styled-menu::-webkit-scrollbar-track {
+    background: transparent;
+}
+.styled-select .styled-menu::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+.styled-select .styled-menu::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+.styled-select .styled-menu {
+    scrollbar-color: #555 transparent; /* Firefox */
+    scrollbar-width: thin;
+}
+
+/* Apply transparent track to other inventory dropdowns */
+.category-dropdown::-webkit-scrollbar-track,
+.name-dropdown::-webkit-scrollbar-track,
+.variants-table-container::-webkit-scrollbar-track,
+.permissions-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.category-dropdown,
+.name-dropdown,
+.variants-table-container,
+.permissions-content {
+    scrollbar-color: #555 transparent;
+}
+.styled-select .styled-option .tag {
+    background: #ff9800; color: #171717; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
+}
+
+/* small responsive tweak */
+@media (max-width:720px) {
+    .styled-select { max-width: 140px; }
+}
+
 /* Search Bar Toggle Functionality */
 .search-controls {
     position: relative;
