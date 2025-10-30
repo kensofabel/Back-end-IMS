@@ -1074,7 +1074,7 @@ width: 100%;
 .inventory-table th,
 .sales-table th {
     background: #181818;
-    padding: 15px;
+    padding: 20px;
     text-align: left;
     font-weight: 600;
     color: #ff9800;
@@ -1083,7 +1083,7 @@ width: 100%;
 
 .inventory-table td,
 .sales-table td {
-    padding: 15px;
+    padding: 8px;
     border-bottom: 1px solid #333;
     color: #fff;
 }
