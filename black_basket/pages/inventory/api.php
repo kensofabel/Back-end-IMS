@@ -138,24 +138,6 @@ switch ($method) {
             exit;
         }
 
-        // Lightweight action: update product-level track_stock from client toggles
-        if (isset($data['action']) && $data['action'] === 'update_track') {
-            $product_id = isset($data['product_id']) ? intval($data['product_id']) : 0;
-            $value = isset($data['value']) ? intval($data['value']) : 0;
-            if ($product_id <= 0) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Invalid product id']);
-                exit;
-            }
-            $upd_sql = "UPDATE products SET track_stock = " . ($value ? 1 : 0) . " WHERE id = " . $product_id;
-            if ($conn->query($upd_sql)) {
-                echo json_encode(['success' => true, 'product_id' => $product_id, 'track_stock' => ($value ? 1 : 0)]);
-            } else {
-                http_response_code(500);
-                echo json_encode(['error' => $conn->error]);
-            }
-            exit;
-        }
         // Lightweight action: update product category
         if (isset($data['action']) && $data['action'] === 'update_category') {
             $product_id = isset($data['product_id']) ? intval($data['product_id']) : 0;
@@ -204,6 +186,7 @@ switch ($method) {
                 exit;
             }
         }
+        
         // Lightweight action: add stock to product or variant
         if (isset($data['action']) && $data['action'] === 'add_stock') {
             $product_id = isset($data['product_id']) ? intval($data['product_id']) : 0;

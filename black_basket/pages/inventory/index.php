@@ -102,7 +102,7 @@ createDefaultCategory($_SESSION['user_id']);
                         <thead>
                             <tr>
                                 <th style="width:40px; text-align:center;">
-                                    <label class="permission-checkbox table-checkbox" style="margin:0;">
+                                    <label class="permission-checkbox table-checkbox" style="margin-left: 20px;">
                                         <input type="checkbox" id="selectAllItems" title="Select all" />
                                         <span class="checkmark"></span>
                                     </label>
@@ -135,12 +135,84 @@ createDefaultCategory($_SESSION['user_id']);
 
                                     // If there are variants, show each
                                     if (!empty($variants)) {
+                                        // Render a parent product row for products that have variants.
+                                        // Variant rows will follow and are hidden by default; they
+                                        // can be toggled open by the chevron button rendered here.
+                                        $parentName = htmlspecialchars($p['product_name'], ENT_QUOTES, 'UTF-8');
+                                        $categoryName = isset($categories[$p['category_id']]) ? htmlspecialchars($categories[$p['category_id']], ENT_QUOTES, 'UTF-8') : '';
+                                        $pPrice = $p['product_price'];
+                                        $pCost = $p['product_cost'];
+                                        $pIsPriceNumeric = is_numeric($pPrice);
+                                        $pIsCostNumeric = is_numeric($pCost);
+                                        $parentDisplayPrice = $pIsPriceNumeric ? '₱' . number_format((float)$pPrice, 2) : htmlspecialchars((string)$pPrice, ENT_QUOTES, 'UTF-8');
+                                        $parentDisplayCost = $pIsCostNumeric ? '₱' . number_format((float)$pCost, 2) : htmlspecialchars((string)$pCost, ENT_QUOTES, 'UTF-8');
+                                        if ($pIsPriceNumeric && $pIsCostNumeric && (float)$pPrice != 0.0) {
+                                            $parentMargin = round((((float)$pPrice - (float)$pCost) / (float)$pPrice) * 100, 2);
+                                        } else {
+                                            $parentMargin = '-';
+                                        }
+                                        // Compute parent stock as the sum of its variants' stock.
+                                        $totalVariantStock = 0;
+                                        foreach ($variants as $vv) {
+                                            $totalVariantStock += (int) ($vv['in_stock'] ?? 0);
+                                        }
+                                        $parentStock = $totalVariantStock;
+                                        $parentLowThreshold = (int) ($p['low_stock'] ?? 0);
+                                        // determine stock status for parent row (out/low/in)
+                                        if ($parentStock === 0) {
+                                            $parentStockStatus = 'out';
+                                            $parentLowFlag = '';
+                                        } elseif ($parentStock <= $parentLowThreshold && $parentLowThreshold > 0) {
+                                            $parentStockStatus = 'low';
+                                            $parentLowFlag = 'low';
+                                        } else {
+                                            $parentStockStatus = 'in';
+                                            $parentLowFlag = '';
+                                        }
+
+                                        $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
+
+                                        // Parent row: includes a chevron toggle (structure only)
+                                        // Add data-stock and data-low attributes so parent rows are filterable by stock
+                                        echo "<tr class='parent-row' data-product-id='" . (int)$p['product_id'] . "' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $parentStockStatus . "\" data-low=\"" . $parentLowFlag . "\">";
+                                        echo "<td style=\"text-align:center;\">";
+                                        // Chevron toggle (will be wired by JS). Keep accessible label.
+                                        // Chevron button placed before the checkbox but will be
+                                        // absolutely positioned via CSS so it doesn't affect layout
+                                        // and the checkbox stays centered.
+                                        echo "<button type='button' class='variant-toggle' data-product-id='" . (int)$p['product_id'] . "' aria-expanded='false' title='Show variants' style='background:transparent;border:none;cursor:pointer;padding:4px;'>";
+                                        echo "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7 10l5 5 5-5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
+                                        echo "</button>";
+                                        echo "<label class='permission-checkbox table-checkbox' style='margin-left: 10px;display:inline-flex;justify-content:center;'>";
+                                        echo "<input type='checkbox' class='row-select-checkbox' />";
+                                        echo "<span class='checkmark'></span>";
+                                        echo "</label>";
+                                        echo "</td>";
+                                        echo "<td>" . $parentName . "</td>";
+                                        // Parent category editable dropdown (match variant rows behavior)
+                                        echo "<td>";
+                                        echo "<select class='category-select' data-product-id='" . (int)$p['product_id'] . "'>";
+                                        foreach ($categories as $cid => $cname) {
+                                            $safeName = htmlspecialchars($cname, ENT_QUOTES, 'UTF-8');
+                                            $selected = ($cid == $p['category_id']) ? ' selected' : '';
+                                            echo "<option value=\"" . (int)$cid . "\"" . $selected . ">" . $safeName . "</option>\n";
+                                        }
+                                        echo "</select>";
+                                        echo "</td>";
+                                        // Parent rows should not show price/cost/margin values.
+                                        // Output empty placeholder TDs to preserve table column alignment.
+                                        echo "<td class='parent-price-cell'></td>";
+                                        echo "<td class='parent-cost-cell'></td>";
+                                        echo "<td class='parent-margin-cell'></td>";
+                                        echo "<td>" . $parentStock . "</td>";
+                                        echo "</tr>\n";
+
+                                        // Now render each variant as a hidden row tied to the parent product.
                                         foreach ($variants as $v) {
-                                            $itemName = htmlspecialchars($p['product_name'] . ' - ' . $v['name'], ENT_QUOTES, 'UTF-8');
-                                            $categoryName = isset($categories[$p['category_id']]) ? htmlspecialchars($categories[$p['category_id']], ENT_QUOTES, 'UTF-8') : '';
+                                            // Show only the variant's own name (do not prefix with parent product name)
+                                            $itemName = htmlspecialchars($v['name'], ENT_QUOTES, 'UTF-8');
                                             $price = is_null($v['price']) || $v['price'] === '' ? ($p['product_price'] ?? '') : $v['price'];
                                             $cost = is_null($v['cost']) || $v['cost'] === '' ? ($p['product_cost'] ?? '') : $v['cost'];
-                                            // Preserve textual values like 'variable'. Compute margin only when numeric.
                                             $stock = (int)$v['in_stock'];
                                             $low = (int) ($v['low_stock'] ?? 0);
                                             $isPriceNumeric = is_numeric($price);
@@ -161,7 +233,6 @@ createDefaultCategory($_SESSION['user_id']);
                                             } else {
                                                 $margin = '-';
                                             }
-                                            // Determine stock status per your rule: in when stock > low, low when 0 < stock <= low, out when stock == 0
                                             if ($stock === 0) {
                                                 $stockStatus = 'out';
                                             } elseif ($stock <= $low) {
@@ -170,33 +241,24 @@ createDefaultCategory($_SESSION['user_id']);
                                                 $stockStatus = 'in';
                                             }
                                             $posAttr = isset($v['pos_available']) && $v['pos_available'] ? '1' : '0';
-                                            // variants don't have track_stock in schema; fall back to product
                                             $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
-                                            $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
-                                            echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
-                                            // checkbox cell (styled using permission-checkbox pattern)
-                                            echo "<td style=\"text-align:center;\">";
-                                            echo "<label class='permission-checkbox table-checkbox' style='margin:0;display:inline-flex;justify-content:center;'>";
-                                            echo "<input type='checkbox' class='row-select-checkbox' />";
-                                            echo "<span class='checkmark'></span>";
-                                            echo "</label>";
-                                            echo "</td>";
+
+                                            echo "<tr class='variant-row' data-parent-id='" . (int)$p['product_id'] . "' style='display:none;' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                            // Variant rows are not selectable; output an empty cell to
+                                            // preserve table alignment. Add a class for future styling.
+                                            echo "<td class='variant-checkbox-cell' style=\"text-align:center;\">&nbsp;</td>";
                                             echo "<td>" . $itemName . "</td>";
-                                            // Category dropdown (editable)
-                                            echo "<td>";
-                                            echo "<select class='category-select' data-product-id='" . (int)$p['product_id'] . "' data-variant-id='" . (int)$v['id'] . "'>";
-                                            echo "<option value=''>No Category</option>";
-                                            foreach ($categories as $cid => $cname) {
-                                                $safeName = htmlspecialchars($cname, ENT_QUOTES, 'UTF-8');
-                                                $selected = ($cid == $p['category_id']) ? ' selected' : '';
-                                                echo "<option value=\"" . (int)$cid . "\"" . $selected . ">" . $safeName . "</option>\n";
-                                            }
-                                            echo "</select>";
-                                            echo "</td>";
+                                            // For variant rows we do not show the category selector UI.
+                                            // Output an empty TD (keeps table alignment) and add a
+                                            // class so CSS can target it if you later want to hide/adjust it.
+                                            echo "<td class='variant-category-cell'></td>";
                                             echo "<td>" . $displayPrice . "</td>";
                                             echo "<td>" . $displayCost . "</td>";
                                             echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
                                             echo "<td>" . $stock . "</td>";
+                                            if ($stockStatus === 'low') {
+                                                echo "<td class='stock-indicator-cell'><span class='low-stock-badge'>Low stock</span></td>";
+                                            }
                                             echo "</tr>\n";
                                         }
                                     } else {
@@ -236,7 +298,7 @@ createDefaultCategory($_SESSION['user_id']);
                                         $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
                                         echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
                                         echo "<td style=\"text-align:center;\">";
-                                        echo "<label class='permission-checkbox table-checkbox' style='margin:0;display:inline-flex;justify-content:center;'>";
+                                        echo "<label class='permission-checkbox table-checkbox' style='margin-left: 10px;display:inline-flex;justify-content:center;'>";
                                         echo "<input type='checkbox' class='row-select-checkbox' />";
                                         echo "<span class='checkmark'></span>";
                                         echo "</label>";
@@ -245,7 +307,6 @@ createDefaultCategory($_SESSION['user_id']);
                                         // Category dropdown (editable)
                                         echo "<td>";
                                         echo "<select class='category-select' data-product-id='" . (int)$p['product_id'] . "'>";
-                                        echo "<option value=''>No Category</option>";
                                         foreach ($categories as $cid => $cname) {
                                             $safeName = htmlspecialchars($cname, ENT_QUOTES, 'UTF-8');
                                             $selected = ($cid == $p['category_id']) ? ' selected' : '';
@@ -256,7 +317,13 @@ createDefaultCategory($_SESSION['user_id']);
                                         echo "<td>" . $displayPrice . "</td>";
                                         echo "<td>" . $displayCost . "</td>";
                                         echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
+                                        // Stock number cell (keeps numeric alignment)
                                         echo "<td>" . $stock . "</td>";
+                                        // Only output an extra indicator cell when this row is low; otherwise
+                                        // do not output an extra td (we'll manage indicator column dynamically in JS)
+                                        if ($stockStatus === 'low') {
+                                            echo "<td class='stock-indicator-cell'><span class='low-stock-badge'>Low stock</span></td>";
+                                        }
                                         echo "</tr>\n";
                                     }
                                 }
@@ -309,6 +376,11 @@ function checkInventoryAndToggleControls() {
 
 // Search toggle and item type toggle functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Cleanup any leftover portal clones from previous runs (dev hot-reload or errors)
+    try {
+        document.querySelectorAll('.category-menu-portal').forEach(c => c.remove());
+        document.querySelectorAll('.category-menu').forEach(m => { if (m.dataset && m.dataset.hidden) { m.style.display = ''; delete m.dataset.hidden; } });
+    } catch (e) { /* ignore */ }
     // Connect Add Item button to modal
     var addProductBtn = document.getElementById('addProductBtn');
     var scannerModal = document.getElementById('scannerModal');
@@ -436,6 +508,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const rowsSelect = paginationBar ? paginationBar.querySelector('.pagination-rows-select') : null;
     let rowsPerPage = rowsSelect ? parseInt(rowsSelect.value, 10) || 10 : 10;
     let currentPage = 1;
+    // Sorting state: key can be 'name','category','price','cost','margin','stock'
+    let sortState = { key: 'name', dir: 1 };
+    // Ensure sortable headers are only initialized once (prevents duplicate listeners)
+    let headersInitialized = false;
 
     function filterRows() {
         const rows = Array.from(document.querySelectorAll('#inventory-table-body tr'));
@@ -497,7 +573,63 @@ document.addEventListener('DOMContentLoaded', function() {
         const allRows = Array.from(inventoryTableBody.querySelectorAll('tr'));
     // Consider only rows that are currently visible by filter (not marked data-filtered)
     const visibleRows = allRows.filter(r => !r.hasAttribute('data-filtered'));
-        const totalPages = Math.max(1, Math.ceil(visibleRows.length / rowsPerPage));
+        // Exclude variant rows from pagination counting (they should not affect total pages)
+        const visibleNonVariantRows = visibleRows.filter(r => !r.classList.contains('variant-row'));
+        // Apply sorting to non-variant rows before paging
+        if (sortState && sortState.key) {
+            visibleNonVariantRows.sort(function(a, b) {
+                function getRowValue(row, key) {
+                    if (!row) return '';
+                    // name => td:nth-child(2)
+                    if (key === 'name') return (row.querySelector('td:nth-child(2)') ? row.querySelector('td:nth-child(2)').textContent.trim().toLowerCase() : '');
+                    if (key === 'category') return (row.getAttribute('data-category') || '').toLowerCase();
+                    if (key === 'stock') {
+                        // stock cell is usually in column 7
+                        const t = row.querySelector('td:nth-child(7)');
+                        if (t) {
+                            const n = parseFloat((t.textContent || '').replace(/[^0-9.-]/g, ''));
+                            return isNaN(n) ? -Infinity : n;
+                        }
+                        return -Infinity;
+                    }
+                    // price/cost/margin: numeric parsing from their respective columns
+                    if (key === 'price') {
+                        const t = row.querySelector('td:nth-child(4)');
+                        if (t) {
+                            const n = parseFloat((t.textContent || '').replace(/[^0-9.-]/g, ''));
+                            return isNaN(n) ? Infinity : n; // place non-numeric (Variable) at end
+                        }
+                        return Infinity;
+                    }
+                    if (key === 'cost') {
+                        const t = row.querySelector('td:nth-child(5)');
+                        if (t) {
+                            const n = parseFloat((t.textContent || '').replace(/[^0-9.-]/g, ''));
+                            return isNaN(n) ? Infinity : n;
+                        }
+                        return Infinity;
+                    }
+                    if (key === 'margin') {
+                        const t = row.querySelector('td:nth-child(6)');
+                        if (t) {
+                            const txt = (t.textContent || '').replace('%','').trim();
+                            const n = parseFloat(txt.replace(/[^0-9.-]/g, ''));
+                            return isNaN(n) ? Infinity : n;
+                        }
+                        return Infinity;
+                    }
+                    return '';
+                }
+                const va = getRowValue(a, sortState.key);
+                const vb = getRowValue(b, sortState.key);
+                if (typeof va === 'string' && typeof vb === 'string') {
+                    return sortState.dir * va.localeCompare(vb);
+                } else {
+                    return sortState.dir * ( (va === vb) ? 0 : (va < vb ? -1 : 1) );
+                }
+            });
+        }
+        const totalPages = Math.max(1, Math.ceil(visibleNonVariantRows.length / rowsPerPage));
         currentPage = Math.max(1, Math.min(page, totalPages));
 
         // First, hide all rows. We'll re-show only those belonging to the current page.
@@ -505,18 +637,153 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const start = (currentPage - 1) * rowsPerPage;
         const end = currentPage * rowsPerPage;
-        visibleRows.forEach((row, idx) => {
-            if (idx >= start && idx < end) {
-                row.style.display = '';
+        // Determine which non-variant rows belong to this page
+        const pageRows = visibleNonVariantRows.slice(start, end);
+
+        // Show the non-variant rows for the current page
+        pageRows.forEach(row => {
+            row.style.display = '';
+        });
+
+        // If any of the displayed rows are parent rows and are expanded, show their variant rows
+        pageRows.forEach(function(row) {
+            if (row.classList && row.classList.contains('parent-row')) {
+                const pid = row.getAttribute('data-product-id');
+                const parentBtn = inventoryTableBody ? inventoryTableBody.querySelector('.variant-toggle[data-product-id="' + pid + '"]') : null;
+                const isExpanded = parentBtn && parentBtn.getAttribute('aria-expanded') === 'true';
+                if (isExpanded) {
+                    const variantRows = Array.from(inventoryTableBody.querySelectorAll('tr.variant-row[data-parent-id="' + pid + '"]'));
+                    variantRows.forEach(function(vr) {
+                        // Show only variants that aren't filtered out
+                        if (!vr.hasAttribute('data-filtered')) vr.style.display = '';
+                    });
+                }
             }
         });
 
+
+    // Initialize sortable headers: make th clickable and show sort indicators
+    function initSortableHeaders() {
+        if (!inventoryTable) return;
+        const headerCells = Array.from(inventoryTable.querySelectorAll('thead th'));
+        // mapping column index to sort key (1-based th index)
+        const keyMap = {2: 'name', 3: 'category', 4: 'price', 5: 'cost', 6: 'margin', 7: 'stock'};
+
+        headerCells.forEach(function(th, idx) {
+            const col = idx + 1;
+            const key = keyMap[col];
+            if (!key) return; // skip non-sortable columns
+            th.classList.add('sortable');
+            // append indicator if missing
+            let ind = th.querySelector('.sort-indicator');
+            if (!ind) {
+                ind = document.createElement('span');
+                ind.className = 'sort-indicator';
+                ind.style.marginLeft = '8px';
+                th.appendChild(ind);
+            }
+
+            // Avoid adding multiple listeners to the same th
+            if (th._sortableInit) return;
+            th._sortableInit = true;
+
+            th.addEventListener('click', function() {
+                if (sortState.key === key) {
+                    sortState.dir = -sortState.dir; // toggle
+                } else {
+                    sortState.key = key;
+                    sortState.dir = 1;
+                }
+                // update header classes
+                headerCells.forEach(function(h, i) {
+                    h.classList.remove('sorted-asc','sorted-desc');
+                    const k = keyMap[i+1];
+                    if (k === sortState.key) h.classList.add(sortState.dir === 1 ? 'sorted-asc' : 'sorted-desc');
+                });
+                renderTablePage(1);
+            });
+        });
+
+        // Reflect initial sort state on headers (so the indicator shows on load)
+        headerCells.forEach(function(h, i) {
+            const k = keyMap[i+1];
+            if (k === sortState.key) {
+                h.classList.add(sortState.dir === 1 ? 'sorted-asc' : 'sorted-desc');
+            }
+        });
+
+        headersInitialized = true;
+    }
+
+    // call once to wire headers
+    initSortableHeaders();
         if (pageInput) pageInput.value = currentPage;
         if (totalSpan) totalSpan.textContent = totalPages;
         if (prevBtn) prevBtn.disabled = currentPage === 1;
         if (paginationNextBtn) paginationNextBtn.disabled = currentPage === totalPages;
         if (prevBtn) prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
         if (paginationNextBtn) paginationNextBtn.style.cursor = paginationNextBtn.disabled ? 'not-allowed' : 'pointer';
+        // Update indicator column (adds/removes header dynamically depending on visible low-stock badges)
+        updateIndicatorColumn();
+    }
+
+    // Insert or remove the indicator header depending on whether any visible rows
+    // on the current page have a low-stock badge. This keeps the DOM light while
+    // ensuring the indicator only appears when necessary (per your request).
+    function updateIndicatorColumn() {
+        const theadRow = document.querySelector('.inventory-table thead tr');
+        if (!theadRow) return;
+
+        // Find visible rows on current page
+        const allRows = Array.from(inventoryTableBody ? inventoryTableBody.querySelectorAll('tr') : []);
+        const visibleRows = allRows.filter(r => r.style.display !== 'none');
+
+        const hasVisibleBadge = visibleRows.some(r => (r.getAttribute('data-low') || '') === 'low');
+        const headerExists = !!theadRow.querySelector('th.stock-indicator-header');
+
+        if (hasVisibleBadge && !headerExists) {
+            // Create header cell and insert after the Stock header (7th th)
+            const th = document.createElement('th');
+            th.className = 'stock-indicator-header';
+            th.style.width = '110px';
+            th.style.textAlign = 'left';
+            th.style.paddingLeft = '0px';
+            th.innerHTML = '&nbsp;';
+            // Try to insert after 7th header if possible
+            const headers = Array.from(theadRow.children);
+            if (headers.length >= 7) {
+                const after = headers[6].nextSibling; // index 6 is the 7th th
+                theadRow.insertBefore(th, after);
+            } else {
+                theadRow.appendChild(th);
+            }
+        }
+
+        if (hasVisibleBadge) {
+            // Ensure each visible row has an indicator cell. Server emits the
+            // indicator TD only for low rows; here we add empty indicator TDs
+            // to non-low rows so all rows on the page have the same column count.
+            visibleRows.forEach(row => {
+                if (!row.querySelector('td.stock-indicator-cell')) {
+                    const td = document.createElement('td');
+                    td.className = 'stock-indicator-cell';
+                    // prefer CSS but set a safe inline fallback to left-align and pad
+                    td.style.textAlign = 'left';
+                    td.style.paddingLeft = '8px';
+                    td.style.whiteSpace = 'nowrap';
+                    td.innerHTML = '';
+                    row.appendChild(td);
+                }
+            });
+        } else if (headerExists) {
+            // Remove header and any indicator tds from visible rows when none are low
+            const h = theadRow.querySelector('th.stock-indicator-header');
+            if (h) h.remove();
+            visibleRows.forEach(row => {
+                const td = row.querySelector('td.stock-indicator-cell');
+                if (td) td.remove();
+            });
+        }
     }
 
     // Wire pagination controls
@@ -527,6 +794,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // initial filter pass (this will call renderTablePage via filterRows)
     filterRows();
+
 
     // Make category <select> editable: delegate change handling to the table body
     if (inventoryTableBody) {
@@ -559,13 +827,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('update_category error', err);
                 alert('Failed to update category');
             }).finally(() => { target.disabled = false; });
-        });
+        }); 
     }
 
     // Initialize styled dropdowns that mirror .category-select
     function initStyledSelects(root) {
         root = root || document;
-        const selects = root.querySelectorAll && root.querySelectorAll('.category-select');
+    // Initialize styled selects for row-level category selects, plus the
+    // filter controls and pagination rows select so they all share the same
+    // visual treatment.
+    const selects = root.querySelectorAll && root.querySelectorAll('select.category-select, select#categoryFilter, select#stockAlert, select.pagination-rows-select');
         if (!selects || !selects.length) return;
 
         selects.forEach(function(select) {
@@ -607,14 +878,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // Populate menu from select options
             function rebuildMenu() {
                 menu.innerHTML = '';
-                Array.from(select.options).forEach(function(opt, idx) {
+                // Build an array of option elements and move the currently selected
+                // option to the front so it appears first in the rendered menu.
+                const opts = Array.from(select.options);
+                const selIdx = opts.findIndex(o => String(o.value) === String(select.value));
+                if (selIdx > 0) {
+                    const [sel] = opts.splice(selIdx, 1);
+                    opts.unshift(sel);
+                }
+
+                opts.forEach(function(opt, idx) {
                     const o = document.createElement('div');
                     o.className = 'styled-option';
                     o.setAttribute('data-value', opt.value);
+                    // data-index refers to the position inside the rendered menu (not the original select index)
                     o.setAttribute('data-index', String(idx));
                     o.textContent = opt.textContent || opt.innerText || opt.value;
                     if (opt.classList && opt.classList.contains('new-category')) o.classList.add('new-category');
-                    if (select.value === opt.value) o.classList.add('active');
+                    if (String(select.value) === String(opt.value)) o.classList.add('active');
                     o.addEventListener('click', function(e) {
                         // set native select and trigger change
                         select.value = opt.value;
@@ -703,6 +984,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (inventoryTableBody) {
         const mo = new MutationObserver(function() { initStyledSelects(inventoryTableBody); });
         mo.observe(inventoryTableBody, { childList: true, subtree: true });
+    }
+
+    // Variant toggle behavior: clicking the chevron on a parent row will
+    // show/hide its variant rows (structure-only logic).
+    if (inventoryTableBody) {
+        inventoryTableBody.addEventListener('click', function(ev) {
+            const btn = ev.target.closest && ev.target.closest('.variant-toggle');
+            if (!btn) return;
+            const pid = btn.getAttribute('data-product-id');
+            if (!pid) return;
+            const variantRows = inventoryTableBody.querySelectorAll('tr.variant-row[data-parent-id="' + pid + '"]');
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            variantRows.forEach(function(r) {
+                r.style.display = isExpanded ? 'none' : '';
+            });
+            btn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        });
     }
 });
 

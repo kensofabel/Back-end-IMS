@@ -1,4 +1,4 @@
-#barcodeResultsMount, .barcode-results-inner {
+    #barcodeResultsMount, .barcode-results-inner {
     display: block !important; /* Stack rows vertically */
 }
 
@@ -435,167 +435,6 @@
     font-size: 14px;
     cursor: pointer;
     transition: all 0.3s ease;
-}
-
-/* Category select used inside the inventory table rows - keep visual style consistent */
-.inventory-table .category-select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    padding: 6px 10px;
-    border: 1.5px solid #333;
-    background: #232323;
-    color: #dbdbdb;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    min-width: 140px;
-    max-width: 260px;
-    height: 34px;
-    line-height: 1.2;
-    cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.inventory-table .category-select:focus {
-    outline: none;
-    border-color: #555;
-    box-shadow: 0 0 0 3px rgba(85,85,85,0.12);
-}
-.inventory-table .category-select[disabled] {
-    opacity: 0.65;
-    cursor: not-allowed;
-}
-
-.inventory-table td {
-    padding: 6px 10px; /* smaller vertical padding */
-    vertical-align: middle;
-}
-
-.inventory-table th:first-child {
-    border-top-left-radius: 15px;
-}
-
-.inventory-table th:last-child {
-    border-top-right-radius: 15px;
-}
-
-/* Custom styled select wrapper that mirrors native <select> but allows a styled option list */
-.styled-select {
-    position: relative;
-    display: inline-block;
-    vertical-align: middle;
-    width: 100%;
-    max-width: 260px;
-}
-.styled-select .styled-display {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    /* reduced vertical padding and min-height to shrink top/bottom whitespace */
-    padding: 4px 10px; /* small vertical padding keeps content centered */
-    background: #232323;
-    border: none;
-    border-radius: 8px;
-    color: #dbdbdb;
-    cursor: pointer;
-    height: 40px; /* match typical native select height (34px) */
-    box-sizing: border-box;
-}
-
-.styled-select:hover .styled-display,
-.styled-select.open .styled-display {
-    background: #444;
-    border-color: #555;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    color: #fff;
-}
-
-.styled-select .styled-display .label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.95rem;
-}
-.styled-select .styled-display .chev {
-    width: 16px;
-    height: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #bdbdbd;
-}
-.styled-select .styled-menu {
-    position: absolute;
-    z-index: 10001;
-    left: 0;
-    right: 0;
-    margin-top: 6px;
-    background: #2a2a2a;
-    border: 2px solid #444;
-    border-radius: 8px;
-    max-height: 220px;
-    overflow-y: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-    display: none;
-}
-.styled-select .styled-menu.show {
-    display: block;
-}
-.styled-select .styled-option {
-    padding: 10px 12px;
-    color: #fff;
-    cursor: pointer;
-    border-bottom: 1px solid #373737;
-}
-.styled-select .styled-option:last-child { border-bottom: none; }
-.styled-select .styled-option:hover,
-.styled-select .styled-option.active {
-    background: #3a3a3a;
-}
-.styled-select .styled-option.new-category {
-    display: flex; justify-content: space-between; align-items: center;
-}
-
-/* Transparent scrollbar track for styled menus and inventory scroll containers */
-.styled-select .styled-menu::-webkit-scrollbar {
-    width: 8px;
-}
-.styled-select .styled-menu::-webkit-scrollbar-track {
-    background: transparent;
-}
-.styled-select .styled-menu::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 4px;
-}
-.styled-select .styled-menu::-webkit-scrollbar-thumb:hover {
-    background: #777;
-}
-.styled-select .styled-menu {
-    scrollbar-color: #555 transparent; /* Firefox */
-    scrollbar-width: thin;
-}
-
-/* Apply transparent track to other inventory dropdowns */
-.category-dropdown::-webkit-scrollbar-track,
-.name-dropdown::-webkit-scrollbar-track,
-.variants-table-container::-webkit-scrollbar-track,
-.permissions-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.category-dropdown,
-.name-dropdown,
-.variants-table-container,
-.permissions-content {
-    scrollbar-color: #555 transparent;
-}
-.styled-select .styled-option .tag {
-    background: #ff9800; color: #171717; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
-}
-
-/* small responsive tweak */
-@media (max-width:720px) {
-    .styled-select { max-width: 140px; }
 }
 
 /* Search Bar Toggle Functionality */
@@ -1853,3 +1692,354 @@ body #addItemsModal .modal-content.fb-modal-out {
     box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2) !important;
     position: relative;
 }
+/* Right-align numeric columns in the inventory table (Price, Cost, Margin, Stock)
+   Column mapping in the table: 1=checkbox, 2=Item Name, 3=Category, 4=Price, 5=Cost, 6=Margin, 7=Stock */
+.inventory-table th:nth-child(4),
+.inventory-table td:nth-child(4),
+.inventory-table th:nth-child(5),
+.inventory-table td:nth-child(5),
+.inventory-table th:nth-child(6),
+.inventory-table td:nth-child(6) {
+    text-align: right;
+    padding-right: 12px;
+    /* Ensure numeric values don't wrap awkwardly */
+    white-space: nowrap;
+}
+
+/* Give the Stock column (7th column) a little more right padding so numbers
+   don't touch the table edge or nearby controls. */
+.inventory-table th:nth-child(7),
+.inventory-table td:nth-child(7) {
+    text-align: right;
+    padding-right: 20px; /* increased from 12px */
+    white-space: nowrap;
+}
+
+/* Give Item Name column priority for remaining horizontal space and keep
+   Category column compact. This makes extra room go to the product name */
+.inventory-table {
+    width: 100%;
+    table-layout: auto; /* allow the name column to expand */
+}
+
+.inventory-table th:nth-child(2),
+.inventory-table td:nth-child(2) {
+    /* Item Name: allow it to take remaining space, but keep single-line with ellipsis */
+    width: auto;
+    min-width: 180px; /* ensure readable minimum */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Align header and cells: same left padding and vertical alignment */
+    padding-left: 15px;
+    vertical-align: middle;
+}
+
+.inventory-table th:nth-child(3) {
+    /* Category header: keep compact width and hide overflow in header */
+    width: 160px;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.inventory-table td:nth-child(3) {
+    /* Category data cell: allow overflow so dropdown menus can escape the cell
+       and appear above subsequent rows. Keep width constraints but permit
+       visible overflow for absolute-positioned dropdowns. */
+    width: 160px;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: visible; /* allow the .category-menu to escape */
+    text-overflow: ellipsis;
+}
+
+.inventory-table th:nth-child(8),
+.inventory-table td:nth-child(8) {
+    text-align: left;
+    padding-left: 0;
+    white-space: nowrap;
+}
+
+/* Low stock badge styling (keeps inline PHP badge consistent and allows future reuse) */
+.low-stock-badge {
+    display: inline-block;
+    text-align: left;
+    margin: 0;
+    color: #ffb400;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.stock-indicator-cell {
+    text-align: left;        /* place badge near the stock cell to its left */
+    padding-left: 8px;      /* small gap from the stock column */
+    white-space: nowrap;
+}
+
+/* Position the variant chevron inside the first cell of parent rows so the
+   checkbox remains centered. The button is absolutely positioned and does
+   not affect the cell's layout. */
+.inventory-table tr.parent-row td:first-child {
+    position: relative;
+}
+.inventory-table tr.parent-row .variant-toggle {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: #dbdbdb;
+    font-size: 14px;
+    line-height: 1;
+    padding: 4px;
+    cursor: pointer;
+}
+.inventory-table tr.parent-row .variant-toggle:hover {
+    color: #ff9800;
+}
+/* Hover/interaction polish for the SVG chevron inside .variant-toggle */
+.inventory-table tr.parent-row .variant-toggle {
+    transition: color 0.14s ease, background-color 0.12s ease;
+    border-radius: 6px; /* makes background tint look nicer on hover */
+}
+.inventory-table tr.parent-row .variant-toggle svg {
+    display: block;
+    transition: transform 0.16s ease, stroke 0.14s ease;
+    transform-origin: 50% 50%;
+    color: inherit; /* ensure svg uses currentColor via stroke="currentColor" */
+}
+.inventory-table tr.parent-row .variant-toggle:hover svg {
+    transform: translateY(-1px) scale(1.05);
+}
+.inventory-table tr.parent-row .variant-toggle:hover {
+    background-color: #121212;
+}
+/* Rotate when expanded */
+.inventory-table tr.parent-row .variant-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+.inventory-table tr.variant-row td {
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+.inventory-table th:first-child {
+    border-top-left-radius: 15px;
+}
+
+.inventory-table th:last-child {
+    border-top-right-radius: 15px;
+}
+
+/* Custom styled select wrapper that mirrors native <select> but allows a styled option list */
+.styled-select {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    width: 100%;
+    max-width: 260px;
+}
+.styled-select .styled-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    /* reduced vertical padding and min-height to shrink top/bottom whitespace */
+    padding: 4px 10px; /* small vertical padding keeps content centered */
+    background: #232323;
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    height: 40px; /* match typical native select height (34px) */
+    box-sizing: border-box;
+}
+
+.styled-select:hover .styled-display,
+.styled-select.open .styled-display {
+    background: #444;
+    border-color: #555;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    color: #ffffff;
+}
+
+.styled-select .styled-display .label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.95rem;
+}
+.styled-select .styled-display .chev {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+}
+.styled-select .styled-menu {
+    position: absolute;
+    z-index: 10001;
+    left: 0;
+    right: 0;
+    /* Nudge the menu slightly upward so it sits closer to the control */
+    margin-top: -40px;
+    background: #2a2a2a;
+    border: 2px solid #444;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    display: none;
+}
+.styled-select .styled-menu.show {
+    display: block;
+}
+.styled-select .styled-option {
+    padding: 10px 12px;
+    color: #ffffff;
+    cursor: pointer;
+    border-bottom: 1px solid #373737;
+}
+.styled-select .styled-option:last-child { border-bottom: none; }
+.styled-select .styled-option:hover,
+.styled-select .styled-option.active {
+    background: #3a3a3a;
+}
+.styled-select .styled-option.new-category {
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+/* Transparent scrollbar track for styled menus and inventory scroll containers */
+.styled-select .styled-menu::-webkit-scrollbar {
+    width: 8px;
+}
+.styled-select .styled-menu::-webkit-scrollbar-track {
+    background: transparent;
+}
+.styled-select .styled-menu::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+.styled-select .styled-menu::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+.styled-select .styled-menu {
+    scrollbar-color: #555 transparent; /* Firefox */
+    scrollbar-width: thin;
+}
+
+/* Apply transparent track to other inventory dropdowns */
+.category-dropdown::-webkit-scrollbar-track,
+.name-dropdown::-webkit-scrollbar-track,
+.variants-table-container::-webkit-scrollbar-track,
+.permissions-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.category-dropdown,
+.name-dropdown,
+.variants-table-container,
+.permissions-content {
+    scrollbar-color: #555 transparent;
+}
+.styled-select .styled-option .tag {
+    background: #ff9800; color: #171717; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
+}
+
+/* small responsive tweak */
+@media (max-width:720px) {
+    .styled-select { max-width: 140px; }
+}
+
+/* Sized variants for styled selects used in the filter bar and pagination */
+.filter-controls .styled-select,
+.inventory-pagination-bar .styled-select {
+    width: auto;       /* don't stretch to full width inside flex containers */
+    max-width: 200px;  /* reasonable maximum so it doesn't overflow */
+    display: inline-block;
+}
+
+.inventory-pagination-bar .styled-select {
+    min-width: 90px;   /* make rows-per-page select readable */
+}
+
+.filter-controls .styled-select {
+    background: transparent !important;
+    border: #ffffff;
+}
+
+/* Sortable table header visuals */
+.inventory-table thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+.inventory-table thead th .sort-indicator {
+    /* Make the indicator flow inline immediately after the header text
+       so it appears like: "Category ↑". Keep it non-interactive so clicks
+       hit the th itself. */
+    display: inline-block;
+    position: static;
+    margin-left: 8px; /* spacing between label and arrow */
+    vertical-align: middle;
+    transform: scale(1);
+    font-size: 16px; /* slightly larger for better legibility */
+    line-height: 1;
+    color: #bdbdbd;
+    pointer-events: none; /* let clicks reach the th */
+    transition: transform 0.12s ease, color 0.12s ease;
+}
+/* Show a neutral hover/focus indicator so users see sorting affordance.
+   Only show the neutral glyph when the column is NOT currently sorted so
+   active ↑/↓ indicators are never overridden on hover/focus. */
+.inventory-table thead th.sortable:not(.sorted-asc):not(.sorted-desc):hover .sort-indicator::after,
+.inventory-table thead th.sortable:not(.sorted-asc):not(.sorted-desc):focus .sort-indicator::after {
+    content: '↑↓';
+    color: #bdbdbd;
+    opacity: 0.95;
+}
+.inventory-table thead th.sorted-asc .sort-indicator::after { content: '↑'; }
+.inventory-table thead th.sorted-desc .sort-indicator::after { content: '↓'; }
+
+/* Slightly enlarge and highlight the indicator when the column is sorted */
+.inventory-table thead th.sorted-asc .sort-indicator,
+.inventory-table thead th.sorted-desc .sort-indicator {
+    transform: scale(1.18);
+    color: #ff9800;
+}
+
+.inventory-table thead th:nth-child(4) .sort-indicator,
+.inventory-table thead th:nth-child(5) .sort-indicator,
+.inventory-table thead th:nth-child(6) .sort-indicator,
+.inventory-table thead th:nth-child(7) .sort-indicator {
+    position: static; /* flow inline with the header text */
+    display: inline-block;
+    margin-left: 6px; /* tighter gap between label and arrow */
+    vertical-align: middle;
+    font-size: 14px; /* slightly smaller than other headers */
+    transform: scale(1);
+}
+
+/* When those numeric headers are active, apply the same active scale/color */
+.inventory-table thead th:nth-child(4).sorted-asc .sort-indicator,
+.inventory-table thead th:nth-child(4).sorted-desc .sort-indicator,
+.inventory-table thead th:nth-child(5).sorted-asc .sort-indicator,
+.inventory-table thead th:nth-child(5).sorted-desc .sort-indicator,
+.inventory-table thead th:nth-child(6).sorted-asc .sort-indicator,
+.inventory-table thead th:nth-child(6).sorted-desc .sort-indicator,
+.inventory-table thead th:nth-child(7).sorted-asc .sort-indicator,
+.inventory-table thead th:nth-child(7).sorted-desc .sort-indicator {
+    transform: scale(1.12);
+    color: #ff9800;
+}
+
+/* Variant row indentation: make variant names visually indented under parent */
+.inventory-table tr.variant-row td:nth-child(2) {
+    padding-left: 20px;
+}
+
+/* Ensure variant-toggle button doesn't disturb layout (checkbox alignment) */
+.inventory-table tr.parent-row td:first-child { position: relative; }
+.inventory-table tr.parent-row .variant-toggle { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
