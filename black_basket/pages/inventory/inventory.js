@@ -5,11 +5,16 @@ function stopScanner() {
             window.Quagga.stop();
             window.Quagga.initialized = false;
         }
-        // Do NOT stop camera stream
-        if (videoEl && videoEl.srcObject) {
-            videoEl.pause();
-            videoEl.srcObject.getTracks().forEach(track => track.stop());
-            videoEl.srcObject = null;
+        // Do NOT stop camera stream — prefer the page's camera element if available
+        try {
+            const v = (typeof videoEl !== 'undefined' && videoEl) ? videoEl : document.getElementById('cameraVideo');
+            if (v && v.srcObject) {
+                v.pause();
+                v.srcObject.getTracks().forEach(track => track.stop());
+                v.srcObject = null;
+            }
+        } catch (e) {
+            // swallow errors, they are already logged by outer catch
         }
     } catch (e) { console.warn('[DEBUG] Failed to stop scanner/camera:', e); }
 }
@@ -216,6 +221,17 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(() => {
         const skuInput = document.getElementById('inlineItemSKU');
         if (skuInput) {
+            // Prevent focus styling from overriding red border for duplicates
+            skuInput.addEventListener('focus', function() {
+                // Check if this input is a duplicate
+                const allSkuInputs = Array.from(document.querySelectorAll('.variant-sku'));
+                const val = skuInput.value.trim();
+                const skuCount = allSkuInputs.filter(input => input.value.trim() === val).length;
+                if (val && skuCount > 1) {
+                    skuInput.classList.add('sku-error');
+                    skuInput.style.borderBottomColor = '#dc3545';
+                }
+            });
             fetch('get_next_sku.php')
                 .then(res => res.json())
                 .then(data => {
@@ -854,6 +870,11 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Show dropdown with "Add Variants" option
         function showDropdown() {
+            // If we're in the Create->Add flow where track toggles and cost
+            // are locked/hidden, do not show the Add Variants dropdown. This
+            // avoids offering variant creation when the flow expects a single
+            // item continuation.
+            if (window && (window._hideTrackToggle || window._inlineCostFixed)) return;
             nameDropdown.innerHTML = '';
             
             // Position dropdown below the input field
@@ -932,7 +953,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Event listeners
         nameInput.addEventListener('focus', () => {
-            if (nameInput.value.trim() !== '' && !isVariantsMode) {
+            if (nameInput.value.trim() !== '' && !isVariantsMode && !(window && (window._hideTrackToggle || window._inlineCostFixed))) {
                 showDropdown();
             }
         });
@@ -944,7 +965,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (typingTimer) clearTimeout(typingTimer);
             if (hideTimer) clearTimeout(hideTimer);
             
-            if (searchTerm !== '' && !isVariantsMode) {
+            if (searchTerm !== '' && !isVariantsMode && !(window && (window._hideTrackToggle || window._inlineCostFixed))) {
                 // Show dropdown immediately only if not in variants mode
                 showDropdown();
                 
@@ -1190,21 +1211,123 @@ document.addEventListener('DOMContentLoaded', function () {
             setupUnitSelector();
         }
 
-        // Fetch and populate SKU for the newly added variant if it's empty
+        // Add SKU uniqueness check on input
+        var skuInput = row.querySelector('input.variant-sku');
+        if (skuInput) {
+            function checkVariantDuplicates() {
+                // Check for duplicates among all variant SKUs
+                const allSkuInputs = Array.from(document.querySelectorAll('.variant-sku'));
+                // Count occurrences and collect all duplicate values
+                const skuCount = {};
+                allSkuInputs.forEach(input => {
+                    const val = input.value.trim();
+                    if (!val) return;
+                    skuCount[val] = (skuCount[val] || 0) + 1;
+                });
+                // Find all values that are duplicated
+                const duplicates = Object.keys(skuCount).filter(val => skuCount[val] > 1);
+                // Set red border for all duplicates, reset otherwise
+                allSkuInputs.forEach(input => {
+                    const val = input.value.trim();
+                    if (val && duplicates.includes(val)) {
+                        input.classList.add('sku-error');
+                        input.style.borderBottomColor = '#dc3545';
+                    } else {
+                        input.classList.remove('sku-error');
+                        input.style.borderBottomColor = '';
+                    }
+                });
+            }
+            skuInput.addEventListener('input', function() {
+                // Always check for duplicates among all variant SKUs
+                checkVariantDuplicates();
+            });
+            skuInput.addEventListener('blur', function() {
+                checkSkuUniquenessBorderOnly(skuInput);
+                checkVariantDuplicates();
+            });
+        }
+// Helper: Check if a SKU is unique (not in products or variants), only set border color
+function checkSkuUniquenessBorderOnly(inputEl) {
+    const sku = inputEl.value.trim();
+    if (!sku) {
+        inputEl.classList.remove('sku-error');
+        inputEl.style.borderBottomColor = '';
+        return;
+    }
+    fetch('api.php?find=sku:' + encodeURIComponent(sku))
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.found) {
+                inputEl.classList.add('sku-error');
+                inputEl.style.borderBottomColor = '#dc3545';
+            } else {
+                inputEl.classList.remove('sku-error');
+                inputEl.style.borderBottomColor = '';
+            }
+        })
+        .catch(() => {
+            inputEl.classList.remove('sku-error');
+            inputEl.style.borderBottomColor = '';
+        });
+}
+
+function removeSkuErrorBorderOnly(inputEl) {
+    inputEl.classList.remove('sku-error');
+    inputEl.style.borderBottomColor = '';
+    let errorDiv = inputEl.parentElement.querySelector('.sku-error-msg');
+    if (errorDiv) errorDiv.remove();
+}
+
+        // Assign SKU for the new variant row
         (function populateVariantSKU() {
             try {
                 var skuInput = row.querySelector('input.variant-sku');
                 if (!skuInput) return;
-                // Only fetch if field is currently empty
+                // Only fetch/assign if field is currently empty
                 if (skuInput.value && skuInput.value.trim() !== '') return;
+
+                const tableBody = document.getElementById('variantsTableBody');
+                const rows = Array.from(tableBody.querySelectorAll('tr'));
+                const thisIndex = rows.indexOf(row);
+                
+                if (thisIndex === 0) {
+                    // First variant: use the main SKU if available
+                    const mainSkuInput = document.getElementById('inlineItemSKU');
+                    if (mainSkuInput && mainSkuInput.value && mainSkuInput.value.trim() !== '') {
+                        skuInput.value = mainSkuInput.value.trim();
+                        skuInput.setAttribute('data-auto-filled', 'true');
+                        skuInput.addEventListener('input', function onEdit() {
+                            skuInput.removeAttribute('data-auto-filled');
+                            skuInput.removeEventListener('input', onEdit);
+                        });
+                        return;
+                    }
+                } else if (thisIndex > 0) {
+                    // Next variants: increment previous variant's SKU if numeric
+                    const prevRow = rows[thisIndex - 1];
+                    const prevSkuInput = prevRow.querySelector('input.variant-sku');
+                    if (prevSkuInput && prevSkuInput.value) {
+                        // Try to increment if numeric
+                        const prevSku = prevSkuInput.value.trim();
+                        if (/^\d+$/.test(prevSku)) {
+                            skuInput.value = String(parseInt(prevSku, 10) + 1);
+                            skuInput.setAttribute('data-auto-filled', 'true');
+                            skuInput.addEventListener('input', function onEdit() {
+                                skuInput.removeAttribute('data-auto-filled');
+                                skuInput.removeEventListener('input', onEdit);
+                            });
+                            return;
+                        }
+                    }
+                }
+                // Fallback: fetch next available SKU from backend
                 fetch('get_next_sku.php')
                     .then(function(resp) { return resp.json(); })
                     .then(function(data) {
                         if (data && data.next_sku) {
                             skuInput.value = data.next_sku;
-                            // Mark as auto-filled so closing variants ignores it until user edits
                             skuInput.setAttribute('data-auto-filled', 'true');
-                            // Remove auto-filled flag if user modifies the field
                             skuInput.addEventListener('input', function onEdit() {
                                 skuInput.removeAttribute('data-auto-filled');
                                 skuInput.removeEventListener('input', onEdit);
@@ -1590,7 +1713,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const addBtn = document.getElementById('addProductBtn');
     const closeScanner = document.getElementById('closeScanner');
     const scanTab = document.getElementById('scanTab');
-    const manualTab = document.getElementById('manualTab');
     const scannerMode = document.getElementById('scannerMode');
     const manualMode = document.getElementById('manualMode');
     const cameraScanner = document.getElementById('cameraScanner');
@@ -1598,6 +1720,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const nextBtn = document.getElementById('nextBtn');
     const skipScannerBtn = document.getElementById('skipScanner');
     const skipManualEntryBtn = document.getElementById('skipManualEntry');
+    const skipCreateTabBtn = document.getElementById('skipCreateTab');
     const addItemsModal = document.getElementById('addItemsModal');
     const addItemsModalContent = addItemsModal ? addItemsModal.querySelector('.modal-content') : null;
     const closeAddItemsBtn = document.getElementById('closeAddItems');
@@ -1650,6 +1773,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Attach event listeners to skip buttons
     if (skipScannerBtn) {
         skipScannerBtn.addEventListener('click', function () {
+            // Ensure Add Items opens in normal mode (not Create->Add transient mode)
+            try { restoreCreateAddState(); } catch (e) {}
             // Prefer inline panel if mount and template exist
             if (inlineAddItemsMount && inlineTpl) {
                 openInlineAddItemsPanel();
@@ -1660,6 +1785,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (skipManualEntryBtn) {
         skipManualEntryBtn.addEventListener('click', function () {
+            try { restoreCreateAddState(); } catch (e) {}
+            if (inlineAddItemsMount && inlineTpl) {
+                openInlineAddItemsPanel();
+            } else {
+                showAddItemsModalWithTransition();
+            }
+        });
+    }
+    if (skipCreateTabBtn) {
+        skipCreateTabBtn.addEventListener('click', function () {
+            try { restoreCreateAddState(); } catch (e) {}
             if (inlineAddItemsMount && inlineTpl) {
                 openInlineAddItemsPanel();
             } else {
@@ -1700,9 +1836,11 @@ document.addEventListener('DOMContentLoaded', function () {
             backBtn.parentNode.replaceChild(newBackBtn, backBtn);
             newBackBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                // If previousTab is 'manual', go to 'manual' (preserve manual flow), else go to previousTab or fallback to 'scan'
-                if (typeof previousTab !== 'undefined' && previousTab === 'manual') {
-                    showTab('manual');
+                // Restore transient Create->Add UI state before navigating back
+                try { restoreCreateAddState(); } catch (e) {}
+                // If previousTab is 'manual' or 'createtab', go to that tab, else fallback to previousTab or 'scan'
+                if (typeof previousTab !== 'undefined' && (previousTab === 'manual' || previousTab === 'createtab')) {
+                    showTab(previousTab);
                 } else if (typeof previousTab !== 'undefined' && previousTab) {
                     showTab(previousTab);
                 } else {
@@ -1714,8 +1852,68 @@ document.addEventListener('DOMContentLoaded', function () {
         // Submit handler
         const form = node.querySelector('#inlineAddItemsForm');
         if (form) {
-            form.addEventListener('submit', function(e) {
+            form.addEventListener('submit', async function(e) {
                 e.preventDefault();
+                let hasError = false;
+                // Check main SKU uniqueness
+                const mainSkuInput = node.querySelector('#inlineItemSKU');
+                if (mainSkuInput && mainSkuInput.value.trim()) {
+                    const resp = await fetch('api.php?find=sku:' + encodeURIComponent(mainSkuInput.value.trim()));
+                    const data = await resp.json();
+                    // Remove any error message
+                    let errorDiv = mainSkuInput.parentElement.querySelector('.sku-error-msg');
+                    if (errorDiv) errorDiv.remove();
+                    if (data && data.found) {
+                        mainSkuInput.classList.add('sku-error');
+                        mainSkuInput.focus();
+                        hasError = true;
+                    }
+                }
+                // Check all variant SKUs for uniqueness (in DB)
+                const variantSkuInputs = node.querySelectorAll('input.variant-sku');
+                for (let input of variantSkuInputs) {
+                    if (input.value.trim()) {
+                        const resp = await fetch('api.php?find=sku:' + encodeURIComponent(input.value.trim()));
+                        const data = await resp.json();
+                        // Remove any error message
+                        let errorDiv = input.parentElement.querySelector('.sku-error-msg');
+                        if (errorDiv) errorDiv.remove();
+                        if (data && data.found) {
+                            input.classList.add('sku-error');
+                            if (!hasError) input.focus();
+                            hasError = true;
+                        }
+                    }
+                }
+                // Check for duplicate SKUs among variants (client-side)
+                const seen = {};
+                variantSkuInputs.forEach(input => {
+                    const val = input.value.trim();
+                    if (!val) return;
+                    if (seen[val]) {
+                        input.classList.add('sku-error');
+                        input.style.borderBottomColor = '#dc3545';
+                        seen[val].classList.add('sku-error');
+                        seen[val].style.borderBottomColor = '#dc3545';
+                        hasError = true;
+                    } else {
+                        seen[val] = input;
+                    }
+                });
+                // Prevent submit if any SKU input has sku-error class
+                const allSkuInputs = [mainSkuInput, ...variantSkuInputs];
+                if (allSkuInputs.some(input => input && input.classList.contains('sku-error'))) {
+                    if (typeof showErrorPopup === 'function') {
+                        showErrorPopup('One or more SKUs are invalid or duplicated. Please fix highlighted fields.');
+                    } else if (window.showErrorPopup) {
+                        window.showErrorPopup('One or more SKUs are invalid or duplicated. Please fix highlighted fields.');
+                    } else {
+                        alert('One or more SKUs are invalid or duplicated. Please fix highlighted fields.');
+                    }
+                    return false;
+                }
+                if (hasError) return false;
+                // If all SKUs are unique, proceed
                 const name = node.querySelector('#inlineItemName').value.trim();
                 const category = node.querySelector('#inlineItemCategory').value.trim();
                 const trackStock = node.querySelector('#inlineTrackStock').checked;
@@ -1750,6 +1948,11 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
             panel.remove();
             if (baseAddFlow) baseAddFlow.classList.remove('slide-out-left');
+            // Restore Add Items header when inline panel closed
+            try {
+                const header = document.querySelector('#addItemsTabPanel .modal-title');
+                if (header) header.textContent = 'Add new item';
+            } catch (e) {}
         }, 400);
     }
     
@@ -1894,11 +2097,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 locate: true
             }, function(err) {
-                if (err) {
-                    console.error('[Quagga] init error:', err);
-                    alert('Failed to initialize barcode scanner.');
-                    return;
-                }
+                    if (err) {
+                        console.error('[Quagga] init error:', err);
+                        // Don't show a blocking alert when camera isn't available or permission denied.
+                        // Instead show the scan status message inside the camera container so it's visible
+                        // but non-blocking. This handles machines without cameras or when user dismissed
+                        // permission dialogs.
+                        try {
+                            let scanMessage = document.getElementById('scanStatusMessage');
+                            if (!scanMessage) {
+                                scanMessage = document.createElement('div');
+                                scanMessage.id = 'scanStatusMessage';
+                                scanMessage.style.position = 'absolute';
+                                scanMessage.style.top = '50%';
+                                scanMessage.style.left = '50%';
+                                scanMessage.style.transform = 'translate(-50%, -50%)';
+                                scanMessage.style.background = 'rgba(30,30,30,0.92)';
+                                scanMessage.style.color = '#ff9800';
+                                scanMessage.style.padding = '18px 28px';
+                                scanMessage.style.borderRadius = '12px';
+                                scanMessage.style.fontSize = '18px';
+                                scanMessage.style.fontWeight = '600';
+                                scanMessage.style.zIndex = '9999';
+                                scanMessage.style.display = 'none';
+                                scanMessage.style.textAlign = 'center';
+                                const cameraContainer = document.querySelector('.camera-container');
+                                if (cameraContainer) cameraContainer.appendChild(scanMessage);
+                                else document.body.appendChild(scanMessage);
+                            }
+                            scanMessage.textContent = 'Camera Unavailable';
+                            scanMessage.style.display = 'block';
+                            scanMessage.style.color = '#ff9800';
+                        } catch (e) {
+                            console.warn('[Quagga] could not show scan message overlay:', e);
+                        }
+                        return;
+                    }
                 window.Quagga.initialized = true;
                 window.Quagga.start();
                 console.log('[Quagga] Started');
@@ -2597,6 +2831,117 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    // Handle Create tab Next: open Add Items and prefill cost with create total
+    function handleCreateNext() {
+        try {
+            // Read the displayed total cost (formatted, e.g. "₱1,234.00")
+            const totalEl = document.getElementById('createTotalCost');
+            const totalText = totalEl ? String(totalEl.textContent || totalEl.value || '').trim() : '';
+
+            // Immediately apply hide/read-only state to elements inside the
+            // existing Add Items panel so they are not visible/clickable during
+            // the transition animation. This targets the panel DOM that is
+            // already present (but may be display:none) so changes take effect
+            // before showTab animates the panel in.
+            try {
+                const addItemsPanel = document.getElementById('addItemsTabPanel');
+                if (addItemsPanel) {
+                    // Lock and prefill the cost input inside the panel
+                    try {
+                        const panelCost = addItemsPanel.querySelector('#inlineItemCost');
+                        if (panelCost && totalText) {
+                            panelCost.value = totalText;
+                            panelCost.readOnly = true;
+                            panelCost.setAttribute('data-fixed-from-create', '1');
+                            panelCost.setAttribute('title', 'Cost fixed from Create tab');
+                            panelCost.style.background = '#151515';
+                            panelCost.style.opacity = '0.95';
+                        }
+                    } catch (e) { /* non-critical */ }
+
+                    // Hide track toggles and stock row inside panel (preserve layout)
+                    try {
+                        const inlineTrack = addItemsPanel.querySelector('#inlineTrackStockToggle');
+                        if (inlineTrack) {
+                            const group = inlineTrack.closest('.form-group') || (inlineTrack.parentElement && inlineTrack.parentElement.parentElement);
+                            if (group) group.style.visibility = 'hidden';
+                            inlineTrack.checked = false;
+                        }
+                        const variantsToggle = addItemsPanel.querySelector('#variantsTrackStockToggle');
+                        if (variantsToggle) {
+                            const container = variantsToggle.parentElement && variantsToggle.parentElement.parentElement;
+                            if (container) container.style.visibility = 'hidden';
+                            variantsToggle.checked = false;
+                            try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                        }
+                        const stockFieldsRow = addItemsPanel.querySelector('#stockFieldsRow');
+                        if (stockFieldsRow) stockFieldsRow.style.display = 'none';
+                    } catch (e) { /* non-critical */ }
+                }
+            } catch (e) { console.error('pre-transition apply Create->Add adjustments failed', e); }
+
+            // Open Add Items panel (use legacy modal path so listeners attach)
+            showTab('addItems', true);
+            try { window.ensureAttachAddItems(); } catch (e) {}
+
+            // Mark that the inline cost should be fixed for this flow
+            window._inlineCostFixed = true;
+            // Also hide track-stock toggles for this flow so user cannot change tracking
+            window._hideTrackToggle = true;
+
+            // Update Add Items header to match Create flow
+            try {
+                const header = document.querySelector('#addItemsTabPanel .modal-title');
+                if (header && (window._inlineCostFixed || window._hideTrackToggle)) {
+                    header.textContent = 'Create an Item';
+                }
+            } catch (e) { /* non-critical */ }
+
+            // After panel mounts, populate the inline cost input if present and make it readonly
+            setTimeout(() => {
+                const inlineCost = document.getElementById('inlineItemCost');
+                if (inlineCost && totalText) {
+                    // Preserve formatting (currency symbol) to keep UX consistent
+                    inlineCost.value = totalText;
+                    try {
+                        inlineCost.readOnly = true; // keep value submitted by form
+                        inlineCost.setAttribute('data-fixed-from-create', '1');
+                        inlineCost.setAttribute('title', 'Cost fixed from Create tab');
+                        inlineCost.style.background = '#151515';
+                        inlineCost.style.opacity = '0.95';
+                    } catch (e) { /* non-critical */ }
+                }
+                // focus the name input for faster continuation
+                const inlineName = document.getElementById('inlineItemName');
+                if (inlineName) try { inlineName.focus(); } catch (e) {}
+                // Hide track stock toggles (main + variants) and ensure stock fields are hidden
+                try {
+                    const inlineTrack = document.getElementById('inlineTrackStockToggle');
+                    if (inlineTrack) {
+                        const group = inlineTrack.closest('.form-group') || (inlineTrack.parentElement && inlineTrack.parentElement.parentElement);
+                        // hide the contents but preserve layout space
+                        if (group) group.style.visibility = 'hidden';
+                        inlineTrack.checked = false;
+                    }
+                    const variantsToggle = document.getElementById('variantsTrackStockToggle');
+                    if (variantsToggle) {
+                        // hide the surrounding container but preserve layout space
+                        const container = variantsToggle.parentElement && variantsToggle.parentElement.parentElement;
+                        if (container) container.style.visibility = 'hidden';
+                        variantsToggle.checked = false;
+                        try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                    }
+                    const stockFieldsRow = document.getElementById('stockFieldsRow');
+                    if (stockFieldsRow) stockFieldsRow.style.display = 'none';
+                } catch (e) { /* non-critical */ }
+            }, 140);
+        } catch (e) {
+            console.error('handleCreateNext error', e);
+            // Fallback to generic Next behavior
+            try { handleNext(); } catch (err) {}
+        }
+    }
+
     // Show mismatch popup and wire buttons
     function showMismatchPopup(sku, barcode, skuResp, barcodeResp) {
         const modal = document.getElementById('mismatchChoiceModal');
@@ -2738,6 +3083,43 @@ document.addEventListener('DOMContentLoaded', function () {
             if (document.getElementById('inlineAddItemsPanel')) return;
             const node = window.inlineTpl.content.firstElementChild.cloneNode(true);
             window.inlineAddItemsMount.appendChild(node);
+            // Immediately apply hide/read-only hints to the cloned node so
+            // controls are not visible/clickable before the deferred setup runs.
+            try {
+                if (window._inlineCostFixed || window._hideTrackToggle) {
+                    const _immediateCost = node.querySelector('#inlineItemCost');
+                    const _totalEl = document.getElementById('createTotalCost');
+                    const _totalText = _totalEl ? String(_totalEl.textContent || _totalEl.value || '').trim() : '';
+                    if (_immediateCost && window._inlineCostFixed && _totalText) {
+                        _immediateCost.value = _totalText;
+                        try { _immediateCost.readOnly = true; } catch (e) {}
+                    }
+                    if (window._hideTrackToggle) {
+                        const _it = node.querySelector('#inlineTrackStockToggle');
+                        if (_it) {
+                            const g = _it.closest('.form-group') || (_it.parentElement && _it.parentElement.parentElement);
+                            if (g) g.style.visibility = 'hidden';
+                            _it.checked = false;
+                        }
+                        const _vt = node.querySelector('#variantsTrackStockToggle');
+                        if (_vt) {
+                            const c = _vt.parentElement && _vt.parentElement.parentElement;
+                            if (c) c.style.visibility = 'hidden';
+                            _vt.checked = false;
+                        }
+                        const _sf = node.querySelector('#stockFieldsRow');
+                        if (_sf) _sf.style.display = 'none';
+                    }
+                }
+            } catch (e) { /* best-effort */ }
+
+            // If this clone is opened as part of Create->Add flow, update any header inside the clone
+            try {
+                if (window._inlineCostFixed || window._hideTrackToggle) {
+                    const clonedHeader = node.querySelector('.modal-title');
+                    if (clonedHeader) clonedHeader.textContent = 'Create an Item';
+                }
+            } catch (e) { /* ignore */ }
             if (window.baseAddFlow) window.baseAddFlow.classList.add('slide-out-left');
             requestAnimationFrame(() => {
                 node.classList.add('show');
@@ -2761,6 +3143,46 @@ document.addEventListener('DOMContentLoaded', function () {
                         try { inlineName.focus(); } catch (e) {}
                     }, 320);
                 }
+                // If this inline panel was opened as part of the Create->Add flow,
+                // apply the same fixed-cost and hide-track-toggle behavior to the
+                // cloned node so it is enforced immediately (no visible flicker).
+                try {
+                    if (window._inlineCostFixed || window._hideTrackToggle) {
+                        // Prefill and lock cost inside the cloned node when requested
+                        const clonedCost = node.querySelector('#inlineItemCost');
+                        const totalEl = document.getElementById('createTotalCost');
+                        const totalText = totalEl ? String(totalEl.textContent || totalEl.value || '').trim() : '';
+                        if (clonedCost && window._inlineCostFixed && totalText) {
+                            clonedCost.value = totalText;
+                            try {
+                                clonedCost.readOnly = true;
+                                clonedCost.setAttribute('data-fixed-from-create', '1');
+                                clonedCost.setAttribute('title', 'Cost fixed from Create tab');
+                                clonedCost.style.background = '#151515';
+                                clonedCost.style.opacity = '0.95';
+                            } catch (e) { /* non-critical */ }
+                        }
+
+                        // Hide track toggles inside the clone but preserve layout space
+                        if (window._hideTrackToggle) {
+                            const clonedInlineTrack = node.querySelector('#inlineTrackStockToggle');
+                            if (clonedInlineTrack) {
+                                const group = clonedInlineTrack.closest('.form-group') || (clonedInlineTrack.parentElement && clonedInlineTrack.parentElement.parentElement);
+                                if (group) group.style.visibility = 'hidden';
+                                clonedInlineTrack.checked = false;
+                            }
+                            const clonedVariantsToggle = node.querySelector('#variantsTrackStockToggle');
+                            if (clonedVariantsToggle) {
+                                const container = clonedVariantsToggle.parentElement && clonedVariantsToggle.parentElement.parentElement;
+                                if (container) container.style.visibility = 'hidden';
+                                clonedVariantsToggle.checked = false;
+                                try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                            }
+                            const clonedStockFields = node.querySelector('#stockFieldsRow');
+                            if (clonedStockFields) clonedStockFields.style.display = 'none';
+                        }
+                    }
+                } catch (e) { console.error('apply inline Create->Add adjustments failed', e); }
                 // Attach back button handler to close and restart scanner
                 const backBtn = node.querySelector('#backInlineAddItems');
                 if (backBtn) {
@@ -2769,6 +3191,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     backBtn.parentNode.replaceChild(newBackBtn, backBtn);
                     newBackBtn.addEventListener('click', function(e) {
                         e.preventDefault();
+                        try { restoreCreateAddState(); } catch (e) {}
                         // If previousTab is 'manual', go to 'manual' (preserve manual flow), else go to previousTab or fallback to 'scan'
                         if (typeof previousTab !== 'undefined' && previousTab === 'manual') {
                             showTab('manual');
@@ -2789,6 +3212,13 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('[DEBUG] Using fallback modal Add Items panel');
         showTab('addItems', true);
         window.ensureAttachAddItems();
+        // Update modal header when opened from Create flow
+        try {
+            const header = document.querySelector('#addItemsTabPanel .modal-title');
+            if (header && (window._inlineCostFixed || window._hideTrackToggle)) {
+                header.textContent = 'Create an Item';
+            }
+        } catch (e) { /* ignore */ }
         setTimeout(() => {
             const inlineSKU = document.getElementById('inlineItemSKU');
             const inlineBarcode = document.getElementById('inlineItemBarcode');
@@ -2817,6 +3247,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     backBtn.parentNode.replaceChild(newBackBtn, backBtn);
                     newBackBtn.addEventListener('click', function(e) {
                         e.preventDefault();
+                        try { restoreCreateAddState(); } catch (e) {}
                         // If previousTab is 'manual', return to 'manual'; otherwise go to previousTab or fallback to 'scan'
                         if (typeof previousTab !== 'undefined' && previousTab === 'manual') {
                             showTab('manual');
@@ -3839,6 +4270,39 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     // Go back from form to tabs
+    // Helper: restore any Create->Add transient UI state (called when backing out)
+    function restoreCreateAddState() {
+        try {
+            // Clear flags
+            window._inlineCostFixed = false;
+            // Restore inline cost editability
+            const inlineCost = document.getElementById('inlineItemCost');
+            if (inlineCost) {
+                inlineCost.readOnly = false;
+                inlineCost.removeAttribute('data-fixed-from-create');
+                inlineCost.removeAttribute('title');
+                inlineCost.style.background = '';
+                inlineCost.style.opacity = '';
+            }
+            // Restore Add Items header to default
+            try {
+                const header = document.querySelector('#addItemsTabPanel .modal-title');
+                if (header) header.textContent = 'Add new item';
+            } catch (e) {}
+            // Restore track stock toggles visibility if we hid them for Create flow
+            try {
+                if (window._hideTrackToggle) {
+                    const inlineTrackGroup = (function() { const el = document.getElementById('inlineTrackStockToggle'); return el ? (el.closest('.form-group') || (el.parentElement && el.parentElement.parentElement)) : null; })();
+                    if (inlineTrackGroup) inlineTrackGroup.style.visibility = '';
+                    const variantsContainer = (function() { const v = document.getElementById('variantsTrackStockToggle'); return v ? (v.parentElement && v.parentElement.parentElement) : null; })();
+                    if (variantsContainer) variantsContainer.style.visibility = '';
+                    window._hideTrackToggle = false;
+                    try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                }
+            } catch (e) {}
+        } catch (e) { /* ignore */ }
+    }
+
     function goBackToTabs() {
         // Remove form-mode class from modal
         if (scannerModal) {
@@ -3877,6 +4341,35 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Reinitialize scanner
         checkAndInitializeScanner();
+        // Clear any fixed-cost state when going back to tabs
+        try {
+            window._inlineCostFixed = false;
+            const inlineCost = document.getElementById('inlineItemCost');
+            if (inlineCost) {
+                inlineCost.readOnly = false;
+                inlineCost.removeAttribute('data-fixed-from-create');
+                inlineCost.removeAttribute('title');
+                inlineCost.style.background = '';
+                inlineCost.style.opacity = '';
+            }
+            // Restore Add Items header to default
+            try {
+                const header = document.querySelector('#addItemsTabPanel .modal-title');
+                if (header) header.textContent = 'Add new item';
+            } catch (e) {}
+            // Restore track stock toggles visibility if we hid them for Create flow
+            try {
+                    if (window._hideTrackToggle) {
+                    const inlineTrackGroup = (function() { const el = document.getElementById('inlineTrackStockToggle'); return el ? (el.closest('.form-group') || (el.parentElement && el.parentElement.parentElement)) : null; })();
+                    if (inlineTrackGroup) inlineTrackGroup.style.visibility = '';
+                    const variantsContainer = (function() { const v = document.getElementById('variantsTrackStockToggle'); return v ? (v.parentElement && v.parentElement.parentElement) : null; })();
+                    if (variantsContainer) variantsContainer.style.visibility = '';
+                    // Unset the flag
+                    window._hideTrackToggle = false;
+                    try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                }
+            } catch (e) {}
+        } catch (e) {}
     }
     
     // Close scanner modal
@@ -3942,6 +4435,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 representationSection.style.display = 'none';
             }
         }
+        // Clear any fixed-cost flag and restore inline cost editability
+        try {
+            window._inlineCostFixed = false;
+            const inlineCost = document.getElementById('inlineItemCost');
+            if (inlineCost) {
+                inlineCost.readOnly = false;
+                inlineCost.removeAttribute('data-fixed-from-create');
+                inlineCost.removeAttribute('title');
+                inlineCost.style.background = '';
+                inlineCost.style.opacity = '';
+            }
+            // Restore track stock toggles visibility if previously hidden
+            try {
+                if (window._hideTrackToggle) {
+                    const inlineTrackGroup = (function() { const el = document.getElementById('inlineTrackStockToggle'); return el ? (el.closest('.form-group') || (el.parentElement && el.parentElement.parentElement)) : null; })();
+                    if (inlineTrackGroup) inlineTrackGroup.style.visibility = '';
+                    const variantsContainer = (function() { const v = document.getElementById('variantsTrackStockToggle'); return v ? (v.parentElement && v.parentElement.parentElement) : null; })();
+                    if (variantsContainer) variantsContainer.style.visibility = '';
+                    window._hideTrackToggle = false;
+                    // Restore Add Items header to default
+                    try {
+                        const header = document.querySelector('#addItemsTabPanel .modal-title');
+                        if (header) header.textContent = 'Add new item';
+                    } catch (e) {}
+                    try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                }
+            } catch (e) {}
+        } catch (e) {}
     }
     
     // Event listeners - Check if elements exist before binding
@@ -3966,18 +4487,29 @@ document.addEventListener('DOMContentLoaded', function () {
         manualTab.onclick = switchToManualMode;
     }
     
-    if (nextBtn) {
-        // Route Next to manual or normal handler depending on current mode/tab
-        nextBtn.onclick = function(e) {
-            // If manual tab is active or manual mode flag is set, use manual handler
-            if (typeof isManualMode !== 'undefined' && isManualMode) {
-                handleManualNext(e);
-            } else if (typeof currentTab !== 'undefined' && currentTab === 'manual') {
-                handleManualNext(e);
-            } else {
-                handleNext(e);
+    // Attach the Next handler to ALL Next buttons inside the scanner modal.
+    // The markup contains multiple buttons with id="nextBtn" (one per tab),
+    // so using getElementById only bound the first one. Use querySelectorAll
+    // and attach the same routing logic to each instance so clicks always work.
+    const nextBtnNodes = document.querySelectorAll('#scannerModal #nextBtn');
+    if (nextBtnNodes && nextBtnNodes.length) {
+        nextBtnNodes.forEach(function(btnNode) {
+            try {
+                btnNode.onclick = function(e) {
+                    if (typeof isManualMode !== 'undefined' && isManualMode) {
+                        handleManualNext(e);
+                    } else if (typeof currentTab !== 'undefined' && currentTab === 'manual') {
+                        handleManualNext(e);
+                    } else if (typeof currentTab !== 'undefined' && currentTab === 'create') {
+                        handleCreateNext(e);
+                    } else {
+                        handleNext(e);
+                    }
+                };
+            } catch (err) {
+                console.error('Failed to attach nextBtn handler to node', err);
             }
-        };
+        });
     }
     
 
@@ -4115,15 +4647,19 @@ function showTab(tabName, transition = true) {
     const scanPanel = document.getElementById('scanTabPanel');
     const manualPanel = document.getElementById('manualTabPanel');
     const addItemsPanel = document.getElementById('addItemsTabPanel');
+    const createPanel = document.getElementById('createTabPanel');
     const barcodePanel = document.getElementById('barcodeResultsTabPanel');
     // Hide all panels, but if opening addItems, animate previous panel out first, then animate addItems in
     if (tabName === 'addItems') {
-        const prevPanel = { scan: scanPanel, manual: manualPanel }[previousTab];
+        const prevPanel = { scan: scanPanel, manual: manualPanel, create: createPanel }[previousTab];
         const modalContent = document.querySelector('.modal-content.scanner-modal');
+        // Always hide scan, manual, and create panels when showing addItems
+        if (scanPanel) { scanPanel.style.display = 'none'; scanPanel.classList.remove('active', 'slide-in', 'slide-out-left'); }
+        if (manualPanel) { manualPanel.style.display = 'none'; manualPanel.classList.remove('active', 'slide-in', 'slide-out-left'); }
+        if (createPanel) { createPanel.style.display = 'none'; createPanel.classList.remove('active', 'slide-in', 'slide-out-left'); }
         if (addItemsPanel) {
             // Make sure addItemsPanel is rendered for sizing
             addItemsPanel.style.display = 'block';
-            // Auto-generate SKU only if input is empty removed
             // Temporarily set width to 'auto' to measure natural content width
             const prevWidth = addItemsPanel.style.width;
             addItemsPanel.style.width = 'auto';
@@ -4173,21 +4709,60 @@ function showTab(tabName, transition = true) {
                     modalContent.style.height = '';
                     modalContent.style.width = '';
                 }
+                // If the inline cost was fixed by Create flow, ensure the field remains readonly
+                const inlineCost = document.getElementById('inlineItemCost');
+                if (inlineCost) {
+                    if (window._inlineCostFixed) {
+                        inlineCost.readOnly = true;
+                        inlineCost.setAttribute('data-fixed-from-create', '1');
+                        inlineCost.setAttribute('title', 'Cost fixed from Create tab');
+                        inlineCost.style.background = '#151515';
+                        inlineCost.style.opacity = '0.95';
+                        // If requested, hide track stock toggles when coming from Create
+                        try {
+                            if (window._hideTrackToggle) {
+                                    const inlineTrack = document.getElementById('inlineTrackStockToggle');
+                                    if (inlineTrack) {
+                                        const group = inlineTrack.closest('.form-group') || (inlineTrack.parentElement && inlineTrack.parentElement.parentElement);
+                                        if (group) group.style.visibility = 'hidden';
+                                        inlineTrack.checked = false;
+                                    }
+                                    const variantsToggle = document.getElementById('variantsTrackStockToggle');
+                                    if (variantsToggle) {
+                                        const container = variantsToggle.parentElement && variantsToggle.parentElement.parentElement;
+                                        if (container) container.style.visibility = 'hidden';
+                                        variantsToggle.checked = false;
+                                        try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch (e) {}
+                                    }
+                                    const stockFieldsRow = document.getElementById('stockFieldsRow');
+                                    if (stockFieldsRow) stockFieldsRow.style.display = 'none';
+                                }
+                        } catch (e) { /* ignore */ }
+                    } else {
+                        inlineCost.readOnly = false;
+                        inlineCost.removeAttribute('data-fixed-from-create');
+                        inlineCost.removeAttribute('title');
+                        inlineCost.style.background = '';
+                        inlineCost.style.opacity = '';
+                    }
+                }
             }, 250);
         }
         // Hide tab buttons
         var modalTabs = document.querySelector('.modal-tabs');
         var scanTabBtn = document.getElementById('scanTab');
         var manualTabBtn = document.getElementById('manualTab');
+        var createTabBtn = document.getElementById('createTab');
         if (modalTabs) modalTabs.style.display = 'none';
         if (scanTabBtn) scanTabBtn.classList.remove('active');
         if (manualTabBtn) manualTabBtn.classList.remove('active');
+        if (createTabBtn) createTabBtn.classList.remove('active');
         // Also add hide-tabs class to modal-content for CSS-driven hiding
         const modalContentElem = document.querySelector('.modal-content.scanner-modal');
         if (modalContentElem) modalContentElem.classList.add('hide-tabs');
     } else if (currentTab === 'addItems') {
         // Reverse transition: going back from Add Items to scan/manual
-        const prevPanel = { scan: scanPanel, manual: manualPanel }[tabName];
+    const prevPanel = { scan: scanPanel, manual: manualPanel, create: createPanel }[tabName];
         const modalContent = document.querySelector('.modal-content.scanner-modal');
         const modalTabs = document.querySelector('.modal-tabs');
         if (addItemsPanel && prevPanel) {
@@ -4240,7 +4815,8 @@ function showTab(tabName, transition = true) {
         if (manualTabBtn) manualTabBtn.classList.toggle('active', tabName === 'manual');
     } else if (currentTab === 'barcodeResults') {
         // Reverse transition: leaving barcodeResults back to scan/manual with animation
-        const prevPanel = { scan: scanPanel, manual: manualPanel }[tabName];
+    // Treat 'create' tab the same as 'scan' and 'manual' for back transition
+    const prevPanel = { scan: scanPanel, manual: manualPanel, create: createPanel }[tabName];
         const modalContent = document.querySelector('.modal-content.scanner-modal');
         const modalTabs = document.querySelector('.modal-tabs');
         if (barcodePanel && prevPanel) {
@@ -4292,14 +4868,16 @@ function showTab(tabName, transition = true) {
             }, 250);
         }
         // Show tab buttons and set active state
-        var scanTabBtn = document.getElementById('scanTab');
-        var manualTabBtn = document.getElementById('manualTab');
-        if (modalTabs) modalTabs.style.display = 'flex';
-        if (scanTabBtn) scanTabBtn.classList.toggle('active', tabName === 'scan');
-        if (manualTabBtn) manualTabBtn.classList.toggle('active', tabName === 'manual');
+    var scanTabBtn = document.getElementById('scanTab');
+    var manualTabBtn = document.getElementById('manualTab');
+    var createTabBtn = document.getElementById('createTab');
+    if (modalTabs) modalTabs.style.display = 'flex';
+    if (scanTabBtn) scanTabBtn.classList.toggle('active', tabName === 'scan');
+    if (manualTabBtn) manualTabBtn.classList.toggle('active', tabName === 'manual');
+    if (createTabBtn) createTabBtn.classList.toggle('active', tabName === 'create');
     } else {
         // Hide all panels instantly
-        [scanPanel, manualPanel, addItemsPanel, barcodePanel].forEach(panel => {
+        [scanPanel, manualPanel, addItemsPanel, createPanel, barcodePanel].forEach(panel => {
             if (panel) {
                 panel.style.display = 'none';
                 panel.classList.remove('active', 'slide-in', 'slide-out-left');
@@ -4318,6 +4896,7 @@ function showTab(tabName, transition = true) {
             scan: scanPanel,
             manual: manualPanel,
             addItems: addItemsPanel,
+            create: createPanel,
             barcodeResults: barcodePanel
         }[tabName];
         if (activePanel) {
@@ -4327,24 +4906,33 @@ function showTab(tabName, transition = true) {
         }
     }
     // Show/hide tab buttons
-    var modalTabs = document.querySelector('.modal-tabs');
-    var scanTabBtn = document.getElementById('scanTab');
-    var manualTabBtn = document.getElementById('manualTab');
-    if (tabName === 'addItems' || tabName === 'barcodeResults') {
-        if (modalTabs) modalTabs.style.display = 'none';
-        if (scanTabBtn) scanTabBtn.classList.remove('active');
-        if (manualTabBtn) manualTabBtn.classList.remove('active');
-    } else {
-        if (modalTabs) modalTabs.style.display = 'flex';
-        if (scanTabBtn) scanTabBtn.classList.toggle('active', tabName === 'scan');
-        if (manualTabBtn) manualTabBtn.classList.toggle('active', tabName === 'manual');
-    }
+        var modalTabs = document.querySelector('.modal-tabs');
+        var scanTabBtn = document.getElementById('scanTab');
+        var manualTabBtn = document.getElementById('manualTab');
+        var createTabBtn = document.getElementById('createTab');
+        if (tabName === 'addItems' || tabName === 'barcodeResults') {
+            if (modalTabs) modalTabs.style.display = 'none';
+            if (scanTabBtn) scanTabBtn.classList.remove('active');
+            if (manualTabBtn) manualTabBtn.classList.remove('active');
+            if (createTabBtn) createTabBtn.classList.remove('active');
+        } else if (tabName === 'create') {
+            if (modalTabs) modalTabs.style.display = 'flex';
+            if (scanTabBtn) scanTabBtn.classList.remove('active');
+            if (manualTabBtn) manualTabBtn.classList.remove('active');
+            if (createTabBtn) createTabBtn.classList.add('active');
+        } else {
+            if (modalTabs) modalTabs.style.display = 'flex';
+            if (scanTabBtn) scanTabBtn.classList.toggle('active', tabName === 'scan');
+            if (manualTabBtn) manualTabBtn.classList.toggle('active', tabName === 'manual');
+            if (createTabBtn) createTabBtn.classList.toggle('active', tabName === 'create');
+        }
     // Show the requested panel (normal case)
     if (!(currentTab === 'addItems' && tabName !== 'addItems')) {
         const activePanel = {
             scan: scanPanel,
             manual: manualPanel,
             addItems: addItemsPanel,
+            create: createPanel,
             barcodeResults: barcodePanel
         }[tabName];
         if (activePanel) {
@@ -4378,13 +4966,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // Tab buttons
     const scanTabBtn = document.getElementById('scanTab');
     const manualTabBtn = document.getElementById('manualTab');
+    const createTabBtn = document.getElementById('createTab');
     // Panels
+    const createTabPanel = document.getElementById('createTabPanel');
     const scanPanel = document.getElementById('scanTabPanel');
     const manualPanel = document.getElementById('manualTabPanel');
     const addItemsPanel = document.getElementById('addItemsTabPanel');
     // Add Items triggers
     const skipScannerBtn = document.getElementById('skipScanner');
     const skipManualEntryBtn = document.getElementById('skipManualEntry');
+    const skipCreateTabBtn = document.getElementById('skipCreateTab');
     // Add Items panel buttons
     function attachAddItemsPanelListeners() {
         if (!addItemsPanel) return;
@@ -4393,10 +4984,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (backBtn) {
             backBtn.onclick = function(e) {
                 e.preventDefault();
-                // If previousTab is 'manual', return to 'manual'; otherwise go to previousTab or fallback to 'scan'
-                if (typeof previousTab !== 'undefined' && previousTab === 'manual') {
-                    showTab('manual');
-                } else if (typeof previousTab !== 'undefined' && previousTab) {
+                // Treat 'create' tab the same as 'manual' and 'scan' for back transition
+                if (typeof previousTab !== 'undefined' && previousTab) {
                     showTab(previousTab);
                 } else {
                     showTab('scan');
@@ -4445,12 +5034,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // Tab switching
     if (scanTabBtn) scanTabBtn.onclick = () => showTab('scan', false);
     if (manualTabBtn) manualTabBtn.onclick = () => showTab('manual', false);
+    if (createTabBtn) createTabBtn.onclick = () => showTab('create', false);
     // Add Items triggers
     if (skipScannerBtn) skipScannerBtn.onclick = () => {
         showTab('addItems', true);
         window.ensureAttachAddItems();
     };
     if (skipManualEntryBtn) skipManualEntryBtn.onclick = () => {
+        showTab('addItems', true);
+        window.ensureAttachAddItems();
+    };
+    if (skipCreateTabBtn) skipCreateTabBtn.onclick = () => {
         showTab('addItems', true);
         window.ensureAttachAddItems();
     };

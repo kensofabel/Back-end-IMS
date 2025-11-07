@@ -19,6 +19,137 @@ createDefaultCategory($_SESSION['user_id']);
     <link rel="stylesheet" href="inventory.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
+    <style>
+        /* Small hover effect for the Delete button - match Add Item and avoid shifting on hover */
+        #deleteSelectedBtn {
+            /* Only animate visual properties, avoid transform so the button doesn't move */
+            transition: box-shadow 120ms ease, opacity 120ms ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            /* space between icon and label */
+            gap: 8px;
+            radius: 6px;
+            /* Match common button sizing used across the toolbar */
+            height: 35px;
+            padding: 6px 20px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        #deleteSelectedBtn:hover {
+            /* Visual emphasis only — no translate so layout stays stable */
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            opacity: 0.98;
+            transform: none;
+        }
+        /* Confirmation modal styles (improved color palette) */
+        .confirm-modal-backdrop {
+            position: fixed;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            /* slightly stronger backdrop for better contrast */
+            background: rgba(0,0,0,0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+        }
+        .confirm-modal {
+            background: #232323;
+            color: #111;
+            border-radius: 10px;
+            padding: 18px 20px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 14px 44px rgba(0,0,0,0.35);
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        .confirm-modal p { margin: 0 0 14px 0; color: #dbdbdb; font-weight: 400; }
+        .confirm-modal .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .confirm-modal .btn { min-width: 84px; }
+        /* Cancel / outline button inside the modal */
+        .confirm-modal .btn-outline {
+            background: transparent;
+            color: #dbdbdb;
+        }
+        .confirm-modal .btn-outline:hover { background: #f5f7f9; color: #232323;}
+        /* Stronger, friendlier red for destructive action */
+        .confirm-modal .btn-danger {
+            background: #e74c3c; /* vivid red */
+            border-color: #e74c3c;
+            color: #fff;
+        }
+        .confirm-modal .btn-danger:hover { background: #c43b2b; border-color: #c43b2b; }
+        /* Toast / Snackbar */
+        .app-toast {
+            position: fixed;
+            left: 50%;
+            top: 18px;
+            /* start slightly above and slide down when shown */
+            transform: translate(-50%, -8px);
+            min-width: 220px;
+            max-width: 420px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #fff;
+            display: none;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            z-index: 1400;
+            font-size: 0.95rem;
+            opacity: 0;
+            transition: transform 180ms ease, opacity 180ms ease;
+            pointer-events: auto;
+        }
+        .app-toast.show { display: flex; transform: translate(-50%, 0); opacity: 1; }
+        .app-toast.success { background: linear-gradient(90deg,#2ecc71,#27ae60); }
+        .app-toast.error { background: linear-gradient(90deg,#e74c3c,#c0392b); }
+        .app-toast.info { background: linear-gradient(90deg,#3498db,#2980b9); }
+        .app-toast .toast-icon { margin-right: 10px; font-size: 1.05rem; }
+        .app-toast .toast-msg { flex: 1; }
+
+        /* Fixed row height for inventory table rows
+           - Ensures all rows have a consistent height and vertical centering
+           - Uses truncation/ellipsis to keep long text from breaking layout
+           - Provides a smaller height on narrow screens for better fit */
+        .inventory-table tbody tr {
+            height: 56px; /* change this value to taste */
+            max-height: 56px;
+            box-sizing: border-box;
+        }
+        .inventory-table tbody tr td {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            vertical-align: middle;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            max-height: 56px;
+        }
+        /* Slightly tighter spacing for variant rows if desired */
+        .inventory-table tbody tr.variant-row td {
+            padding-top: 6px;
+            padding-bottom: 6px;
+        }
+        /* Ensure name/category cells truncate gracefully */
+        .inventory-table tbody tr td .br-name,
+        .inventory-table tbody tr td .item-name {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        @media (max-width: 720px) {
+            .inventory-table tbody tr { height: 48px; max-height: 48px; }
+            .inventory-table tbody tr td { padding-top: 6px; padding-bottom: 6px; }
+        }
+    </style>
 </head>
 <body>
     <?php include '../../partials/navigation.php'; ?>
@@ -44,6 +175,7 @@ createDefaultCategory($_SESSION['user_id']);
             </span>
             <div id="tab-info-actions">
                 <button class="btn btn-primary" id="addProductBtn"><i class="fa fa-plus"></i> Add Item</button>
+                <button class="btn btn-danger" id="deleteSelectedBtn" style="display:none; margin-left:8px;"><i class="fa fa-trash"></i> Delete</button>
     <!-- Modal include -->
     <?php include 'popupmodal.php'; ?>
                 <button class="btn btn-outline" id="importBtn" title="Import"><i class="fa fa-download"></i></button>
@@ -184,7 +316,7 @@ createDefaultCategory($_SESSION['user_id']);
                                         echo "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7 10l5 5 5-5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
                                         echo "</button>";
                                         echo "<label class='permission-checkbox table-checkbox' style='margin-left: 10px;display:inline-flex;justify-content:center;'>";
-                                        echo "<input type='checkbox' class='row-select-checkbox' />";
+                                        echo "<input type='checkbox' class='row-select-checkbox' data-product-id='" . (int)$p['product_id'] . "' />";
                                         echo "<span class='checkmark'></span>";
                                         echo "</label>";
                                         echo "</td>";
@@ -299,7 +431,7 @@ createDefaultCategory($_SESSION['user_id']);
                                         echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
                                         echo "<td style=\"text-align:center;\">";
                                         echo "<label class='permission-checkbox table-checkbox' style='margin-left: 10px;display:inline-flex;justify-content:center;'>";
-                                        echo "<input type='checkbox' class='row-select-checkbox' />";
+                                        echo "<input type='checkbox' class='row-select-checkbox' data-product-id='" . (int)$p['product_id'] . "' />";
                                         echo "<span class='checkmark'></span>";
                                         echo "</label>";
                                         echo "</td>";
@@ -349,6 +481,21 @@ createDefaultCategory($_SESSION['user_id']);
                     </div>
                 </div>
     </div>
+<!-- Confirmation modal (used instead of window.confirm) -->
+<div class="confirm-modal-backdrop" id="confirmModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="confirm-modal" role="document">
+        <p id="confirmModalMessage">Are you sure?</p>
+        <div class="confirm-actions" style="margin-top:8px;">
+            <button class="btn btn-outline" id="confirmCancelBtn">Cancel</button>
+            <button class="btn btn-danger" id="confirmOkBtn">Delete</button>
+        </div>
+    </div>
+</div>
+<!-- Toast container -->
+<div id="appToast" class="app-toast" role="status" aria-live="polite">
+    <div class="toast-icon" id="appToastIcon">✓</div>
+    <div class="toast-msg" id="appToastMsg">Saved</div>
+</div>
 </body>
 </html>
 <script>
@@ -386,17 +533,319 @@ document.addEventListener('DOMContentLoaded', function() {
     var scannerModal = document.getElementById('scannerModal');
     if (addProductBtn && scannerModal) {
         addProductBtn.addEventListener('click', function() {
-            // Open modal but do not force a specific tab so we preserve previous state
+            // If the button label indicates Create mode, open Create tab and prefill with checked items
+            var label = (addProductBtn.textContent || '').trim().toLowerCase();
+            var isCreateMode = label.indexOf('create') !== -1;
+
+            // Show the modal in any case
             scannerModal.style.display = 'block';
+
+            if (isCreateMode) {
+                // collect checked product rows
+                var checked = Array.from(document.querySelectorAll('.row-select-checkbox:checked'));
+                var items = checked.map(function(cb) {
+                    try {
+                        var row = cb.closest && cb.closest('tr') ? cb.closest('tr') : null;
+                        var pid = cb.dataset && cb.dataset.productId ? cb.dataset.productId : (row ? row.getAttribute('data-product-id') : null);
+                        var nameCell = row ? row.querySelector('td:nth-child(2)') : null;
+                        var costCell = row ? row.querySelector('td:nth-child(5)') : null;
+                        var name = nameCell ? (nameCell.textContent || '').trim() : '';
+                        var rawCost = costCell ? (costCell.textContent || '') : '';
+                        // parse numeric cost from displayed string like '₱1,234.00'
+                        var parsedCost = 0;
+                        try {
+                            var num = String(rawCost).replace(/[^0-9.\-]/g, '');
+                            parsedCost = num === '' ? 0 : parseFloat(num);
+                        } catch (e) { parsedCost = 0; }
+                        return { id: pid ? pid : null, name: name, cost: parsedCost };
+                    } catch (e) { return null; }
+                }).filter(Boolean);
+
+                // Show the create tab
+                if (typeof showTab === 'function') {
+                    try { showTab('create', false); } catch (e) { /* ignore */ }
+                } else {
+                    // fallback: show panels manually
+                    document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
+                    var createPanel = document.getElementById('createTabPanel');
+                    if (createPanel) createPanel.style.display = 'block';
+                }
+
+                // Store pending items so the modal helper can pick them up when ready.
+                try {
+                    console.debug('Create mode detected, collected items:', items);
+                    window._pendingCreateItems = items;
+                    // If helper is already available, call it immediately and clear pending
+                    if (window.appendCreateComponents) {
+                        try { console.debug('appendCreateComponents available, invoking'); window.appendCreateComponents(items); window._pendingCreateItems = []; } catch(e) { console.warn('appendCreateComponents failed', e); }
+                    } else {
+                        // As a safety fallback, if the modal hasn't initialized yet, try to append simple rows
+                        // directly into the Create components body after a short delay so the UI shows something.
+                        setTimeout(function() {
+                            try {
+                                if (window.appendCreateComponents) {
+                                    console.debug('appendCreateComponents became available, invoking now');
+                                    window.appendCreateComponents(items);
+                                    window._pendingCreateItems = [];
+                                    return;
+                                }
+                                var cb = document.getElementById('createComponentsBody');
+                                if (!cb) {
+                                    console.debug('createComponentsBody not present yet');
+                                    return;
+                                }
+                                // Clear and insert rows that match the modal's component-row structure and styles
+                                cb.innerHTML = '';
+
+                                // formatting helper
+                                function _formatCurrency(n) { return '₱' + Number(n||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+                                // Local fallback recalc function (mirrors modal recalcTotal)
+                                function _fallbackRecalcTotal() {
+                                    try {
+                                        var total = 0;
+                                        var rows = cb.querySelectorAll('tr.component-row');
+                                        rows.forEach(function(r) {
+                                            var q = parseFloat((r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) || 0) || 0;
+                                            var c = parseFloat((r.querySelector('.comp-cost') && r.querySelector('.comp-cost').value || '').replace(/[^0-9.-]/g, '')) || 0;
+                                            total += q * c;
+                                        });
+                                        var totalEl = document.getElementById('createTotalCost');
+                                        if (totalEl) totalEl.textContent = _formatCurrency(total);
+                                    } catch (e) { console.warn('fallback recalc error', e); }
+                                }
+
+                                // Create a lightweight variant dropdown if not already present (one instance)
+                                var fallbackDropdown = document.querySelector('.comp-variant-dropdown');
+                                if (!fallbackDropdown) {
+                                    fallbackDropdown = document.createElement('div');
+                                    fallbackDropdown.className = 'create-dropdown comp-variant-dropdown';
+                                    fallbackDropdown.style.position = 'absolute';
+                                    fallbackDropdown.style.zIndex = 99999;
+                                    fallbackDropdown.style.display = 'none';
+                                    document.body.appendChild(fallbackDropdown);
+                                }
+
+                                // open dropdown positioned under triggerEl
+                                function openFallbackVariantDropdown(triggerEl, row, product, variants) {
+                                    try {
+                                        fallbackDropdown.innerHTML = '';
+                                        // Build list (variants may be empty)
+                                        if (!variants || !variants.length) {
+                                            var noOpt = document.createElement('div');
+                                            noOpt.className = 'create-option';
+                                            noOpt.style.opacity = '0.7';
+                                            noOpt.style.cursor = 'default';
+                                            noOpt.textContent = 'No variants';
+                                            fallbackDropdown.appendChild(noOpt);
+                                        } else {
+                                            // Place selected variant first if dataset present
+                                            var variantsToRender = Array.prototype.slice.call(variants || []);
+                                            try {
+                                                var curId = row && row.dataset && row.dataset.selectedVariantId ? String(row.dataset.selectedVariantId) : '';
+                                                if (curId) {
+                                                    var idx = variantsToRender.findIndex(function(x){ return String(x.id) === curId; });
+                                                    if (idx > 0) {
+                                                        var found = variantsToRender.splice(idx,1)[0];
+                                                        variantsToRender.unshift(found);
+                                                    }
+                                                }
+                                            } catch(e) {}
+
+                                            variantsToRender.forEach(function(v) {
+                                                var opt = document.createElement('div');
+                                                opt.className = 'create-option';
+                                                var parentName = product && product.name ? product.name : '';
+                                                var variantName = v.name || '';
+                                                var sku = v.sku || '';
+                                                var cost = (v.cost !== undefined && v.cost !== null) ? v.cost : (v.price !== undefined && v.price !== null ? v.price : '');
+                                                opt.innerHTML = '<div style="display:grid; grid-template-columns: 1fr 100px; align-items:center; gap:8px; width:100%;">'
+                                                    + '<div style="min-width:0;">'
+                                                    + '<div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:#e6e6e6;">' + (variantName ? variantName : '') + '</div>'
+                                                    + (sku ? '<div style="color:#9e9e9e; font-size:12px; margin-top:4px;">SKU: ' + sku + '</div>' : '')
+                                                    + '</div>'
+                                                    + '<div style="text-align:right; color:#9ca3af; white-space:nowrap;">' + (cost !== '' ? ('₱' + Number(cost).toFixed(2)) : '') + '</div>'
+                                                    + '</div>';
+                                                opt.addEventListener('mousedown', function(e){ e.preventDefault(); });
+                                                opt.addEventListener('click', function() {
+                                                    try {
+                                                        var nameTextEl = row.querySelector('.comp-name-text');
+                                                        var skuEl = row.querySelector('.comp-sku');
+                                                        var costInput = row.querySelector('.comp-cost');
+                                                        if (nameTextEl) nameTextEl.textContent = (product.name || '') + (variantName ? ' (' + variantName + ')' : '');
+                                                        if (skuEl) skuEl.textContent = sku ? ('SKU: ' + sku) : (product.sku ? ('SKU: ' + product.sku) : '\u00A0');
+                                                        if (costInput) costInput.value = _formatCurrency(parseFloat(cost) || 0);
+                                                        try { row.dataset.selectedVariantId = v.id || ''; } catch(e){}
+                                                        _fallbackRecalcTotal();
+                                                    } catch(e) { console.warn('apply variant selection error', e); }
+                                                    closeFallbackVariantDropdown();
+                                                });
+                                                fallbackDropdown.appendChild(opt);
+                                            });
+                                        }
+
+                                        // position
+                                        var r = triggerEl.getBoundingClientRect();
+                                        var left = r.left + window.scrollX;
+                                        var width = Math.max(240, Math.round(r.width));
+                                        var maxRight = window.scrollX + document.documentElement.clientWidth - 8;
+                                        if (left + width > maxRight) left = Math.max(8 + window.scrollX, maxRight - width);
+                                        if (left < 8 + window.scrollX) left = 8 + window.scrollX;
+                                        fallbackDropdown.style.width = width + 'px';
+                                        fallbackDropdown.style.left = left + 'px';
+                                        fallbackDropdown.style.display = 'block';
+                                        // mark trigger open
+                                        try { triggerEl.classList.add('open'); } catch(e) {}
+                                        var dh = fallbackDropdown.offsetHeight || fallbackDropdown.scrollHeight || 200;
+                                        var topCover = r.top + window.scrollY;
+                                        var viewportBottom = window.scrollY + document.documentElement.clientHeight - 8;
+                                        if (topCover < window.scrollY + 8 || (topCover + dh) > viewportBottom) {
+                                            fallbackDropdown.style.top = (r.bottom + window.scrollY + 6) + 'px';
+                                        } else {
+                                            fallbackDropdown.style.top = topCover + 'px';
+                                        }
+                                    } catch (e) { console.warn('openFallbackVariantDropdown error', e); }
+                                }
+
+                                function closeFallbackVariantDropdown() {
+                                    try {
+                                        fallbackDropdown.style.display = 'none';
+                                        fallbackDropdown.innerHTML = '';
+                                        // remove open class from any .comp-name
+                                        var openEl = document.querySelector('.comp-name.open'); if (openEl) openEl.classList.remove('open');
+                                    } catch (e) { /* ignore */ }
+                                }
+
+                                // close on outside click or escape
+                                document.addEventListener('click', function(e) {
+                                    if (!fallbackDropdown) return;
+                                    if (!fallbackDropdown.contains(e.target)) {
+                                        // allow clicks inside comp-name to open/close
+                                        if (e.target && e.target.closest && e.target.closest('.comp-name')) return;
+                                        closeFallbackVariantDropdown();
+                                    }
+                                });
+                                document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeFallbackVariantDropdown(); });
+
+                                // For each item: if it has a product id, try to fetch product+variants
+                                // so we can show SKU and variant options (fallback to provided data otherwise).
+                                var pendingFetches = [];
+                                items.forEach(function(it) {
+                                    try {
+                                        var pid = it && (it.id || it.product_id) ? (it.id || it.product_id) : null;
+                                        if (pid) {
+                                            // fetch authoritative product info to populate SKU/variants
+                                            var p = fetch('get_product.php?product_id=' + encodeURIComponent(pid))
+                                                .then(function(resp) { return resp.json(); })
+                                                .then(function(data) {
+                                                    try { console.debug('get_product result for', pid, data); } catch(e) {}
+                                                
+                                                    try {
+                                                        if (data && data.success && data.product) {
+                                                            var product = data.product;
+                                                            var variants = Array.isArray(product.variants) ? product.variants : [];
+                                                            // create row using product and variants
+                                                            var tr = document.createElement('tr');
+                                                            tr.className = 'component-row';
+                                                            tr.style.borderBottom = '1px solid #2b2b2b';
+
+                                                            var tdName = document.createElement('td'); tdName.style.padding = '8px'; tdName.style.color = '#dbdbdb';
+                                                            var nameWrapper = document.createElement('div'); nameWrapper.className = 'comp-name'; nameWrapper.style.overflow = 'hidden'; nameWrapper.style.textOverflow = 'ellipsis'; nameWrapper.style.whiteSpace = 'nowrap';
+                                                            var nameText = document.createElement('div'); nameText.className = 'comp-name-text'; nameText.textContent = (product.name || it.name || '');
+                                                            var skuDiv = document.createElement('div'); skuDiv.className = 'comp-sku'; skuDiv.style.color = '#9e9e9e'; skuDiv.style.fontSize = '12px'; skuDiv.style.marginTop = '0'; skuDiv.textContent = product.sku ? ('SKU: ' + product.sku) : '\u00A0';
+                                                            nameWrapper.appendChild(nameText); nameWrapper.appendChild(skuDiv); tdName.appendChild(nameWrapper);
+
+                                                            var tdQty = document.createElement('td'); tdQty.style.padding = '8px'; tdQty.style.width = '120px'; tdQty.style.textAlign = 'right';
+                                                            var qtyInput = document.createElement('input'); qtyInput.className = 'comp-qty'; qtyInput.type = 'number'; qtyInput.min = '0'; qtyInput.value = (it.qty !== undefined && it.qty !== null) ? it.qty : 1; qtyInput.style.width = '100%'; qtyInput.style.padding = '6px'; qtyInput.style.background = '#171717'; qtyInput.style.border = '1px solid #333'; qtyInput.style.color = '#fff'; qtyInput.style.borderRadius = '4px'; qtyInput.style.textAlign = 'right'; tdQty.appendChild(qtyInput);
+
+                                                            var tdCost = document.createElement('td'); tdCost.style.padding = '8px'; tdCost.style.width = '120px'; tdCost.style.textAlign = 'right';
+                                                            var costVal = (product.cost !== undefined && product.cost !== null) ? product.cost : (product.price !== undefined && product.price !== null ? product.price : (it.cost || 0));
+                                                            var costInput = document.createElement('input'); costInput.className = 'comp-cost'; costInput.setAttribute('currency-localization','₱'); costInput.readOnly = true; costInput.value = _formatCurrency(Number(costVal || 0)); costInput.style.width = '100%'; costInput.style.background = '#171717'; costInput.style.border = 'none'; costInput.style.color = '#fff'; costInput.style.cursor = 'default'; costInput.style.pointerEvents = 'none'; costInput.style.textAlign = 'right'; tdCost.appendChild(costInput);
+
+                                                            var tdAction = document.createElement('td'); tdAction.style.padding = '8px'; tdAction.style.width = '45px'; tdAction.style.textAlign = 'center';
+                                                            var remBtn = document.createElement('button'); remBtn.className = 'comp-remove btn'; remBtn.title = 'Remove'; remBtn.style.background = 'transparent'; remBtn.style.border = 'none'; remBtn.style.color = '#bbb'; remBtn.style.fontSize = '18px'; remBtn.style.lineHeight = '1'; remBtn.style.width = '30px'; remBtn.style.height = '34px'; remBtn.style.display = 'inline-flex'; remBtn.style.alignItems = 'center'; remBtn.style.justifyContent = 'center'; remBtn.textContent = '🗑'; tdAction.appendChild(remBtn);
+
+                                                            tr.appendChild(tdName); tr.appendChild(tdQty); tr.appendChild(tdCost); tr.appendChild(tdAction);
+                                                            cb.appendChild(tr);
+
+                                                            try { qtyInput.addEventListener('input', function() { _fallbackRecalcTotal(); }); } catch(e) {}
+                                                            try { remBtn.addEventListener('click', function() { tr.remove(); _fallbackRecalcTotal(); }); } catch (e) {}
+
+                                                            // wire variants if present
+                                                            if (variants && variants.length) {
+                                                                try { tr._variants = variants; tr._product = { id: product.id || pid, name: product.name || it.name || '', sku: product.sku || '' }; } catch(e){}
+                                                                try { nameWrapper.classList.add('interactive'); nameWrapper.addEventListener('click', function(ev){ ev.stopPropagation(); openFallbackVariantDropdown(nameWrapper, tr, tr._product, tr._variants); }); } catch(e){}
+                                                            }
+                                                        } else {
+                                                            // fallback to simple row with provided data
+                                                            throw new Error('product not found');
+                                                        }
+                                                    } catch (err) {
+                                                        console.warn('get_product processing error', err);
+                                                        // fallback create basic row
+                                                        createBasicRow(it);
+                                                    }
+                                                })
+                                                .catch(function(err) {
+                                                    console.warn('get_product fetch failed', err);
+                                                    createBasicRow(it);
+                                                });
+                                            pendingFetches.push(p);
+                                        } else {
+                                            // no product id — create basic row immediately
+                                            createBasicRow(it);
+                                        }
+                                    } catch (ee) { console.warn('fallback append row error', ee); }
+                                });
+
+                                // helper to create a basic row from item data
+                                function createBasicRow(it) {
+                                    try {
+                                        var tr = document.createElement('tr');
+                                        tr.className = 'component-row';
+                                        tr.style.borderBottom = '1px solid #2b2b2b';
+
+                                        var tdName = document.createElement('td'); tdName.style.padding = '8px'; tdName.style.color = '#dbdbdb';
+                                        var nameWrapper = document.createElement('div'); nameWrapper.className = 'comp-name'; nameWrapper.style.overflow = 'hidden'; nameWrapper.style.textOverflow = 'ellipsis'; nameWrapper.style.whiteSpace = 'nowrap';
+                                        var nameText = document.createElement('div'); nameText.className = 'comp-name-text'; nameText.textContent = it.name || '';
+                                        var skuDiv = document.createElement('div'); skuDiv.className = 'comp-sku'; skuDiv.style.color = '#9e9e9e'; skuDiv.style.fontSize = '12px'; skuDiv.style.marginTop = '0'; skuDiv.textContent = it.sku ? ('SKU: ' + it.sku) : '\u00A0';
+                                        nameWrapper.appendChild(nameText); nameWrapper.appendChild(skuDiv); tdName.appendChild(nameWrapper);
+
+                                        var tdQty = document.createElement('td'); tdQty.style.padding = '8px'; tdQty.style.width = '120px'; tdQty.style.textAlign = 'right';
+                                        var qtyInput = document.createElement('input'); qtyInput.className = 'comp-qty'; qtyInput.type = 'number'; qtyInput.min = '0'; qtyInput.value = (it.qty !== undefined && it.qty !== null) ? it.qty : 1; qtyInput.style.width = '100%'; qtyInput.style.padding = '6px'; qtyInput.style.background = '#171717'; qtyInput.style.border = '1px solid #333'; qtyInput.style.color = '#fff'; qtyInput.style.borderRadius = '4px'; qtyInput.style.textAlign = 'right'; tdQty.appendChild(qtyInput);
+
+                                        var tdCost = document.createElement('td'); tdCost.style.padding = '8px'; tdCost.style.width = '120px'; tdCost.style.textAlign = 'right';
+                                        var costInput = document.createElement('input'); costInput.className = 'comp-cost'; costInput.setAttribute('currency-localization','₱'); costInput.readOnly = true; costInput.value = _formatCurrency(Number(it.cost || 0)); costInput.style.width = '100%'; costInput.style.background = '#171717'; costInput.style.border = 'none'; costInput.style.color = '#fff'; costInput.style.cursor = 'default'; costInput.style.pointerEvents = 'none'; costInput.style.textAlign = 'right'; tdCost.appendChild(costInput);
+
+                                        var tdAction = document.createElement('td'); tdAction.style.padding = '8px'; tdAction.style.width = '45px'; tdAction.style.textAlign = 'center';
+                                        var remBtn = document.createElement('button'); remBtn.className = 'comp-remove btn'; remBtn.title = 'Remove'; remBtn.style.background = 'transparent'; remBtn.style.border = 'none'; remBtn.style.color = '#bbb'; remBtn.style.fontSize = '18px'; remBtn.style.lineHeight = '1'; remBtn.style.width = '30px'; remBtn.style.height = '34px'; remBtn.style.display = 'inline-flex'; remBtn.style.alignItems = 'center'; remBtn.style.justifyContent = 'center'; remBtn.textContent = '🗑'; tdAction.appendChild(remBtn);
+
+                                        tr.appendChild(tdName); tr.appendChild(tdQty); tr.appendChild(tdCost); tr.appendChild(tdAction);
+                                        cb.appendChild(tr);
+                                        try { qtyInput.addEventListener('input', function() { _fallbackRecalcTotal(); }); } catch(e) {}
+                                        try { remBtn.addEventListener('click', function() { tr.remove(); _fallbackRecalcTotal(); }); } catch(e) {}
+                                    } catch (e) { console.warn('createBasicRow error', e); }
+                                }
+
+                                // After all fetches complete, run an initial recalc
+                                Promise.allSettled(pendingFetches).finally(function() { try { _fallbackRecalcTotal(); } catch(e){} });
+                            } catch (er) { console.warn('create fallback error', er); }
+                        }, 220);
+                    }
+                } catch (e) { console.warn('populate create components error', e); }
+
+                return;
+            }
+
+            // Normal Add Item flow: restore previous tab (scan/manual) if available
             // If the modal tab logic is loaded, restore the last active tab (currentTab) when available.
-            // Fallback to 'scan' only if the tab state isn't defined yet.
             if (typeof showTab === 'function') {
                 try {
-                    var tabToShow = (typeof currentTab !== 'undefined' && currentTab) ? currentTab : 'sWcan';
+                    var tabToShow = (typeof currentTab !== 'undefined' && currentTab) ? currentTab : 'scan';
                     showTab(tabToShow, false);
                 } catch (e) {
                     // Fallback: show scan tab
-                    showTab('scan', false);
+                    try { showTab('scan', false); } catch (err) { /* ignore */ }
                 }
             }
             // Start scanner/camera only if the scan panel is actually visible
@@ -508,6 +957,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const rowsSelect = paginationBar ? paginationBar.querySelector('.pagination-rows-select') : null;
     let rowsPerPage = rowsSelect ? parseInt(rowsSelect.value, 10) || 10 : 10;
     let currentPage = 1;
+    // Persist selected product ids across pagination/filtering
+    // Make the set global so multiple DOMContentLoaded handlers can access it without ReferenceError
+    window.selectedProductIds = window.selectedProductIds || new Set();
+    var selectedProductIds = window.selectedProductIds;
     // Sorting state: key can be 'name','category','price','cost','margin','stock'
     let sortState = { key: 'name', dir: 1 };
     // Ensure sortable headers are only initialized once (prevents duplicate listeners)
@@ -660,6 +1113,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+
+        // Sync checkbox state for visible rows based on selectedProductIds so selections persist across pages
+        try {
+            const allCheckboxes = inventoryTableBody ? Array.from(inventoryTableBody.querySelectorAll('.row-select-checkbox')) : [];
+            const visibleCheckboxes = allCheckboxes.filter(cb => {
+                const r = cb.closest && cb.closest('tr');
+                return r && r.style.display !== 'none';
+            });
+            visibleCheckboxes.forEach(cb => {
+                const pid = cb.dataset && cb.dataset.productId ? parseInt(cb.dataset.productId, 10) : null;
+                if (pid && !isNaN(pid) && selectedProductIds.has(pid)) cb.checked = true; else cb.checked = false;
+            });
+        } catch (e) { console.warn('sync checkboxes error', e); }
+
+        // Ensure header/controls reflect the current visible selection
+        try { updateSelectAllState(); } catch (e) {}
 
 
     // Initialize sortable headers: make th clickable and show sort indicators
@@ -1001,6 +1470,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             btn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
         });
+
+        // NOTE: Removed hover-based Delete visibility. Delete button should only
+        // appear when a checkbox is checked. Hovering near a row or checkbox
+        // will no longer show the Delete button.
     }
 });
 
@@ -1012,9 +1485,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const tableBody = document.getElementById('inventory-table-body');
 
     function updateSelectAllState() {
-        const checkboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+        // Only consider checkboxes that are currently visible (on the current page)
+        const allCheckboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+        const checkboxes = allCheckboxes.filter(cb => {
+            const row = cb.closest && cb.closest('tr');
+            return row && row.style.display !== 'none';
+        });
         if (!checkboxes.length) {
-            if (selectAll) selectAll.checked = false;
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            }
+            updateDeleteButtonVisibility();
             return;
         }
         const allChecked = checkboxes.every(cb => cb.checked);
@@ -1023,26 +1505,235 @@ document.addEventListener('DOMContentLoaded', function() {
             selectAll.checked = allChecked;
             selectAll.indeterminate = !allChecked && someChecked;
         }
+        updateDeleteButtonVisibility();
+    }
+
+    function updateDeleteButtonVisibility() {
+        const deleteBtn = document.getElementById('deleteSelectedBtn');
+        if (!deleteBtn) return;
+        // Only consider currently visible checkboxes (current page)
+        const allCheckboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+        const visibleCheckboxes = allCheckboxes.filter(cb => {
+            const row = cb.closest && cb.closest('tr');
+            return row && row.style.display !== 'none';
+        });
+        const anyChecked = visibleCheckboxes.some(cb => cb.checked);
+    // Show the delete button only when at least one visible checkbox is checked.
+    const shouldShow = anyChecked;
+        deleteBtn.style.display = shouldShow ? '' : 'none';
+
+        // Hide import/export while items are selected (anyChecked true). Restore when none selected.
+        const importBtn = document.getElementById('importBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        if (importBtn) importBtn.style.display = anyChecked ? 'none' : '';
+        if (exportBtn) exportBtn.style.display = anyChecked ? 'none' : '';
+        // Change the Add Item button label to Create Item when any item is checked
+        try {
+            const addBtn = document.getElementById('addProductBtn');
+            if (addBtn) {
+                if (anyChecked) {
+                    // keep the same icon, change label to "Create Item"
+                    addBtn.innerHTML = '<i class="fa fa-plus"></i> Create Item';
+                } else {
+                    addBtn.innerHTML = '<i class="fa fa-plus"></i> Add Item';
+                }
+            }
+        } catch (e) { console.warn('update add button label error', e); }
+    }
+
+    // showConfirmModal(message) -> Promise<boolean>
+    // Resolves true when user confirms, false on cancel/escape.
+    function showConfirmModal(message) {
+        return new Promise(function(resolve) {
+            var modal = document.getElementById('confirmModal');
+            var msg = document.getElementById('confirmModalMessage');
+            var ok = document.getElementById('confirmOkBtn');
+            var cancel = document.getElementById('confirmCancelBtn');
+            if (!modal || !ok || !cancel || !msg) {
+                // Fallback to native confirm if modal not available
+                resolve(window.confirm(message));
+                return;
+            }
+            msg.textContent = message;
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+
+            function cleanup() {
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+                ok.removeEventListener('click', onOk);
+                cancel.removeEventListener('click', onCancel);
+                document.removeEventListener('keydown', onKey);
+            }
+
+            function onOk(e) { e.preventDefault(); cleanup(); resolve(true); }
+            function onCancel(e) { e.preventDefault(); cleanup(); resolve(false); }
+            function onKey(e) {
+                if (e.key === 'Escape') { onCancel(e); }
+                if (e.key === 'Enter') { onOk(e); }
+            }
+
+            ok.addEventListener('click', onOk);
+            cancel.addEventListener('click', onCancel);
+            document.addEventListener('keydown', onKey);
+
+            // Focus OK for keyboard users
+            setTimeout(function() { try { ok.focus(); } catch (e) {} }, 10);
+        });
+    }
+
+    // Lightweight toast/snackbar: showToast(message, type = 'success', duration = 3000)
+    function showToast(message, type, duration) {
+        type = type || 'success';
+        duration = typeof duration === 'number' ? duration : 3000;
+        var toast = document.getElementById('appToast');
+        var msg = document.getElementById('appToastMsg');
+        var icon = document.getElementById('appToastIcon');
+        if (!toast || !msg || !icon) return;
+        msg.textContent = message;
+        // icon per type
+        if (type === 'success') icon.textContent = '✓';
+        else if (type === 'error') icon.textContent = '⚠';
+        else icon.textContent = 'ℹ';
+        toast.classList.remove('success','error','info');
+        toast.classList.add(type);
+        // show
+        toast.style.display = 'flex';
+        // trigger reflow to ensure transition
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        // auto hide
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(function() {
+            toast.classList.remove('show');
+            // wait for transition then hide
+            setTimeout(function() { try { toast.style.display = 'none'; } catch(e) {} }, 220);
+        }, duration);
+    }
+
+    // Delete handler: collects selected product ids and calls API
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async function() {
+            const checkboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+            // Only delete selected checkboxes (no hover fallback)
+            const ids = checkboxes.filter(cb => cb.checked && cb.dataset && cb.dataset.productId).map(cb => parseInt(cb.dataset.productId, 10)).filter(id => !isNaN(id));
+            const targetIds = ids.slice();
+            if (!targetIds.length) {
+                alert('No items selected to delete');
+                return;
+            }
+            const confirmed = await showConfirmModal('Are you sure you want to delete the selected item(s)? This action cannot be undone.');
+            if (!confirmed) return;
+
+            // Call API to delete
+            fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_products', product_ids: targetIds })
+            }).then(resp => resp.json()).then(res => {
+                if (res && res.success) {
+                        // Remove any rows (parent/product rows, standalone product rows, and variant rows)
+                        targetIds.forEach(id => {
+                            try {
+                                // 1) Parent row (product with variants)
+                                const parentRow = tableBody.querySelector('tr.parent-row[data-product-id="' + id + '"]');
+                                if (parentRow) parentRow.remove();
+
+                                // 2) Any row that contains a checkbox for this product (products without variants)
+                                const checkbox = tableBody.querySelector('input.row-select-checkbox[data-product-id="' + id + '"]');
+                                if (checkbox) {
+                                    const tr = checkbox.closest('tr');
+                                    if (tr) tr.remove();
+                                }
+
+                                // 3) Any variant rows that belong to this product
+                                const variantRows = Array.from(tableBody.querySelectorAll('tr.variant-row[data-parent-id="' + id + '"]'));
+                                variantRows.forEach(r => r.remove());
+
+                                // 4) Clean from selection set
+                                selectedProductIds.delete(id);
+                            } catch (e) { console.warn('cleanup deleted row error', e); }
+                        });
+
+                        // Clear any temporary hover metadata
+                        try { deleteBtn.dataset.hoverProductId = ''; } catch (e) {}
+
+                        // Refresh filters/pagination and controls so page recalculates visible rows
+                        setTimeout(() => {
+                            try { if (typeof filterRows === 'function') filterRows(); } catch (e) {}
+                            try { updateSelectAllState(); } catch (e) {}
+                            try { updateDeleteButtonVisibility(); } catch (e) {}
+                        }, 40);
+
+                        // Friendly feedback (non-blocking toast)
+                        try { if (typeof showSuccessPopup === 'function') showSuccessPopup('Deleted selected items'); else showToast('Deleted selected items', 'success', 3000); } catch (e) {}
+                } else {
+                    try {
+                        var errMsg = (res && res.error) ? res.error : 'Unknown';
+                            if (typeof showErrorPopup === 'function') showErrorPopup('Failed to delete items: ' + errMsg);
+                            else showToast('Failed to delete items: ' + errMsg, 'error', 5000);
+                    } catch (e) {}
+                }
+            }).catch(err => {
+                console.error('delete_products error', err);
+                    try { if (typeof showErrorPopup === 'function') showErrorPopup('Delete failed'); else showToast('Delete failed', 'error', 4000); } catch (e) {}
+            }).finally(() => { updateDeleteButtonVisibility(); updateSelectAllState(); });
+        });
     }
 
     // When header checkbox toggled, set all visible (non-filtered) rows
     if (selectAll) {
         selectAll.addEventListener('change', function() {
-            const checkboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
-            // Only toggle checkboxes for rows that are currently visible (not data-filtered)
-            checkboxes.forEach(cb => {
-                const row = cb.closest('tr');
-                if (row && !row.hasAttribute('data-filtered')) {
-                    cb.checked = selectAll.checked;
-                }
+            // Toggle only checkboxes that are currently visible on the page (display != 'none')
+            const allCheckboxes = tableBody ? Array.from(tableBody.querySelectorAll('.row-select-checkbox')) : [];
+            const visibleCheckboxes = allCheckboxes.filter(cb => {
+                const row = cb.closest && cb.closest('tr');
+                return row && row.style.display !== 'none';
             });
+            visibleCheckboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
+                // Update selectedProductIds accordingly
+                try {
+                    const pid = cb.dataset && cb.dataset.productId ? parseInt(cb.dataset.productId, 10) : null;
+                    if (pid && !isNaN(pid)) {
+                        if (selectAll.checked) selectedProductIds.add(pid);
+                        else selectedProductIds.delete(pid);
+                    }
+                } catch (e) { /* ignore */ }
+            });
+            // Update state and Delete button visibility after toggling
+            setTimeout(updateSelectAllState, 0);
         });
     }
 
-    // Delegate clicks on row checkboxes to update header state
+        // Delegate clicks on row checkboxes to update header state and selection set
     if (tableBody) {
         tableBody.addEventListener('change', function(e) {
             if (e.target && e.target.classList && e.target.classList.contains('row-select-checkbox')) {
+                try {
+                    const cb = e.target;
+                    const pid = cb.dataset && cb.dataset.productId ? parseInt(cb.dataset.productId, 10) : null;
+                    if (pid && !isNaN(pid)) {
+                        if (cb.checked) selectedProductIds.add(pid);
+                        else selectedProductIds.delete(pid);
+                    }
+                } catch (err) { console.warn('row checkbox change error', err); }
+                // If after this change there are no visible checked boxes, set a short
+                // ignore flag so hover doesn't immediately re-show the delete button
+                // while the mouse is still on the row the user just unchecked.
+                try {
+                    const deleteBtn = document.getElementById('deleteSelectedBtn');
+                    if (deleteBtn && tableBody) {
+                        const allCheckboxes = Array.from(tableBody.querySelectorAll('.row-select-checkbox'));
+                        const visibleCheckboxes = allCheckboxes.filter(cb => {
+                            const row = cb.closest && cb.closest('tr');
+                            return row && row.style.display !== 'none';
+                        });
+                        const anyChecked = visibleCheckboxes.some(cb => cb.checked);
+                        // Hover/ignore flag removed — visibility controlled only by checkbox state
+                    }
+                } catch (e) { /* ignore */ }
                 updateSelectAllState();
             }
         });

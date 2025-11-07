@@ -250,6 +250,23 @@
                     -webkit-appearance: none;
                     margin: 0;
                 }
+
+                /* Stronger target for the actual typed text: reduce font-size and padding so typed text is smaller */
+                #createItemSearch,
+                .create-autocomplete input[type="text"] {
+                    font-size: 16px !important;
+                    line-height: 1.1 !important;
+                    padding: 10px 15px !important;
+                }
+
+                .create-dropdown .create-option,
+                .create-option {
+                    padding: 5px 15px;
+                }
+
+                .create-autocomplete input::placeholder {
+                    font-size: 16px !important;
+                }
                 /* Provide custom small arrow buttons (unit arrows) matching header */
                 .barcode-result-row .unit-arrows .unit-arrow {
                     background: #1f1f1f;
@@ -262,12 +279,121 @@
                     font-size: 11px;
                 }
     </style>
+    <style>
+    /* Hide number input spinners for create-tab quantity inputs (only targets .comp-qty)
+       — keeps spinner behavior for other number inputs intact. */
+    .comp-qty::-webkit-outer-spin-button,
+    .comp-qty::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    /* Firefox */
+    .comp-qty {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+    </style>
+    <style>
+    /* Container holds header, scrollable body, and footer. Body is the only scrollable part. */
+    .create-table-container { width: 100%; }
+    .create-table-body-container {
+        max-height: 260px; /* adjust as desired */
+        overflow-y: auto;
+        overflow-x: hidden;
+        background: transparent; /* make scroller background transparent */
+        -webkit-overflow-scrolling: touch;
+    }
+    /* make the inner table background transparent so rows show through */
+    #createComponentsBodyTable {
+        background: transparent;
+    }
+    /* Keep table layout stable and allow column widths to align */
+    #createComponentsTable,
+    #createComponentsBodyTable {
+        border-collapse: collapse;
+    }
+    /* Custom scrollbar: transparent track so the modal background shows through */
+    .create-table-body-container::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    .create-table-body-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .create-table-body-container::-webkit-scrollbar-thumb {
+        background: #2b2b2b;
+        border-radius: 6px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+    /* Variant select inside component rows */
+    .comp-variant {
+        background:#171717;
+        color:#fff;
+        border:1px solid #333;
+        padding:4px;
+        border-radius:4px;
+        font-size:14px;
+        min-width:160px;
+    }
+    /* Make the main item cell hoverable only when it is interactive (has variants).
+       Non-interactive items will not show hover/click affordance. */
+    .comp-name {
+        display: block;
+        padding: 0 8px;
+        border-radius: 6px;
+        transition: background 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        cursor: default;
+        background: transparent;
+        border: 1px solid transparent;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    /* When the row has variants, mark the cell .interactive so it shows the panel style by default */
+    .comp-name.interactive {
+        /* leave room on the right for the chevron (slightly reduced) */
+        position: relative;
+        padding: 4px 28px 4px 8px;
+        cursor: pointer;
+        background: #1f1f1f; /* same dark panel used elsewhere */
+        border-color: #333;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    }
+    /* Right-hand chevron like the category select: small triangle that rotates when open */
+    .comp-name.interactive::after {
+        content: "";
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%) rotate(0deg);
+        width: 0;
+        height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 4px solid #cfcfcf; /* chevron color (smaller) */
+        transition: transform 140ms ease, opacity 120ms ease;
+        opacity: 0.95;
+        pointer-events: none;
+    }
+    /* rotate the chevron when the cell is marked open */
+    .comp-name.interactive.open::after {
+        transform: translateY(-50%) rotate(180deg);
+    }
+    .comp-name.interactive:hover,
+    .comp-name.interactive:focus,
+    .comp-name.interactive:active {
+        background: #232323;
+        border-color: #444;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.22);
+    }
+    </style>
 </head>
 <!-- Scanner/Manual/Add Items Modal with Tab Panels -->
 <div class="modal" id="scannerModal">
     <span id="closeModalBtn" style="position:absolute; top:15px; right:15px; font-size:20px; color:#fff; background: none; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,0.2);">&#10006;</span>
     <div class="modal-content scanner-modal">
         <div class="modal-tabs">
+            <button class="scanner-tab" id="createTab">CREATE</button>
             <button class="scanner-tab" id="scanTab">SCAN</button>
             <button class="scanner-tab" id="manualTab">MANUAL</button>
         </div>
@@ -322,6 +448,66 @@
                     </div>
                     <div class="skip-section">
                         <button type="button" class="skip-btn" id="skipManualEntry">Skip for now</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Create Tab Panel -->
+            <div id="createTabPanel" class="tab-panel" style="display:none;">
+                <div class="modal-body">
+                    <div style="margin-bottom:12px;">
+                        <div class="create-table-container">
+                            <!-- Header table (fixed) -->
+                            <table id="createComponentsTable" style="width:100%; border-collapse:collapse;">
+                                <!-- Define column widths here so header and body table columns match -->
+                                <colgroup>
+                                    <col style="width: auto;">
+                                    <col style="width: 18%;">
+                                    <col style="width: 17%;">
+                                    <col style="width: 45px;">
+                                </colgroup>
+                                <thead>
+                                    <tr style="text-align:left; color:#dbdbdb; border-bottom:1px solid #333;">
+                                        <th style="padding:8px; padding-left: 15px;">Component</th>
+                                        <th style="padding:8px; text-align:right;">Quantity</th>
+                                        <th style="padding:8px; text-align:right;">Cost</th>
+                                        <th style="padding:8px; text-align:center;">&nbsp;</th>
+                                    </tr>
+                                </thead>
+                            </table>
+
+                            <!-- Scrollable body (only this scrolls) -->
+                            <div class="create-table-body-container">
+                                <table id="createComponentsBodyTable" style="width:100%; border-collapse:collapse;">
+                                    <colgroup>
+                                        <col style="width: auto;">
+                                        <col style="width: 18%;">
+                                        <col style="width: 17%;">
+                                        <col style="width: 45px;">
+                                    </colgroup>
+                                    <tbody id="createComponentsBody">
+                                        <!-- Component rows will be added here -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Footer (search + total) stays fixed below the list) -->
+                            <div class="create-table-footer" style="margin-top:8px;">
+                                <div style="padding-top:6px;">
+                                    <div class="create-autocomplete" style="width:100%; position:relative;">
+                                        <input id="createItemSearch" placeholder="Item search" style="width:100%; padding:10px; background:#171717; border:1px solid #333; color:#fff; border-radius:6px;" autocomplete="off" />
+                                        <div class="create-dropdown" id="createDropdown"></div>
+                                    </div>
+                                </div>
+                                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                                    <div style="text-align:right; color:#fff; align-self:right;">Total cost:</div>
+                                    <div id="createTotalCost" style="color:#fff; text-align:left; padding-left: 30px; min-width:120px;">₱0.00</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="nextBtn">Next</button>
+                    </div>
+                    <div class="skip-section">
+                        <button type="button" class="skip-btn" id="skipCreateTab">Skip for now</button>
                     </div>
                 </div>
             </div>
@@ -725,6 +911,611 @@
 </div>
 
 <script>
+// Create tab behavior: add/remove components and update total
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+    const createTabBtn = document.getElementById('createTab');
+    const createTabPanel = document.getElementById('createTabPanel');
+    const createItemSearch = document.getElementById('createItemSearch');
+    const componentsBody = document.getElementById('createComponentsBody');
+    const totalCostEl = document.getElementById('createTotalCost');
+    // Compute absolute path for variants API so fetch works regardless of include path
+    <?php $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'); $variantsPath = $base . '/variants_api.php'; ?>
+    const variantsApiPath = '<?php echo $variantsPath; ?>';
+
+        function formatCurrency(n) {
+            // Basic formatting — keep existing currency symbol used elsewhere
+            const num = parseFloat(n) || 0;
+            return '₱' + num.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        }
+
+        function recalcTotal() {
+            let total = 0;
+            const rows = componentsBody.querySelectorAll('tr.component-row');
+            rows.forEach(r => {
+                const q = parseFloat(r.querySelector('.comp-qty').value) || 0;
+                const c = parseFloat(r.querySelector('.comp-cost').value.replace(/[^0-9.-]/g,'')) || 0;
+                total += q * c;
+            });
+            totalCostEl.textContent = formatCurrency(total);
+        }
+
+        function createComponentRow(name, qty, cost, sku) {
+            const tr = document.createElement('tr');
+            tr.className = 'component-row';
+            tr.style.borderBottom = '1px solid #2b2b2b';
+            tr.innerHTML = `
+                <td style="padding:8px; color:#dbdbdb;">
+                    <div class="comp-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <div class="comp-name-text">${escapeHtml(name)}</div>
+                        ${sku ? `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">SKU: ${escapeHtml(sku)}</div>` : ''}
+                    </div>
+                </td>
+                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="number" min="0" value="${qty}" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
+                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-cost" currency-localization="₱" readonly value="${'₱' + Number(cost).toFixed(2)}" style="width:100%; background:#171717; border: none; color:#fff; cursor:default; pointer-events: none; text-align:right;" /></td>
+                <td style="padding:8px; width:45px; text-align:center;"><button class="comp-remove btn" title="Remove" style="background:transparent; border:none; color:#bbb; font-size:18px; line-height:1; width:30px; height:34px; display:inline-flex; align-items:center; justify-content:center;">🗑</button></td>
+            `;
+            // attach listeners
+            tr.querySelector('.comp-qty').addEventListener('input', function() { recalcTotal(); });
+            // comp-cost is readonly — do not attach input listener
+            const rem = tr.querySelector('.comp-remove');
+            if (rem) rem.addEventListener('click', function() { tr.remove(); recalcTotal(); });
+            componentsBody.appendChild(tr);
+            recalcTotal();
+        }
+
+        // Create a component row for a product that has variants.
+        // product: { id, name, sku }
+        // variants: [{ id, name, sku, cost, price, quantity }, ...]
+        // NOTE: variant select dropdown below the parent item has been removed per request.
+        // If variants are present we auto-select the first variant and show the variant
+        // name inline as "Parent (Variant Name)" and display the SKU on the line below.
+        function createComponentRowFromProduct(product, variants) {
+            const tr = document.createElement('tr');
+            tr.className = 'component-row';
+            tr.style.borderBottom = '1px solid #2b2b2b';
+            tr.innerHTML = `
+                <td style="padding:8px; color:#dbdbdb;">
+                    <div class="comp-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <div class="comp-name-text">${escapeHtml(product.name || '')}</div>
+                        ${product.sku ? `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">SKU: ${escapeHtml(product.sku)}</div>` : `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">&nbsp;</div>`}
+                    </div>
+                </td>
+                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="number" min="0" value="1" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
+                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-cost" currency-localization="₱" readonly value="₱0.00" style="width:100%; background:#171717; border: none; color:#fff; cursor:default; pointer-events: none; text-align:right;" /></td>
+                <td style="padding:8px; width:45px; text-align:center;"><button class="comp-remove btn" title="Remove" style="background:transparent; border:none; color:#bbb; font-size:18px; line-height:1; width:30px; height:34px; display:inline-flex; align-items:center; justify-content:center;">🗑</button></td>
+            `;
+
+            componentsBody.appendChild(tr);
+
+            const costInput = tr.querySelector('.comp-cost');
+            const skuEl = tr.querySelector('.comp-sku');
+            const nameTextEl = tr.querySelector('.comp-name-text');
+
+            // If variants available, auto-select the first variant and reflect its values.
+            if (variants && Array.isArray(variants) && variants.length) {
+                const v = variants[0];
+                // show parent with variant name inline
+                if (nameTextEl) nameTextEl.textContent = (product.name || '') + (v.name ? ' (' + v.name + ')' : '');
+                // show SKU from variant (fall back to product.sku)
+                if (skuEl) skuEl.textContent = 'SKU: ' + (v.sku || product.sku || '');
+                // use variant cost (fall back to price/product cost)
+                const costVal = (v.cost !== undefined && v.cost !== null) ? v.cost : (v.price !== undefined && v.price !== null ? v.price : (product.cost || product.price || 0));
+                costInput.value = formatCurrency(parseFloat(costVal) || 0);
+                // remember selected variant id (auto-selected first)
+                try { tr.dataset.selectedVariantId = v.id || ''; } catch(e) {}
+            } else {
+                // No variants: use product-level values
+                if (nameTextEl) nameTextEl.textContent = (product.name || '');
+                if (skuEl) skuEl.textContent = product.sku ? ('SKU: ' + product.sku) : '&nbsp;';
+                const costVal = (product.cost !== undefined && product.cost !== null) ? product.cost : (product.price !== undefined && product.price !== null ? product.price : 0);
+                costInput.value = formatCurrency(parseFloat(costVal) || 0);
+            }
+
+            // store variants/product reference on the row for later use by the inline dropdown
+            try { tr._variants = variants || null; } catch(e) { tr._variants = null; }
+            try { tr._product = product || null; } catch(e) { tr._product = null; }
+
+            // clicking the name opens a dropdown of variants (styled like category select)
+            const nameCell = tr.querySelector('.comp-name');
+            if (nameCell) {
+                // Only make the cell interactive if we have known variants
+                if (tr._variants && Array.isArray(tr._variants) && tr._variants.length) {
+                    nameCell.classList.add('interactive');
+                    nameCell.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        openVariantDropdown(nameCell, tr, product, tr._variants);
+                    });
+                } else {
+                    // ensure it's not interactive
+                    nameCell.classList.remove('interactive');
+                }
+            }
+
+            // wire qty/remove and recalc
+            tr.querySelector('.comp-qty').addEventListener('input', function() { recalcTotal(); });
+            const rem = tr.querySelector('.comp-remove');
+            if (rem) rem.addEventListener('click', function() { tr.remove(); recalcTotal(); });
+
+            recalcTotal();
+        }
+
+        // Shared inline variant dropdown (one instance appended to body)
+        const variantDropdown = document.createElement('div');
+        variantDropdown.className = 'create-dropdown comp-variant-dropdown';
+        variantDropdown.style.position = 'absolute';
+        variantDropdown.style.zIndex = 99999;
+        variantDropdown.style.display = 'none';
+        document.body.appendChild(variantDropdown);
+        let variantDropdownCurrent = null; // { row, product, variants }
+
+        function closeVariantDropdown() {
+            try {
+                if (variantDropdownCurrent && variantDropdownCurrent.row) {
+                    const prevName = variantDropdownCurrent.row.querySelector('.comp-name');
+                    if (prevName) prevName.classList.remove('open');
+                }
+            } catch (e) {}
+            variantDropdown.style.display = 'none';
+            variantDropdown.innerHTML = '';
+            variantDropdownCurrent = null;
+        }
+
+        // open dropdown positioned under triggerEl. variants is an array.
+        function openVariantDropdown(triggerEl, row, product, variants) {
+            // preserve previous so we can clear its open state
+            const previousDropdown = variantDropdownCurrent;
+            variantDropdown.innerHTML = '';
+            variantDropdownCurrent = { row, product, variants };
+
+            // build options
+            if (!variants || !variants.length) {
+                const noOpt = document.createElement('div');
+                noOpt.className = 'create-option';
+                noOpt.style.opacity = '0.7';
+                noOpt.style.cursor = 'default';
+                noOpt.textContent = 'No variants';
+                variantDropdown.appendChild(noOpt);
+            } else {
+                // If the row already has a selectedVariantId, move that variant to the front so it appears first
+                let variantsToRender = Array.isArray(variants) ? variants.slice() : [];
+                try {
+                    const curId = row.dataset && row.dataset.selectedVariantId ? String(row.dataset.selectedVariantId) : '';
+                    if (curId) {
+                        const idx = variantsToRender.findIndex(x => String(x.id) === curId);
+                        if (idx > 0) {
+                            const [found] = variantsToRender.splice(idx, 1);
+                            variantsToRender.unshift(found);
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+
+                variantsToRender.forEach(v => {
+                    const opt = document.createElement('div');
+                    opt.className = 'create-option';
+                    // left: parent (variant) + SKU, right: cost
+                    const parentName = product && product.name ? product.name : '';
+                    const variantName = v.name || '';
+                    const sku = v.sku || '';
+                    const cost = (v.cost !== undefined && v.cost !== null) ? v.cost : (v.price !== undefined && v.price !== null ? v.price : '');
+                    opt.innerHTML = `
+                        <div style="display:grid; grid-template-columns: 1fr 100px; align-items:center; gap:8px; width:100%;">
+                            <div style="min-width:0;">
+                                <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:#e6e6e6;">${escapeHtml(variantName ? variantName : '')}</div>
+                                ${sku ? `<div style="color:#9e9e9e; font-size:12px; margin-top:4px;">SKU: ${escapeHtml(sku)}</div>` : ''}
+                            </div>
+                            <div style="text-align:right; color:#9ca3af; white-space:nowrap;">${cost !== '' ? '₱' + Number(cost).toFixed(2) : ''}</div>
+                        </div>
+                    `;
+                    opt.addEventListener('mousedown', e => e.preventDefault());
+                    opt.addEventListener('click', function() {
+                        // apply selection to row
+                        const nameTextEl = row.querySelector('.comp-name-text');
+                        const skuEl = row.querySelector('.comp-sku');
+                        const costInput = row.querySelector('.comp-cost');
+                        if (nameTextEl) nameTextEl.textContent = (product.name || '') + (variantName ? ' (' + variantName + ')' : '');
+                        if (skuEl) skuEl.textContent = sku ? ('SKU: ' + sku) : (product.sku ? ('SKU: ' + product.sku) : '');
+                        if (costInput) costInput.value = formatCurrency(parseFloat(cost) || 0);
+                        // store selected variant id for potential form submission
+                        try { row.dataset.selectedVariantId = v.id || ''; } catch(e){}
+                        recalcTotal();
+                        closeVariantDropdown();
+                    });
+                    variantDropdown.appendChild(opt);
+                });
+            }
+
+            // position the dropdown relative to the trigger element, accounting for page scroll
+            const r = triggerEl.getBoundingClientRect();
+            // coordinates relative to the document
+            let left = r.left + window.scrollX;
+            // prefer matching trigger width, but ensure min width for readability
+            const width = Math.max(240, Math.round(r.width));
+            // keep within viewport right edge
+            const maxRight = window.scrollX + document.documentElement.clientWidth - 8;
+            if (left + width > maxRight) left = Math.max(8 + window.scrollX, maxRight - width);
+            // keep within viewport left edge
+            if (left < 8 + window.scrollX) left = 8 + window.scrollX;
+
+            variantDropdown.style.width = width + 'px';
+            variantDropdown.style.left = left + 'px';
+            // show it first so we can measure height
+            variantDropdown.style.display = 'block';
+            // mark trigger as open (rotate chevron)
+            try {
+                if (previousDropdown && previousDropdown.row) {
+                    const prevName = previousDropdown.row.querySelector('.comp-name');
+                    if (prevName) prevName.classList.remove('open');
+                }
+                if (triggerEl && triggerEl.classList) triggerEl.classList.add('open');
+            } catch (e) {}
+            const dh = variantDropdown.offsetHeight || variantDropdown.scrollHeight || 200;
+            // compute top so the dropdown's TOP aligns with the trigger TOP (covering the cell)
+            const topCover = r.top + window.scrollY;
+            // If there's not enough room above (or dropdown would overflow viewport bottom), fallback to placing below the trigger
+            const viewportBottom = window.scrollY + document.documentElement.clientHeight - 8;
+            if (topCover < window.scrollY + 8 || (topCover + dh) > viewportBottom) {
+                // place below
+                variantDropdown.style.top = (r.bottom + window.scrollY + 6) + 'px';
+            } else {
+                // align top of dropdown with top of trigger so it covers the cell from the top
+                variantDropdown.style.top = topCover + 'px';
+            }
+        }
+
+        // Close on outside click or Escape
+        document.addEventListener('click', function(e) {
+            if (!variantDropdownCurrent) return;
+            const inside = variantDropdown.contains(e.target) || (variantDropdownCurrent.row && variantDropdownCurrent.row.contains && variantDropdownCurrent.row.contains(e.target));
+            if (!inside) closeVariantDropdown();
+        });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeVariantDropdown(); });
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"'`]/g, function(ch) { return '&#' + ch.charCodeAt(0) + ';'; });
+        }
+
+        // Create-tab autocomplete (mirrors category autocomplete behavior but shows 'No item found' when empty)
+        (function setupCreateAutocomplete() {
+            const input = createItemSearch;
+            const dropdown = document.getElementById('createDropdown');
+            if (!input || !dropdown) return;
+
+            // Move dropdown to body to escape modal clipping
+            document.body.appendChild(dropdown);
+
+            let productsCache = null; // cached full product list
+            let filtered = [];
+            let highlighted = -1;
+
+            function fetchProductsOnce() {
+                if (productsCache !== null) return Promise.resolve(productsCache);
+
+                // Helper: try fetch and parse JSON, but return rejected promise with response text when parse fails
+                function fetchAndParse(url) {
+                    return fetch(url).then(resp => {
+                        return resp.text().then(text => {
+                            try {
+                                return JSON.parse(text);
+                            } catch (e) {
+                                // Attach the raw text for debugging
+                                const err = new Error('Invalid JSON');
+                                err.responseText = text;
+                                err.url = url;
+                                throw err;
+                            }
+                        });
+                    });
+                }
+
+                // Primary attempt (relative). Use a dedicated search endpoint so we don't call the main api.php
+                <?php $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'); $searchPath = $base . '/search_api.php'; ?>
+                const fallbackUrl = '<?php echo $searchPath; ?>';
+
+                // Try the relative path first, then fallback to the PHP-derived absolute path
+                return fetchAndParse('search_api.php')
+                    .catch(err => {
+                        // If server returned HTML (err.responseText starts with '<'), log snippet and retry fallback
+                        try {
+                            if (err && err.responseText && String(err.responseText).trim().charAt(0) === '<') {
+                                console.warn('create autocomplete: api.php returned non-JSON (HTML). Response snippet:', String(err.responseText).slice(0,400));
+                            }
+                        } catch (e) {}
+                        // Retry fallback URL once
+                        try { console.debug('create autocomplete: retrying with fallback URL', fallbackUrl); } catch(e){}
+                        return fetchAndParse(fallbackUrl);
+                    })
+                    .then(data => {
+                        if (Array.isArray(data)) productsCache = data;
+                        else if (data && Array.isArray(data.products)) productsCache = data.products;
+                        else productsCache = [];
+                        try {
+                            console.debug('create autocomplete: products fetched', productsCache.length);
+                            console.debug('create autocomplete: sample', productsCache.slice(0,5));
+                        } catch (e) {}
+                        return productsCache;
+                    })
+                    .catch(err => {
+                        console.warn('create autocomplete fetch error (after fallback)', err);
+                        if (err && err.responseText) console.debug('create autocomplete: final response text snippet', String(err.responseText).slice(0,600));
+                        productsCache = [];
+                        return productsCache;
+                    });
+            }
+
+            function getName(item) {
+                if (!item) return '';
+                if (typeof item === 'string') return item;
+                return String(item.name || item.product_name || item.title || item.product || '').trim();
+            }
+
+            function getCost(item) {
+                if (!item) return '';
+                if (typeof item === 'string') return '';
+                return (item.cost !== undefined ? item.cost : (item.price !== undefined ? item.price : (item.unit_price !== undefined ? item.unit_price : '')));
+            }
+
+                function getSKU(item) {
+                    if (!item) return '';
+                    if (typeof item === 'string') return '';
+                    return String(item.sku || item.product_sku || item.barcode || item.code || item.ref || '').trim();
+                }
+
+            function showDropdown(items, searchTerm = '') {
+                dropdown.innerHTML = '';
+                filtered = items || [];
+                highlighted = -1;
+
+                // Position dropdown below the input field
+                const r = input.getBoundingClientRect();
+                dropdown.style.top = (r.bottom + 2) + 'px';
+                dropdown.style.left = r.left + 'px';
+                dropdown.style.width = r.width + 'px';
+
+                if (filtered.length === 0) {
+                    // show non-clickable no-result row
+                    const noOpt = document.createElement('div');
+                    noOpt.className = 'create-option';
+                    noOpt.style.opacity = '0.7';
+                    noOpt.style.cursor = 'default';
+                    noOpt.textContent = searchTerm.trim() === '' ? 'Start typing to search items' : 'No item found';
+                    dropdown.appendChild(noOpt);
+                } else {
+                    filtered.forEach((p) => {
+                        const opt = document.createElement('div');
+                        opt.className = 'create-option';
+                        const displayName = getName(p);
+                        const displayCost = getCost(p);
+                        const displaySku = getSKU(p);
+                        // Two-column layout: left = name + sku (stacked), right = cost (vertically centered)
+                        opt.innerHTML = `
+                            <div style="display:grid; grid-template-columns: 1fr 120px; align-items:center; gap:8px; width:100%;">
+                                <div style="min-width:0;">
+                                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayName)}</div>
+                                    ${displaySku ? `<div style="color:#9e9e9e; font-size:12px; margin-top: 0;">SKU: ${escapeHtml(displaySku)}</div>` : ''}
+                                </div>
+                                <div style="text-align:right; color:#9ca3af; white-space:nowrap;">${displayCost !== '' ? '₱' + Number(displayCost).toFixed(2) : ''}</div>
+                            </div>
+                        `;
+                        opt.addEventListener('mousedown', e => e.preventDefault());
+                        // Pass the original product object so selectItem can access id/variants
+                        opt.addEventListener('click', () => selectItem(p));
+                        dropdown.appendChild(opt);
+                    });
+                }
+
+                dropdown.classList.add('show');
+            }
+
+            function hideDropdown() {
+                dropdown.classList.remove('show');
+                highlighted = -1;
+            }
+
+            function selectItem(item) {
+                // item may include .name, .cost, .sku, .id and optionally .variants
+                input.value = '';
+                input.focus();
+                hideDropdown();
+
+                // If product already includes variants, use them directly
+                if (item && item.variants && Array.isArray(item.variants) && item.variants.length) {
+                    createComponentRowFromProduct(item, item.variants);
+                    return;
+                }
+
+                // If product has an id, try fetching variants on demand
+                if (item && item.id) {
+                    console.log('selectItem: fetching variants for product id', item.id, 'using', variantsApiPath);
+                    fetch(variantsApiPath + '?product_id=' + encodeURIComponent(item.id))
+                        .then(resp => resp.json())
+                        .then(vars => {
+                            console.log('variants result', vars && vars.length ? vars.length : 0, 'items');
+                            if (vars && Array.isArray(vars) && vars.length) {
+                                createComponentRowFromProduct(item, vars);
+                            } else {
+                                createComponentRow(item.name || item, 1, item.cost || 0, item.sku || '');
+                            }
+                        })
+                        .catch(err => {
+                            // on error, fallback to product-level addition
+                            console.warn('variants fetch error', err);
+                            createComponentRow(item.name || item, 1, item.cost || 0, item.sku || '');
+                        });
+                    return;
+                }
+
+                // Fallback: no id/variants
+                createComponentRow(item.name || item, 1, item.cost || 0, item.sku || '');
+            }
+
+            function filterProducts(term) {
+                const list = productsCache || [];
+                // If the user hasn't typed anything, show all cached items
+                if (!term || term.trim() === '') return list;
+                const q = term.toLowerCase();
+                // Return all matches (no client-side limit)
+                return list.filter(p => {
+                    const name = getName(p).toLowerCase();
+                    return name.includes(q);
+                });
+            }
+
+            function highlight(index) {
+                const opts = dropdown.querySelectorAll('.create-option');
+                opts.forEach(o => o.classList.remove('highlighted'));
+                if (index >= 0 && index < opts.length) {
+                    opts[index].classList.add('highlighted');
+                    highlighted = index;
+                } else highlighted = -1;
+            }
+
+            input.addEventListener('focus', function() {
+                fetchProductsOnce().then(() => {
+                    const list = filterProducts(input.value.trim());
+                    showDropdown(list, input.value.trim());
+                });
+            });
+
+            input.addEventListener('input', function(e) {
+                const term = e.target.value.trim();
+                fetchProductsOnce().then(() => {
+                    const list = filterProducts(term);
+                    try { console.debug('create autocomplete: filter for', term, '=>', list.length, list.slice(0,6)); } catch (e) {}
+                    showDropdown(list, term);
+                });
+            });
+
+            input.addEventListener('keydown', function(e) {
+                const opts = dropdown.querySelectorAll('.create-option');
+                switch (e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        highlighted = Math.min(highlighted + 1, opts.length - 1);
+                        highlight(highlighted);
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        highlighted = Math.max(highlighted - 1, 0);
+                        highlight(highlighted);
+                        break;
+                    case 'Enter':
+                        e.preventDefault();
+                        // If a highlighted option exists, select it.
+                        if (highlighted >= 0 && filtered[highlighted]) {
+                            const sel = filtered[highlighted];
+                            selectItem(sel);
+                            break;
+                        }
+                        // If no highlight but filtered list has results, select the first one.
+                        if (filtered.length > 0) {
+                            const sel = filtered[0];
+                            selectItem(sel);
+                            break;
+                        }
+                        // No matches: do NOT create a new item on Enter. Keep the input and show 'No item found'.
+                        // Optionally, you can add a small visual hint here in future.
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        hideDropdown();
+                        input.blur();
+                        break;
+                }
+            });
+
+            // Hide when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    hideDropdown();
+                }
+            });
+
+            // Small blur safety: allow clicks on dropdown to register
+            input.addEventListener('blur', function() {
+                setTimeout(() => { if (!dropdown.contains(document.activeElement)) hideDropdown(); }, 120);
+            });
+        })();
+
+        // Wire create tab button to show panel (compatible with existing showTab function if present)
+        if (createTabBtn) {
+            createSaveBtn.addEventListener('click', function() {
+                try { if (typeof showTab === 'function') { showTab('create'); return; } } catch(e) {}
+                // Fallback manual toggle
+                document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+                // comp-name contains internal .comp-name-text and optional .comp-sku
+                const nameEl = r.querySelector('.comp-name-text');
+                const name = nameEl ? nameEl.textContent.trim() : (r.querySelector('.comp-name') ? r.querySelector('.comp-name').textContent.trim() : '');
+            });
+        }
+
+        // Back/Close buttons
+        const backFromCreate = document.getElementById('backFromCreate');
+        if (backFromCreate) backFromCreate.addEventListener('click', function() { try { if (typeof showTab === 'function') showTab('scan'); else { createTabPanel.style.display='none'; document.getElementById('scanTabPanel').style.display='block'; } } catch(e){} });
+        const createCancelBtn = document.getElementById('createCancelBtn');
+        if (createCancelBtn) createCancelBtn.addEventListener('click', function() { if (createTabPanel) createTabPanel.style.display='none'; });
+
+        // Optional Save button hook (can be wired to API)
+        const createSaveBtn = document.getElementById('createSaveBtn');
+    if (createSaveBtn) createSaveBtn.addEventListener('click', function() {
+            // gather components
+            const comps = [];
+            componentsBody.querySelectorAll('tr.component-row').forEach(r => {
+                const name = r.querySelector('.comp-name').textContent.trim();
+                const qty = parseFloat(r.querySelector('.comp-qty').value) || 0;
+                const cost = parseFloat((r.querySelector('.comp-cost').value || '').replace(/[^0-9.-]/g,'')) || 0;
+                if (name) comps.push({ name, qty, cost });
+            });
+            // For now just show a toast and close
+            try { if (comps.length === 0) { showErrorPopup('No components to save'); return; } } catch(e) {}
+            try { showSuccessPopup('Components saved (client-side)'); } catch(e) { alert('Components saved'); }
+            if (createTabPanel) createTabPanel.style.display = 'none';
+        });
+
+        // Expose a helper to append components into the Create tab from other pages/scripts.
+        // Uses the local helper functions (createComponentRow, createComponentRowFromProduct, variantsApiPath)
+        // so it's defined inside this DOMContentLoaded scope and has access to those helpers.
+        window.appendCreateComponents = function(items) {
+            try {
+                if (!items || !Array.isArray(items)) return;
+                // Clear existing rows
+                if (componentsBody) componentsBody.innerHTML = '';
+                // Iterate and append each. If product id present, fetch variants then create row.
+                items.forEach(function(it) {
+                    if (!it) return;
+                    var pid = it.id || it.product_id || null;
+                    var name = it.name || it.product_name || it.displayName || '';
+                    var sku = it.sku || '';
+                    var qty = (it.qty !== undefined && it.qty !== null) ? it.qty : 1;
+                    var cost = (it.cost !== undefined && it.cost !== null) ? it.cost : 0;
+
+                    if (pid) {
+                        // fetch variants and call the existing creator
+                        fetch(variantsApiPath + '?product_id=' + encodeURIComponent(pid))
+                            .then(function(resp) { return resp.json(); })
+                            .then(function(vars) {
+                                try {
+                                    createComponentRowFromProduct({ id: pid, name: name, sku: sku }, Array.isArray(vars) ? vars : []);
+                                } catch (e) {
+                                    // fallback to simple row
+                                    createComponentRow(name, qty, cost, sku);
+                                }
+                            })
+                            .catch(function() {
+                                createComponentRow(name, qty, cost, sku);
+                            });
+                    } else {
+                        createComponentRow(name, qty, cost, sku);
+                    }
+                });
+            } catch (e) { console.warn('appendCreateComponents error', e); }
+        };
+
+    } catch (e) { console.warn('create tab init error', e); }
+});
+
 // Product form submission handler
 document.addEventListener('DOMContentLoaded', function() {
     // Color selection logic (always latest selected)
@@ -757,6 +1548,26 @@ document.addEventListener('DOMContentLoaded', function() {
     if (addItemsForm) {
         addItemsForm.addEventListener('submit', function(e) {
             e.preventDefault();
+
+            // Block submission if any SKU has been marked with a client-side error
+            // (inputs receive the `sku-error` class when inventory.js detects DB duplicates
+            // or duplicate SKUs among variant rows). This ensures the canonical submit
+            // handler in this file respects the validation performed in pages/inventory/inventory.js
+            try {
+                if (document.querySelectorAll && document.querySelectorAll('.sku-error').length > 0) {
+                    // Use the in-page popup if available, fall back to alert
+                    if (typeof showErrorPopup === 'function') {
+                        showErrorPopup('SKUs are invalid or already existing.');
+                    } else {
+                        alert('SKUs are invalid or already existing.');
+                    }
+                    return; // abort submit
+                }
+            } catch (err) {
+                // If anything goes wrong checking DOM, do not proceed with submit
+                try { showErrorPopup && showErrorPopup('SKU validation failed. Please check SKU fields.'); } catch (e) { alert('SKU validation failed.'); }
+                return;
+            }
             // Collect form data
             var name = document.getElementById('inlineItemName').value.trim();
             var category = document.getElementById('inlineItemCategory').value.trim();
@@ -794,22 +1605,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 lowStock = '';
             }
             var posAvailable = document.getElementById('availablePOS') ? document.getElementById('availablePOS').checked ? 1 : 0 : 1;
-            // Representation
-            var type = document.querySelector('input[name="representationType"]:checked') ? document.querySelector('input[name="representationType"]:checked').value : 'color_shape';
+            // Determine whether the user provided an image (either as a URL input, a file upload,
+            // or a preview image). We need to compute this BEFORE deciding representation/type
+            // so the form will treat an uploaded image as a valid representation.
+            var image_url = null;
+            var imageInput = document.getElementById('productImageUrl') || document.querySelector('input[name="productImageUrl"]') || document.querySelector('.product-image-url input');
+            if (imageInput) image_url = (imageInput.value || '').trim();
+            var fileInputEl = document.getElementById('posProductImage');
+            var uploadedPreview = document.getElementById('uploadedImagePreview');
+            var hasImage = false;
+            if (image_url && image_url !== '') hasImage = true;
+            if (!hasImage && fileInputEl && fileInputEl.files && fileInputEl.files.length > 0) hasImage = true;
+            if (!hasImage && uploadedPreview && uploadedPreview.src && uploadedPreview.src.trim() !== '') hasImage = true;
+
+            // Representation: prefer an explicitly selected representation type; if none
+            // selected and an image is present, use 'image'. Fall back to 'color_shape'.
+            var repEl = document.querySelector('input[name="representationType"]:checked');
+            var type = repEl ? repEl.value : (hasImage ? 'image' : 'color_shape');
             // Get selected color and shape from UI
             var color = lastSelectedColor || '';
             var shape = lastSelectedShape || '';
-            // If POS is checked and no color/shape selected, set defaults
-            if (posAvailable && !color) color = 'gray';
-            if (posAvailable && !shape) shape = 'square';
-            var image_url = null;
-            var imageInput = document.getElementById('productImageUrl') || document.querySelector('input[name="productImageUrl"]') || document.querySelector('.product-image-url input');
-            if (imageInput) image_url = imageInput.value.trim();
+            // If POS is checked and no color/shape selected, set defaults only when
+            // there is no image (image acts as the representation)
+            if (posAvailable && (!color || color === '') && !hasImage) color = 'gray';
+            if (posAvailable && (!shape || shape === '') && !hasImage) shape = 'square';
             // If POS is checked but no representation chosen (no color, no shape, no image), prompt the POS options first.
             var productFormEl = document.querySelector('.product-form');
             var posOptionsEl = document.getElementById('posOptionsContainer');
             var representationPrompted = productFormEl && productFormEl.dataset && productFormEl.dataset.representationPrompted === '1';
-            if (posAvailable && !lastSelectedColor && !lastSelectedShape && (!image_url || image_url === '') && !representationPrompted) {
+            if (posAvailable && !lastSelectedColor && !lastSelectedShape && !hasImage && !representationPrompted) {
                 if (posOptionsEl) {
                     posOptionsEl.classList.add('slide-up');
                     posOptionsEl.style.display = 'block';
@@ -874,6 +1698,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Debug: log all variant names before sending
                 console.log('Variant names:', variants.map(v => v.name));
             }
+            // If this Add Item flow was initiated from the Create tab (Create -> Next -> Add Items),
+            // include the Create tab components as composite components to be saved with the new product.
+            // We detect the flow via the global flag set earlier by inventory.js (window._inlineCostFixed).
+            var composite_components = [];
+            try {
+                if (window._inlineCostFixed && document.getElementById('createComponentsBody')) {
+                    document.querySelectorAll('#createComponentsBody tr.component-row').forEach(function(r) {
+                        var nameEl = r.querySelector('.comp-name-text');
+                        var qtyEl = r.querySelector('.comp-qty');
+                        var costEl = r.querySelector('.comp-cost');
+                        var skuEl = r.querySelector('.comp-sku');
+                        var cname = nameEl ? nameEl.textContent.trim() : '';
+                        var cqty = qtyEl ? (qtyEl.value || '').toString().trim() : '';
+                        var ccost = costEl ? (costEl.value || '').replace(/[^0-9.-]/g,'') : '';
+                        var csku = '';
+                        if (skuEl) {
+                            try { csku = skuEl.textContent.replace(/^SKU:\s*/i, '').trim(); } catch(e) { csku = ''; }
+                        }
+                        if (cname) {
+                            composite_components.push({
+                                name: cname,
+                                price: 'variable',
+                                cost: ccost || 0,
+                                in_stock: cqty || '',
+                                sku: csku || '',
+                                pos_available: 0
+                            });
+                        }
+                    });
+                }
+            } catch (e) { console.warn('collect composite components error', e); }
                 // Client-side validation: require main Name and SKU (show both errors if both empty)
                 var skuErrorMsg = document.getElementById('skuErrorMsg');
                 var nameErrorMsg = document.getElementById('nameErrorMsg');
@@ -927,6 +1782,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Normalize stock fields: if tracking is disabled or user left field empty, send empty string
                 var payloadInStock = (trackStock && inStock) ? inStock : '';
                 var payloadLowStock = (trackStock && lowStock) ? lowStock : '';
+                // If we have composite components collected above, include them in the payload
+                var compositeFlag = (composite_components && composite_components.length) ? 1 : 0;
                 fetch('api.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -946,7 +1803,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         image_url,
                         sku,
                         barcode,
-                        variants
+                        variants,
+                        composite_from_create: compositeFlag,
+                        composite_components: composite_components,
+                        // If coming from Create flow, mark type as composite so server can store appropriately
+                        type: (compositeFlag ? 'composite' : type)
                     })
                 })
                 .then(res => res.json())
@@ -1031,6 +1892,76 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (productForm) {
                             productForm.classList.remove('pos-options-active');
                             productForm.removeAttribute('data-representation-prompted');
+                        }
+                        // Clear any uploaded image and image inputs so the modal resets to no-image state
+                        try {
+                            // file input
+                            var fileInput = document.getElementById('posProductImage');
+                            if (fileInput) {
+                                try { fileInput.value = ''; } catch (e) { /* ignore */ }
+                            }
+                            // image URL input
+                            var imageUrlInput = document.getElementById('productImageUrl') || document.querySelector('input[name="productImageUrl"]') || document.querySelector('.product-image-url input');
+                            if (imageUrlInput) imageUrlInput.value = '';
+                            // preview and uploaded area
+                            var uploadedPreview = document.getElementById('uploadedImagePreview');
+                            if (uploadedPreview) uploadedPreview.src = '';
+                            document.querySelectorAll('#uploadedImageArea').forEach(function(a) { a.style.display = 'none'; });
+                            var imageUploadArea = document.getElementById('imageUploadArea');
+                            if (imageUploadArea) imageUploadArea.style.display = 'block';
+                            var uploadPlaceholder = document.getElementById('uploadPlaceholder');
+                            if (uploadPlaceholder) uploadPlaceholder.style.display = 'block';
+                            // clear crop canvas if present
+                            var cropCanvas = document.getElementById('imageCropCanvas');
+                            if (cropCanvas && cropCanvas.getContext) {
+                                try { cropCanvas.getContext('2d').clearRect(0,0,cropCanvas.width,cropCanvas.height); } catch(e){}
+                            }
+                            // reset any global cropImage var
+                            try { if (typeof cropImage !== 'undefined') cropImage = null; } catch(e) {}
+                            // reset representation selection (radios)
+                            var reps = document.querySelectorAll('input[name="representationType"]');
+                            reps.forEach(function(r) { try { r.checked = false; } catch(e) {} });
+                            // Switch POS representation tab back to Color & Shape (not Image)
+                            try {
+                                var colorTabBtn = document.querySelector('.pos-tab-btn[data-tab="colorShape"]');
+                                var imageTabBtn = document.querySelector('.pos-tab-btn[data-tab="image"]');
+                                var colorTabPanel = document.getElementById('colorShapeTab');
+                                var imageTabPanel = document.getElementById('imageTab');
+                                var posOptions = document.getElementById('posOptionsContainer');
+
+                                // Remove pos-options-active from any product-form instances to restore interactivity
+                                document.querySelectorAll('.product-form').forEach(function(pf) {
+                                    try { pf.classList.remove('pos-options-active'); } catch(e) {}
+                                    try { pf.removeAttribute('data-representation-prompted'); } catch(e) {}
+                                    try { pf.style.pointerEvents = ''; pf.style.opacity = ''; } catch(e) {}
+                                });
+
+                                // Ensure POS options are hidden and not sliding up
+                                if (posOptions) {
+                                    try { posOptions.classList.remove('slide-up'); } catch(e) {}
+                                    try { posOptions.style.display = 'none'; } catch(e) {}
+                                }
+
+                                if (colorTabBtn && imageTabBtn && colorTabPanel && imageTabPanel) {
+                                    // Ensure both the class and inline styles are consistent with the tab state.
+                                    colorTabBtn.classList.add('active');
+                                    imageTabBtn.classList.remove('active');
+                                    // Mirror the same inline style changes that the tab click handlers apply
+                                    try { colorTabBtn.style.background = '#ff9800'; colorTabBtn.style.color = '#171717'; } catch(e) {}
+                                    try { imageTabBtn.style.background = '#333'; imageTabBtn.style.color = '#dbdbdb'; } catch(e) {}
+
+                                    // Make the color/shape panel interactive and the image panel disabled
+                                    try { colorTabPanel.style.display = 'block'; colorTabPanel.setAttribute('aria-disabled', 'false'); } catch(e) {}
+                                    try { imageTabPanel.style.display = 'none'; imageTabPanel.setAttribute('aria-disabled', 'true'); } catch(e) {}
+
+                                    try { colorTabPanel.classList.add('active'); } catch(e) {}
+                                    try { imageTabPanel.classList.remove('active'); } catch(e) {}
+
+                                    try { if (typeof setTabDisabling === 'function') setTabDisabling(); } catch(e) {}
+                                }
+                            } catch (e) { /* ignore */ }
+                        } catch (e) {
+                            console.warn('reset image state error', e);
                         }
                         // Ensure variants panel is closed and cleared so next add starts fresh
                         var variantsSection = document.getElementById('variantsSection');
@@ -1158,6 +2089,103 @@ function showErrorPopup(message) {
         popup.remove();
     }, 1800);
 }
+// In-page confirmation dialog. Returns a Promise that resolves to true if confirmed,
+// false if cancelled. Also accepts optional callbacks via second/third args.
+window.showConfirm = function(message, onConfirm, onCancel) {
+    return new Promise(function(resolve) {
+        // Create overlay
+        var overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.background = 'rgba(0,0,0,0.45)';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.zIndex = 10000;
+
+        // Modal
+        var modal = document.createElement('div');
+        modal.style.background = '#1e1e1e';
+        modal.style.color = '#fff';
+        modal.style.padding = '18px 20px';
+        modal.style.borderRadius = '10px';
+        modal.style.maxWidth = '520px';
+        modal.style.width = '90%';
+        modal.style.boxShadow = '0 8px 30px rgba(0,0,0,0.5)';
+        modal.style.fontSize = '15px';
+        modal.style.lineHeight = '1.4';
+
+        var msg = document.createElement('div');
+        msg.textContent = message || 'Are you sure?';
+        msg.style.marginBottom = '16px';
+
+        var actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.justifyContent = 'flex-end';
+        actions.style.gap = '8px';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.background = 'transparent';
+        cancelBtn.style.color = '#ddd';
+        cancelBtn.style.border = '1px solid #444';
+        cancelBtn.style.padding = '8px 12px';
+        cancelBtn.style.borderRadius = '6px';
+        cancelBtn.style.cursor = 'pointer';
+
+        var okBtn = document.createElement('button');
+        okBtn.textContent = 'Delete';
+        okBtn.style.background = '#dc3545';
+        okBtn.style.color = '#fff';
+        okBtn.style.border = 'none';
+        okBtn.style.padding = '8px 12px';
+        okBtn.style.borderRadius = '6px';
+        okBtn.style.cursor = 'pointer';
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(okBtn);
+        modal.appendChild(msg);
+        modal.appendChild(actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        // Focus management
+        okBtn.focus();
+
+        function cleanup() {
+            try { overlay.remove(); } catch (e) {}
+            document.removeEventListener('keydown', onKey);
+        }
+
+        function onKey(e) {
+            if (e.key === 'Escape') {
+                cleanup();
+                if (typeof onCancel === 'function') onCancel();
+                resolve(false);
+            } else if (e.key === 'Enter') {
+                // Enter confirms
+                cleanup();
+                if (typeof onConfirm === 'function') onConfirm();
+                resolve(true);
+            }
+        }
+
+        cancelBtn.addEventListener('click', function() {
+            cleanup();
+            if (typeof onCancel === 'function') onCancel();
+            resolve(false);
+        });
+
+        okBtn.addEventListener('click', function() {
+            cleanup();
+            if (typeof onConfirm === 'function') onConfirm();
+            resolve(true);
+        });
+
+        document.addEventListener('keydown', onKey);
+    });
+};
         });
     }
 });
