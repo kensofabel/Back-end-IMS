@@ -45,6 +45,70 @@ function recompute_parents_for_component($conn, $component_product_id = null, $c
     return $count;
 }
 
+// Helper: insert a row into audit_logs (best-effort, non-fatal). Returns bool.
+function insert_audit_log($conn, $action, $details) {
+    // Determine user id from session if available
+    $userId = null;
+    if (isset($_SESSION['user_id'])) {
+        $userId = intval($_SESSION['user_id']);
+    } else if (isset($_SESSION['user'])) {
+        if (is_array($_SESSION['user']) && isset($_SESSION['user']['id'])) $userId = intval($_SESSION['user']['id']);
+        else if (is_numeric($_SESSION['user'])) $userId = intval($_SESSION['user']);
+    }
+
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? $conn->real_escape_string($_SERVER['REMOTE_ADDR']) : '';
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? $conn->real_escape_string($_SERVER['HTTP_USER_AGENT']) : '';
+    $actionEsc = $conn->real_escape_string((string)$action);
+    $detailsEsc = $conn->real_escape_string((string)$details);
+    $userIdSql = ($userId !== null) ? intval($userId) : 'NULL';
+
+    $ins = "INSERT INTO audit_logs (user_id, action, details, ip_address, user_agent, created_at) VALUES (" . $userIdSql . ", '" . $actionEsc . "', '" . $detailsEsc . "', '" . $ip . "', '" . $ua . "', NOW())";
+    $res = $conn->query($ins);
+    if (!$res) {
+        // Log error so admin can inspect php_error.log
+        error_log("[audit] insert failed: " . $conn->error . " SQL: " . $ins);
+        return false;
+    }
+    return true;
+}
+
+// Helper: resolve SKU for a product/variant robustly.
+// Priority: variant.sku -> product.sku -> lookup by provided barcode (variant then product).
+// Returns empty string if no SKU is found (we purposely avoid falling back to barcode).
+function resolve_sku($conn, $product_id, $variant_id = null, $barcode = null) {
+    $sku = '';
+    if ($variant_id && intval($variant_id) > 0) {
+        $r = $conn->query("SELECT sku FROM product_variants WHERE id=" . intval($variant_id) . " LIMIT 1");
+        if ($r && $r->num_rows > 0) {
+            $tmp = $r->fetch_assoc();
+            if (isset($tmp['sku'])) $sku = trim((string)$tmp['sku']);
+        }
+    }
+    if ($sku === '' && $product_id && intval($product_id) > 0) {
+        $r2 = $conn->query("SELECT sku FROM products WHERE id=" . intval($product_id) . " LIMIT 1");
+        if ($r2 && $r2->num_rows > 0) {
+            $tmp2 = $r2->fetch_assoc();
+            if (isset($tmp2['sku'])) $sku = trim((string)$tmp2['sku']);
+        }
+    }
+    if ($sku === '' && $barcode && trim((string)$barcode) !== '') {
+        $b = $conn->real_escape_string(trim((string)$barcode));
+        $r3 = $conn->query("SELECT sku FROM product_variants WHERE barcode='" . $b . "' LIMIT 1");
+        if ($r3 && $r3->num_rows > 0) {
+            $tmp3 = $r3->fetch_assoc();
+            if (isset($tmp3['sku'])) $sku = trim((string)$tmp3['sku']);
+        }
+        if ($sku === '') {
+            $r4 = $conn->query("SELECT sku FROM products WHERE barcode='" . $b . "' LIMIT 1");
+            if ($r4 && $r4->num_rows > 0) {
+                $tmp4 = $r4->fetch_assoc();
+                if (isset($tmp4['sku'])) $sku = trim((string)$tmp4['sku']);
+            }
+        }
+    }
+    return $sku === null ? '' : $sku;
+}
+
 // Check if user is logged in and has permission (simplified example)
 // This app sometimes stores the logged-in id as `user_id` (pages use that),
 // and other places may set `user`. Accept either.
@@ -90,7 +154,19 @@ switch ($method) {
                     $row['variants'] = $variants;
                     echo json_encode(['found' => true, 'results' => [$row], 'product' => $row]);
                 } else {
-                    echo json_encode(['found' => false]);
+                    // No product matched the SKU; try matching variant SKU(s)
+                    $vsql = "SELECT pv.id AS variant_id, pv.product_id, pv.name AS variant_name, pv.sku, pv.barcode, pv.in_stock AS variant_in_stock, pv.low_stock AS variant_low_stock, pv.pos_available, p.name AS product_name, p.track_stock AS product_track_stock, c.name AS category FROM product_variants pv LEFT JOIN products p ON pv.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE pv.sku='" . $conn->real_escape_string($value) . "'";
+                    $vres = $conn->query($vsql);
+                    if ($vres && $vres->num_rows > 0) {
+                        $results = [];
+                        while ($vrow = $vres->fetch_assoc()) {
+                            $vrow['type'] = 'variant';
+                            $results[] = $vrow;
+                        }
+                        echo json_encode(['found' => true, 'results' => $results]);
+                    } else {
+                        echo json_encode(['found' => false]);
+                    }
                 }
             } else if ($type === 'barcode') {
                 // For barcode searches, return products with this barcode and group their variants
@@ -251,6 +327,80 @@ switch ($method) {
             $conn->begin_transaction();
             try {
                 $ids_list = implode(',', array_map('intval', $ids));
+
+                // Fetch product names and SKUs before deletion so we can record audit logs.
+                // This is best-effort: if fetching fails we continue with deletion.
+                $products_for_audit = [];
+                try {
+                    $prod_q = $conn->query("SELECT id, name, sku FROM products WHERE id IN (" . $ids_list . ")");
+                    if ($prod_q && $prod_q->num_rows > 0) {
+                        while ($pr = $prod_q->fetch_assoc()) {
+                            $products_for_audit[] = $pr;
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Non-fatal: log and continue
+                    error_log('[audit] failed to fetch products before delete: ' . $e->getMessage());
+                }
+
+                // Build a product map for quick lookup when creating variant details
+                $product_map = [];
+                foreach ($products_for_audit as $pp) {
+                    if (isset($pp['id'])) $product_map[intval($pp['id'])] = $pp;
+                }
+
+                // Fetch variants for these products so we can record per-variant audit logs (best-effort)
+                $variants_for_audit = [];
+                try {
+                    $v_q = $conn->query("SELECT id, product_id, name, sku FROM product_variants WHERE product_id IN (" . $ids_list . ")");
+                    if ($v_q && $v_q->num_rows > 0) {
+                        while ($vr = $v_q->fetch_assoc()) {
+                            $variants_for_audit[] = $vr;
+                        }
+                    }
+                } catch (Exception $e) {
+                    error_log('[audit] failed to fetch variants before delete: ' . $e->getMessage());
+                }
+
+                // Insert audit log entries for each product being deleted (best-effort)
+                try {
+                    foreach ($products_for_audit as $pa) {
+                        $pname = isset($pa['name']) ? $pa['name'] : '';
+                        $psku = isset($pa['sku']) ? $pa['sku'] : '';
+                        $details = $pname . ' (' . $psku . ')';
+                        // ignore return value; we don't want audit failure to block deletion
+                        insert_audit_log($conn, 'Item Deleted', $details);
+                    }
+                } catch (Exception $e) {
+                    error_log('[audit] failed to insert product delete audits: ' . $e->getMessage());
+                }
+
+                // Insert audit log entries for each variant being deleted (best-effort)
+                try {
+                    foreach ($variants_for_audit as $va) {
+                        $vname = isset($va['name']) ? $va['name'] : '';
+                        $vsku = isset($va['sku']) ? $va['sku'] : '';
+                        $parentId = isset($va['product_id']) ? intval($va['product_id']) : 0;
+                        $parentName = '';
+                        $parentSku = '';
+                        if ($parentId && isset($product_map[$parentId])) {
+                            $parentName = isset($product_map[$parentId]['name']) ? $product_map[$parentId]['name'] : '';
+                            $parentSku = isset($product_map[$parentId]['sku']) ? $product_map[$parentId]['sku'] : '';
+                        } else if ($parentId) {
+                            // fallback to DB lookup if not present in fetched products
+                            $p_res = $conn->query("SELECT name, sku FROM products WHERE id=" . intval($parentId) . " LIMIT 1");
+                            if ($p_res && $p_res->num_rows > 0) {
+                                $p_row = $p_res->fetch_assoc();
+                                $parentName = isset($p_row['name']) ? $p_row['name'] : '';
+                                $parentSku = isset($p_row['sku']) ? $p_row['sku'] : '';
+                            }
+                        }
+                        $variantDetails = $vname . ' (' . $vsku . ') from ' . $parentName . ' (' . $parentSku . ')';
+                        insert_audit_log($conn, 'Variant Deleted', $variantDetails);
+                    }
+                } catch (Exception $e) {
+                    error_log('[audit] failed to insert variant delete audits: ' . $e->getMessage());
+                }
 
                 // Delete related inventory rows if the table exists (schema may vary)
                 $invExists = false;
@@ -420,7 +570,19 @@ switch ($method) {
                         else $parentStatus = 'In stock';
                     }
 
-                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'parent_new_in_stock' => $parentNew, 'parent_status' => $parentStatus, 'parent_update_error' => $parentUpdateError]);
+                    // Record an audit log for Quantity Added (add_stock always supplies qty > 0)
+                    $auditLogged = null;
+                    // Resolve SKU (prefer variant sku, then product sku). If request included a barcode, try lookup by barcode too.
+                    $sku = resolve_sku($conn, $product_id, $variant_id, isset($data['barcode']) ? $data['barcode'] : null);
+                    $qtyNum = floatval($qty);
+                    $qtyAbs = abs($qtyNum);
+                    $qtyDisplay = ($qtyAbs == floor($qtyAbs)) ? (string)intval($qtyAbs) : (string)round($qtyAbs, 2);
+                    $unitStr = isset($data['unit']) ? trim((string)$data['unit']) : '';
+                    if ($unitStr !== '') $qtyDisplay .= ' ' . $unitStr;
+                    $actionStr = 'Quantity Added';
+                    $detailsStr = 'Added (' . $qtyDisplay . ') to (' . $sku . ')';
+                    $auditLogged = insert_audit_log($conn, $actionStr, $detailsStr);
+                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'parent_new_in_stock' => $parentNew, 'parent_status' => $parentStatus, 'parent_update_error' => $parentUpdateError, 'audit_logged' => $auditLogged]);
                     exit;
                 } else {
                     // Update product-level
@@ -442,7 +604,18 @@ switch ($method) {
                     $status = 'In stock';
                     if ($newNum <= 0) $status = 'Out of stock';
                     else if ($lowNum > 0 && $newNum <= $lowNum) $status = 'Low stock';
-                    echo json_encode(['success' => true, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status]);
+                    // Record an audit log for Quantity Added (add_stock always supplies qty > 0)
+                    $auditLogged = null;
+                    $sku = resolve_sku($conn, $product_id, 0, isset($data['barcode']) ? $data['barcode'] : null);
+                    $qtyNum = floatval($qty);
+                    $qtyAbs = abs($qtyNum);
+                    $qtyDisplay = ($qtyAbs == floor($qtyAbs)) ? (string)intval($qtyAbs) : (string)round($qtyAbs, 2);
+                    $unitStr = isset($data['unit']) ? trim((string)$data['unit']) : '';
+                    if ($unitStr !== '') $qtyDisplay .= ' ' . $unitStr;
+                    $actionStr = 'Quantity Added';
+                    $detailsStr = 'Added (' . $qtyDisplay . ') to (' . $sku . ')';
+                    $auditLogged = insert_audit_log($conn, $actionStr, $detailsStr);
+                    echo json_encode(['success' => true, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'audit_logged' => $auditLogged]);
                     exit;
                 }
             } catch (Exception $e) {
@@ -537,7 +710,27 @@ switch ($method) {
                         else $parentStatus = 'In stock';
                     }
 
-                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'parent_new_in_stock' => $parentNew, 'parent_status' => $parentStatus, 'parent_update_error' => $parentUpdateError]);
+                    // Record an audit log for this adjustment (added or reduced)
+                    $auditLogged = null;
+                    if (isset($data['qty'])) {
+                        $reason = isset($data['reason']) ? trim((string)$data['reason']) : '';
+                        // Resolve SKU in a robust way; avoid using barcode as the SKU
+                        $sku = resolve_sku($conn, $product_id, $variant_id, isset($data['barcode']) ? $data['barcode'] : null);
+                        $qtyNum = floatval($data['qty']);
+                        $qtyAbs = abs($qtyNum);
+                        $qtyDisplay = ($qtyAbs == floor($qtyAbs)) ? (string)intval($qtyAbs) : (string)round($qtyAbs, 2);
+                        $unitStr = isset($data['unit']) ? trim((string)$data['unit']) : '';
+                        if ($unitStr !== '') $qtyDisplay .= ' ' . $unitStr;
+                        if ($qtyNum < 0) {
+                            $actionStr = 'Quantity Reduced';
+                            $detailsStr = ($reason !== '' ? $reason : 'No reason provided') . ' (' . $qtyDisplay . ')' . ' from (' . $sku . ')';
+                        } else {
+                            $actionStr = 'Quantity Added';
+                            $detailsStr = 'Added (' . $qtyDisplay . ') to (' . $sku . ')';
+                        }
+                        $auditLogged = insert_audit_log($conn, $actionStr, $detailsStr);
+                    }
+                    echo json_encode(['success' => true, 'variant_id' => $variant_id, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'parent_new_in_stock' => $parentNew, 'parent_status' => $parentStatus, 'parent_update_error' => $parentUpdateError, 'audit_logged' => $auditLogged]);
                     exit;
                 } else {
                     $sel = $conn->query("SELECT in_stock, low_stock FROM products WHERE id=" . $product_id . " LIMIT 1");
@@ -570,7 +763,26 @@ switch ($method) {
                     if ($newNum <= 0) $status = 'Out of stock';
                     else if ($lowNum > 0 && $newNum <= $lowNum) $status = 'Low stock';
 
-                    echo json_encode(['success' => true, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status]);
+                    // Record an audit log for this adjustment (added or reduced)
+                    $auditLogged = null;
+                    if (isset($data['qty'])) {
+                        $reason = isset($data['reason']) ? trim((string)$data['reason']) : '';
+                        $sku = resolve_sku($conn, $product_id, 0, isset($data['barcode']) ? $data['barcode'] : null);
+                        $qtyNum = floatval($data['qty']);
+                        $qtyAbs = abs($qtyNum);
+                        $qtyDisplay = ($qtyAbs == floor($qtyAbs)) ? (string)intval($qtyAbs) : (string)round($qtyAbs, 2);
+                        $unitStr = isset($data['unit']) ? trim((string)$data['unit']) : '';
+                        if ($unitStr !== '') $qtyDisplay .= ' ' . $unitStr;
+                        if ($qtyNum < 0) {
+                            $actionStr = 'Quantity Reduced';
+                            $detailsStr = ($reason !== '' ? $reason : 'No reason provided') . ' (' . $qtyDisplay . ')' . ' from (' . $sku . ')';
+                        } else {
+                            $actionStr = 'Quantity Added';
+                            $detailsStr = 'Added (' . $qtyDisplay . ') to (' . $sku . ')';
+                        }
+                        $auditLogged = insert_audit_log($conn, $actionStr, $detailsStr);
+                    }
+                    echo json_encode(['success' => true, 'product_id' => $product_id, 'new_in_stock' => $new_in_stock, 'status' => $status, 'audit_logged' => $auditLogged]);
                     exit;
                 }
             } catch (Exception $e) {
@@ -746,6 +958,25 @@ switch ($method) {
                     . $vbarcode . "', "
                     . $vpos_available . ")";
                 if (!$conn->query($var_sql)) throw new Exception($conn->error);
+                // Record an audit log for variant creation: "Variant Added" with details "Name(SKU) to Parent*(SKU)"
+                try {
+                    $parentSku = resolve_sku($conn, $product_id, 0, isset($barcode) ? $barcode : null);
+                    // Use the parent's name (from the request $name) when available; otherwise try to load it
+                    $parentName = '';
+                    if (isset($name) && $name !== '') {
+                        $parentName = $name;
+                    } else {
+                        $p_res = $conn->query("SELECT name FROM products WHERE id=" . intval($product_id) . " LIMIT 1");
+                        if ($p_res && $p_res->num_rows > 0) {
+                            $p_row = $p_res->fetch_assoc();
+                            $parentName = isset($p_row['name']) ? $p_row['name'] : '';
+                        }
+                    }
+                    $variantDetails = $vname . ' (' . $vsku . ') to ' . $parentName . ' (' . $parentSku . ')';
+                    insert_audit_log($conn, 'Variant Added', $variantDetails);
+                } catch (Exception $e) {
+                    error_log('[audit] variant create audit failed: ' . $e->getMessage());
+                }
             }
 
             // If composite components were included (Create -> Add flow), persist them into a dedicated
@@ -831,8 +1062,24 @@ switch ($method) {
                 throw $e;
             }
 
+            // Record an audit log for the created item: include human-friendly name and SKU
+            $auditLogged = false;
+            try {
+                $details = (isset($name) ? $name : '') . ' (' . (isset($sku) ? $sku : '') . ')';
+                // If this product is a composite (components were supplied) or the request
+                // indicates the create tab origin, use 'Created an Item' as the action.
+                $isComposite = !empty($composite_components);
+                $createdFromCreateTab = (isset($data['created_from']) && $data['created_from'] === 'create') || (isset($data['from']) && $data['from'] === 'create');
+                $action = ($isComposite || $createdFromCreateTab) ? 'Created an Item' : 'Added an Item';
+                $auditLogged = insert_audit_log($conn, $action, $details);
+            } catch (Exception $e) {
+                // Non-fatal: we still want to commit the product creation even if audit insert fails
+                error_log('[audit] product create audit failed: ' . $e->getMessage());
+                $auditLogged = false;
+            }
+
             $conn->commit();
-            echo json_encode(['success' => true, 'product_id' => $product_id]);
+            echo json_encode(['success' => true, 'product_id' => $product_id, 'audit_logged' => $auditLogged]);
         } catch (Exception $e) {
             $conn->rollback();
             http_response_code(500);

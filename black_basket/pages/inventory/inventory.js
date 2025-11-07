@@ -3333,7 +3333,9 @@ function removeSkuErrorBorderOnly(inputEl) {
                     if (statusEl) statusEl.style.display = 'none';
                 }
 
-                if (catEl) catEl.textContent = item.category || '';
+                // For variant results, show the parent product name on the top line
+                // (previously this displayed the category). For product results, keep showing category.
+                if (catEl) catEl.textContent = (item.type === 'variant') ? (item.product_name || '') : (item.category || '');
                 if (nameEl) nameEl.textContent = item.type === 'variant' ? (item.variant_name || '') : (item.name || '');
                 // Columns that can be hidden when tracking is off
                 const instockCol = node.querySelector('.br-col-instock');
@@ -3535,8 +3537,188 @@ function removeSkuErrorBorderOnly(inputEl) {
                             vAddBtn.addEventListener('click', function() {
                                 const rawQty = vAddQty ? vAddQty.value.trim() : '';
                                 const qty = rawQty === '' ? 0 : parseFloat(rawQty);
-                                if (!qty || isNaN(qty) || qty <= 0) {
+                                if (isNaN(qty) || qty === 0) {
                                     showErrorPopup('Please enter a quantity greater than 0');
+                                    return;
+                                }
+                                if (qty < 0) {
+                                    // Ask for confirmation and reason before allowing negative adjustments
+                                    showNegativeQuantityConfirm(qty, function(reason) {
+                                        // proceed with negative adjustment (use adjust_stock action)
+                                        let unit = '';
+                                        try { const anyUnit = vNode.querySelector('.unit-value'); if (anyUnit) unit = anyUnit.textContent.trim(); } catch (e) {}
+
+                                        // Ghost number animation (negative)
+                                        try {
+                                            if (vInstockEl) {
+                                                const ghost = document.createElement('div');
+                                                ghost.className = 'ghost-add-number';
+                                                ghost.textContent = `${qty}${(unit && unit !== '- -') ? ' ' + unit : ''}`;
+                                                vNode.appendChild(ghost);
+                                                const instRect = vInstockEl.getBoundingClientRect();
+                                                const rowRect = vNode.getBoundingClientRect();
+                                                const ghostRect = ghost.getBoundingClientRect();
+                                                const centerX = instRect.left - rowRect.left + (instRect.width / 2) - (ghostRect.width / 2) - 6;
+                                                const centerY = instRect.top - rowRect.top + (instRect.height / 2) - (ghostRect.height / 2);
+                                                ghost.style.left = (centerX > 4 ? centerX : 4) + 'px';
+                                                ghost.style.top = (centerY > 2 ? centerY : 2) + 'px';
+                                                requestAnimationFrame(() => { ghost.style.animation = 'ghost-float 900ms ease-out forwards'; });
+                                                setTimeout(() => { try { ghost.remove(); } catch(e){} }, 1000);
+                                            }
+                                        } catch (e) { console.error('ghost immediate error', e); }
+
+                                        vAddBtn.disabled = true;
+                                        vAddQty.disabled = true;
+                                        const payload = { action: 'adjust_stock', product_id: item.id, variant_id: variant.variant_id, qty: qty, reason: reason };
+                                        if (unit && unit !== '- -') payload.unit = unit;
+                                        fetch('api.php', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify(payload)
+                                        }).then(res => res.json())
+                                        .then(resp => {
+                                            if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'Unknown error');
+                                            const newInStock = resp.new_in_stock || resp.new_in_stock === '' ? resp.new_in_stock : null;
+                                            const newStatus = resp.status || '';
+                                            if (vInstockEl) vInstockEl.textContent = newInStock !== null ? newInStock : '—';
+                                            if (vStatusEl) vStatusEl.textContent = newStatus || '—';
+                                            try { const wrapper = vNode.closest && vNode.closest('.br-row-wrapper'); if (resp && resp.parent_new_in_stock && wrapper) {
+                                                    const parentNode = wrapper.querySelector('.barcode-result-row'); if (parentNode) {
+                                                        const pInst = parentNode.querySelector('.br-instock-value'); const pStatus = parentNode.querySelector('.br-status');
+                                                        if (pInst) pInst.textContent = resp.parent_new_in_stock || '—';
+                                                        if (pStatus) pStatus.textContent = resp.parent_status || '—';
+                                                        try { parentNode.setAttribute('data-in-stock', resp.parent_new_in_stock ? String(resp.parent_new_in_stock).replace(/\s+/g,'') : ''); } catch (e) {}
+                                                    }
+                                                } else { try { recalcParentTotals(); } catch (e) { console.error('parent recalc after variant add failed', e); } } } catch (e) { console.error('parent update error after variant add', e); }
+                                            vNode.classList.add('added');
+                                            setTimeout(() => vNode.classList.remove('added'), 900);
+                                            const successCol = vNode.querySelector('.br-col-success');
+                                            const successMsg = vNode.querySelector('.br-success-message');
+                                            const successAgainBtn = vNode.querySelector('.br-add-again');
+                                            setTimeout(() => {
+                                                try {
+                                                    const cols = vNode.querySelectorAll('.br-col');
+                                                    cols.forEach(col => {
+                                                        if (!col.classList.contains('br-col-success')) {
+                                                            col.style.display = 'none';
+                                                        }
+                                                    });
+                                                    const nameText = vNameEl ? vNameEl.textContent.trim() : '';
+                                                    const categoryText = vCatEl ? vCatEl.textContent.trim() : '';
+                                                    let displayUnit = (unit && unit !== '- -') ? unit : '';
+                                                    const totalTextRaw = (newInStock !== null) ? String(newInStock) : '';
+                                                    if (!displayUnit && totalTextRaw) {
+                                                        const m = totalTextRaw.match(/^[0-9]+(?:\.[0-9]+)?\s*(.*)$/);
+                                                        if (m && m[1]) displayUnit = m[1].trim();
+                                                    }
+                                                    const addedQtyDisplay = `${qty}${displayUnit || ''}`;
+                                                    const totalText = totalTextRaw || '';
+                                                    const totalDisplay = totalText ? totalText.replace(/\s+/g, '') : '—';
+                                                    let statusTextNow = (newStatus || '').trim();
+                                                    if (!statusTextNow) statusTextNow = '—';
+                                                    else if (statusTextNow.toLowerCase().includes('with')) statusTextNow = 'With stock';
+                                                    else if (statusTextNow.toLowerCase().includes('low')) statusTextNow = 'Low stock';
+                                                    else if (statusTextNow.toLowerCase().includes('out')) statusTextNow = 'Out of stock';
+                                                    if (successMsg) {
+                                                        // If this was a negative adjustment include reason in message
+                                                        if (typeof reason !== 'undefined' && reason) {
+                                                            successMsg.textContent = `You've successfully adjusted ${addedQtyDisplay} of ${nameText || ''} under ${categoryText || 'No Category'} (${reason}) — new total ${totalDisplay} (${statusTextNow})`;
+                                                        } else {
+                                                            successMsg.textContent = `You've successfully added ${addedQtyDisplay} of ${nameText || ''} under ${categoryText || 'No Category'} with a total of ${totalDisplay} (${statusTextNow})`;
+                                                        }
+                                                    }
+                                                    try { vNode._lastAdded = { qty: qty, unit: displayUnit || unit || '' }; } catch (e) {}
+                                                    if (successCol) successCol.style.display = '';
+                                                    if (successAgainBtn) {
+                                                        successAgainBtn.onclick = function() {
+                                                            const cols = vNode.querySelectorAll('.br-col');
+                                                            cols.forEach(col => {
+                                                                if (!col.classList.contains('br-col-success')) {
+                                                                    // Hide track-toggle for variants (never show)
+                                                                    if (col.classList.contains('br-col-track')) {
+                                                                        col.style.display = 'none';
+                                                                    } else {
+                                                                        col.style.display = '';
+                                                                    }
+                                                                }
+                                                            });
+                                                            if (successCol) successCol.style.display = 'none';
+                                                            if (vAddQty) vAddQty.value = '';
+                                                            if (vAddBtn) {
+                                                                vAddBtn.disabled = false;
+                                                                vAddQty.disabled = false;
+                                                                try { vAddQty.focus(); } catch (e) {}
+                                                            }
+                                                        };
+                                                    }
+                                                    const undoBtn = vNode.querySelector('.br-undo');
+                                                    if (undoBtn) {
+                                                        undoBtn.onclick = function() {
+                                                            const last = vNode._lastAdded || { qty: qty, unit: displayUnit || unit || '' };
+                                                            const prevText = undoBtn.textContent;
+                                                            try { undoBtn.textContent = 'Undoing...'; } catch (e) {}
+                                                            const undoQty = -Math.abs(parseFloat(last.qty) || -qty);
+                                                            const adjustPayload = { action: 'adjust_stock', product_id: item.id, variant_id: variant.variant_id, qty: undoQty };
+                                                            if (last.unit && last.unit !== '- -') adjustPayload.unit = last.unit;
+                                                            undoBtn.disabled = true;
+                                                            fetch('api.php', {
+                                                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(adjustPayload)
+                                                            }).then(r => r.json()).then(res => {
+                                                                if (!res || !res.success) throw new Error(res && res.error ? res.error : 'Unknown error');
+                                                                if (vInstockEl) vInstockEl.textContent = res.new_in_stock !== null ? res.new_in_stock : '—';
+                                                                if (vStatusEl) vStatusEl.textContent = res.status || '—';
+                                                                try {
+                                                                    const wrapper = vNode.closest && vNode.closest('.br-row-wrapper');
+                                                                    if (res && res.parent_new_in_stock && wrapper) {
+                                                                        const parentNode = wrapper.querySelector('.barcode-result-row');
+                                                                        if (parentNode) {
+                                                                            const pInst = parentNode.querySelector('.br-instock-value');
+                                                                            const pStatus = parentNode.querySelector('.br-status');
+                                                                            if (pInst) pInst.textContent = res.parent_new_in_stock || '—';
+                                                                            if (pStatus) pStatus.textContent = res.parent_status || '—';
+                                                                            try { parentNode.setAttribute('data-in-stock', res.parent_new_in_stock ? String(res.parent_new_in_stock).replace(/\s+/g,'') : ''); } catch (e) {}
+                                                                        }
+                                                                    } else {
+                                                                        try { recalcParentTotals(); } catch (e) { console.error('parent recalc after variant undo failed', e); }
+                                                                    }
+                                                                } catch (e) { console.error('parent update error after variant undo', e); }
+                                                                const cols = vNode.querySelectorAll('.br-col');
+                                                                cols.forEach(col => {
+                                                                    if (!col.classList.contains('br-col-success')) {
+                                                                        if (col.classList.contains('br-col-track')) {
+                                                                            col.style.display = 'none';
+                                                                        } else {
+                                                                            col.style.display = '';
+                                                                        }
+                                                                    } else {
+                                                                        col.style.display = 'none';
+                                                                    }
+                                                                });
+                                                                try { if (vAddQty) { vAddQty.style.display = ''; vAddQty.disabled = false; vAddQty.value = ''; vAddQty.focus(); } } catch (e) {}
+                                                                try { if (vAddBtn) { vAddBtn.style.display = ''; vAddBtn.disabled = false; } } catch (e) {}
+                                                                undoBtn.textContent = prevText;
+                                                                undoBtn.disabled = false;
+                                                            }).catch(err => {
+                                                                undoBtn.textContent = prevText;
+                                                                undoBtn.disabled = false;
+                                                                showErrorPopup('Failed to undo: ' + (err.message || err));
+                                                            });
+                                                        };
+                                                    }
+                                                } catch (e) {
+                                                    console.error('replace row content error', e);
+                                                }
+                                            }, 750);
+                                        }).catch(err => {
+                                            console.error('adjust_stock error', err);
+                                            showErrorPopup('Failed to adjust stock: ' + (err.message || err));
+                                            vAddBtn.disabled = false;
+                                            vAddQty.disabled = false;
+                                        });
+                                    }, function() {
+                                        // cancelled - do nothing, keep input as-is
+                                        try { vAddQty.focus(); } catch (e) {}
+                                    });
                                     return;
                                 }
                                 let unit = '';
@@ -3818,6 +4000,25 @@ function removeSkuErrorBorderOnly(inputEl) {
                 }
                 const trackingOn = trackingVal === 1;
 
+                // Ensure columns are visible when tracking is ON on initial render.
+                // Some template/CSS variants hide columns by default and rely on the
+                // toggle change handler to reveal them — explicitly show them here
+                // so the initial render matches the UI after toggling.
+                if (trackingOn) {
+                    try {
+                        if (instockCol) instockCol.style.display = '';
+                        if (statusCol) statusCol.style.display = '';
+                        if (addCol) {
+                            // Don't show add-col for parents that actually have variants
+                            if (addCol.getAttribute && addCol.getAttribute('data-has-variants') === '1') {
+                                addCol.style.display = 'none';
+                            } else {
+                                addCol.style.display = '';
+                            }
+                        }
+                    } catch (e) { /* ignore DOM errors */ }
+                }
+
                 // Attach ids for persistence: product or variant
                 if (item.type === 'product' && item.id) {
                     node.setAttribute('data-product-id', item.id);
@@ -3979,8 +4180,153 @@ function removeSkuErrorBorderOnly(inputEl) {
                     addBtn.addEventListener('click', function() {
                         const rawQty = addQty ? addQty.value.trim() : '';
                         const qty = rawQty === '' ? 0 : parseFloat(rawQty);
-                        if (!qty || isNaN(qty) || qty <= 0) {
+                        if (isNaN(qty) || qty === 0) {
                             showErrorPopup('Please enter a quantity greater than 0');
+                            return;
+                        }
+                        if (qty < 0) {
+                            showNegativeQuantityConfirm(qty, function(reason) {
+                                // proceed with adjust_stock since qty is negative
+                                let unit = '';
+                                try { const anyUnit = node.querySelector('.unit-value'); if (anyUnit) unit = anyUnit.textContent.trim(); } catch (e) {}
+
+                                try {
+                                    if (instockEl) {
+                                        const ghost = document.createElement('div');
+                                        ghost.className = 'ghost-add-number';
+                                        ghost.textContent = `${qty}${(unit && unit !== '- -') ? ' ' + unit : ''}`;
+                                        node.appendChild(ghost);
+                                        const instRect = instockEl.getBoundingClientRect();
+                                        const rowRect = node.getBoundingClientRect();
+                                        const ghostRect = ghost.getBoundingClientRect();
+                                        const centerX = instRect.left - rowRect.left + (instRect.width / 2) - (ghostRect.width / 2) - 6;
+                                        const centerY = instRect.top - rowRect.top + (instRect.height / 2) - (ghostRect.height / 2);
+                                        ghost.style.left = (centerX > 4 ? centerX : 4) + 'px';
+                                        ghost.style.top = (centerY > 2 ? centerY : 2) + 'px';
+                                        requestAnimationFrame(() => { ghost.style.animation = 'ghost-float 900ms ease-out forwards'; });
+                                        setTimeout(() => { try { ghost.remove(); } catch(e){} }, 1000);
+                                    }
+                                } catch (e) { console.error('ghost immediate error', e); }
+
+                                addBtn.disabled = true;
+                                addQty.disabled = true;
+                                const payload = { action: 'adjust_stock', product_id: node.getAttribute('data-product-id') ? parseInt(node.getAttribute('data-product-id')) : 0, qty: qty, reason: reason };
+                                if (node.getAttribute('data-variant-id')) payload.variant_id = parseInt(node.getAttribute('data-variant-id'));
+                                if (unit && unit !== '- -') payload.unit = unit;
+
+                                fetch('api.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                }).then(res => res.json())
+                                .then(resp => {
+                                    if (!resp || !resp.success) throw new Error(resp && resp.error ? resp.error : 'Unknown error');
+                                    const newInStock = resp.new_in_stock || resp.new_in_stock === '' ? resp.new_in_stock : null;
+                                    const newStatus = resp.status || '';
+                                    if (instockEl) instockEl.textContent = newInStock !== null ? newInStock : '—';
+                                    if (statusEl) statusEl.textContent = newStatus || '—';
+                                            node.classList.add('added');
+                                            setTimeout(() => node.classList.remove('added'), 900);
+                                            const successCol = node.querySelector('.br-col-success');
+                                            const successMsg = node.querySelector('.br-success-message');
+                                            const successAgainBtn = node.querySelector('.br-add-again');
+                                            setTimeout(() => {
+                                                try {
+                                                    const cols = node.querySelectorAll('.br-col');
+                                                    cols.forEach(col => {
+                                                        if (!col.classList.contains('br-col-success')) {
+                                                            col.style.display = 'none';
+                                                        }
+                                                    });
+                                                    const nameText = nameEl ? nameEl.textContent.trim() : '';
+                                                    const categoryText = catEl ? catEl.textContent.trim() : '';
+                                                    let displayUnit = (unit && unit !== '- -') ? unit : '';
+                                                    const totalTextRaw = (newInStock !== null) ? String(newInStock) : '';
+                                                    if (!displayUnit && totalTextRaw) {
+                                                        const m = totalTextRaw.match(/^[0-9]+(?:\.[0-9]+)?\s*(.*)$/);
+                                                        if (m && m[1]) displayUnit = m[1].trim();
+                                                    }
+                                                    const addedQtyDisplay = `${qty}${displayUnit || ''}`;
+                                                    const totalText = totalTextRaw || '';
+                                                    const totalDisplay = totalText ? totalText.replace(/\s+/g, '') : '—';
+                                                    let statusTextNow = (newStatus || '').trim();
+                                                    if (!statusTextNow) statusTextNow = '—';
+                                                    else if (statusTextNow.toLowerCase().includes('with')) statusTextNow = 'With stock';
+                                                    else if (statusTextNow.toLowerCase().includes('low')) statusTextNow = 'Low stock';
+                                                    else if (statusTextNow.toLowerCase().includes('out')) statusTextNow = 'Out of stock';
+                                                    if (successMsg) {
+                                                        if (typeof reason !== 'undefined' && reason) {
+                                                            successMsg.textContent = `You've successfully adjusted ${addedQtyDisplay} of ${nameText || ''} under ${categoryText || 'No Category'} (${reason}) — new total ${totalDisplay} (${statusTextNow})`;
+                                                        } else {
+                                                            successMsg.textContent = `You've successfully added ${addedQtyDisplay} of ${nameText || ''} under ${categoryText || 'No Category'} with a total of ${totalDisplay} (${statusTextNow})`;
+                                                        }
+                                                    }
+                                                    try { node._lastAdded = { qty: qty, unit: displayUnit || unit || '' }; } catch (e) {}
+                                                    if (successCol) successCol.style.display = '';
+                                                    if (successAgainBtn) {
+                                                        successAgainBtn.onclick = function() {
+                                                            const cols = node.querySelectorAll('.br-col');
+                                                            cols.forEach(col => {
+                                                                if (!col.classList.contains('br-col-success')) {
+                                                                    col.style.display = '';
+                                                                }
+                                                            });
+                                                            if (successCol) successCol.style.display = 'none';
+                                                            if (addQty) addQty.value = '';
+                                                            if (addBtn) {
+                                                                addBtn.disabled = false;
+                                                                addQty.disabled = false;
+                                                                try { addQty.focus(); } catch (e) {}
+                                                            }
+                                                        };
+                                                    }
+                                                    const undoBtn = node.querySelector('.br-undo');
+                                                    if (undoBtn) {
+                                                        undoBtn.onclick = function() {
+                                                            const last = node._lastAdded || { qty: qty, unit: displayUnit || unit || '' };
+                                                            const prevText = undoBtn.textContent;
+                                                            try { undoBtn.textContent = 'Undoing...'; } catch (e) {}
+                                                            const undoQty = -Math.abs(parseFloat(last.qty) || -qty);
+                                                            const adjustPayload = { action: 'adjust_stock', product_id: item.id, qty: undoQty };
+                                                            if (last.unit && last.unit !== '- -') adjustPayload.unit = last.unit;
+                                                            undoBtn.disabled = true;
+                                                            fetch('api.php', {
+                                                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(adjustPayload)
+                                                            }).then(r => r.json()).then(res => {
+                                                                if (!res || !res.success) throw new Error(res && res.error ? res.error : 'Unknown error');
+                                                                if (instockEl) instockEl.textContent = res.new_in_stock !== null ? res.new_in_stock : '—';
+                                                                if (statusEl) statusEl.textContent = res.status || '—';
+                                                                try { recalcParentTotals(); } catch (e) {}
+                                                                const cols = node.querySelectorAll('.br-col');
+                                                                cols.forEach(col => {
+                                                                    if (!col.classList.contains('br-col-success')) {
+                                                                        col.style.display = '';
+                                                                    } else {
+                                                                        col.style.display = 'none';
+                                                                    }
+                                                                });
+                                                                try { if (addQty) { addQty.style.display = ''; addQty.disabled = false; addQty.value = ''; addQty.focus(); } } catch (e) {}
+                                                                try { if (addBtn) { addBtn.style.display = ''; addBtn.disabled = false; } } catch (e) {}
+                                                                undoBtn.textContent = prevText;
+                                                                undoBtn.disabled = false;
+                                                            }).catch(err => {
+                                                                undoBtn.textContent = prevText;
+                                                                undoBtn.disabled = false;
+                                                                showErrorPopup('Failed to undo: ' + (err.message || err));
+                                                            });
+                                                        };
+                                                    }
+                                                } catch (e) {
+                                                    console.error('replace product row content error', e);
+                                                }
+                                            }, 750);
+                                }).catch(err => {
+                                    console.error('adjust_stock error', err);
+                                    showErrorPopup('Failed to adjust stock: ' + (err.message || err));
+                                    addBtn.disabled = false;
+                                    addQty.disabled = false;
+                                });
+                            }, function() { try { addQty.focus(); } catch (e) {} });
                             return;
                         }
 
@@ -5258,5 +5604,224 @@ function setupPOSOptions() {
                 imageInput.dispatchEvent(new Event('change'));
             }
         });
+    }
+}
+
+// Reusable negative-quantity confirmation with reason dropdown
+function showNegativeQuantityConfirm(qty, onConfirm, onCancel) {
+    // Ensure single modal instance
+    let modal = document.getElementById('negativeQtyConfirmModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'negativeQtyConfirmModal';
+        modal.style.position = 'fixed';
+        modal.style.left = '0';
+        modal.style.top = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100vh';
+        modal.style.background = 'rgba(0,0,0,0.45)';
+        modal.style.zIndex = '100000';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+
+        const content = document.createElement('div');
+    content.style.background = '#121212';
+    content.style.padding = '12px';
+    content.style.borderRadius = '10px';
+    content.style.minWidth = '260px';
+    content.style.maxWidth = '360px';
+    content.style.width = 'auto';
+    content.style.color = '#fff';
+        content.style.boxShadow = '0 10px 30px rgba(0,0,0,0.6)';
+
+        const msg = document.createElement('div');
+        msg.id = 'negativeQtyMsg';
+        msg.style.marginBottom = '12px';
+        msg.style.fontSize = '15px';
+        content.appendChild(msg);
+
+        const reasonRow = document.createElement('div');
+        reasonRow.style.display = 'flex';
+        reasonRow.style.flexDirection = 'column';
+        reasonRow.style.gap = '8px';
+        reasonRow.style.marginBottom = '12px';
+
+        const label = document.createElement('label');
+        label.textContent = 'Reason';
+        label.style.fontSize = '13px';
+        label.style.color = '#d7d7d7';
+        reasonRow.appendChild(label);
+
+        // Build a custom-styled dropdown (to match category options) instead of a native <select>
+        const opts = ['Waste','Damaged', 'Expired', 'Inventory adjustment', 'Sold/Returned', 'Other'];
+        let selectedReason = opts[0];
+        const dropdown = document.createElement('div');
+        dropdown.className = 'negative-reason-dropdown';
+        dropdown.style.position = 'relative';
+        dropdown.style.userSelect = 'none';
+        dropdown.style.width = '100%';
+
+        const selectedDisplay = document.createElement('div');
+        selectedDisplay.className = 'negative-reason-selected';
+        selectedDisplay.textContent = selectedReason;
+        selectedDisplay.style.padding = '8px';
+        selectedDisplay.style.background = '#0f0f0f';
+        selectedDisplay.style.color = '#fff';
+        selectedDisplay.style.border = '1px solid #333';
+        selectedDisplay.style.borderRadius = '6px';
+        selectedDisplay.style.cursor = 'pointer';
+        selectedDisplay.style.display = 'flex';
+        selectedDisplay.style.alignItems = 'center';
+        selectedDisplay.style.justifyContent = 'space-between';
+
+        const caret = document.createElement('span');
+        caret.textContent = '▾';
+        caret.style.marginLeft = '8px';
+        caret.style.opacity = '0.8';
+        selectedDisplay.appendChild(caret);
+
+    const optionsList = document.createElement('div');
+    optionsList.className = 'negative-reason-options';
+    optionsList.style.position = 'absolute';
+    optionsList.style.left = '0';
+    optionsList.style.right = '0';
+    optionsList.style.top = '0';
+    // make scroller background transparent to match requested style
+    optionsList.style.background = '#252525ff';
+        optionsList.style.border = '1px solid #333';
+        optionsList.style.borderRadius = '6px';
+        optionsList.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
+        optionsList.style.zIndex = '100001';
+        optionsList.style.display = 'none';
+        optionsList.style.maxHeight = '200px';
+        optionsList.style.overflow = 'auto';
+
+        // Inject light custom scrollbar styles (WebKit + simple fallback) so the
+        // scroller appears transparent and subtle. Only inject once per document.
+        if (!document.getElementById('negativeQtyCustomStyles')) {
+            const ss = document.createElement('style');
+            ss.id = 'negativeQtyCustomStyles';
+            ss.textContent = `
+            .negative-reason-options::-webkit-scrollbar{width:8px;height:8px}
+            .negative-reason-options::-webkit-scrollbar-track{background:transparent}
+            .negative-reason-options::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:6px}
+            `;
+            document.head.appendChild(ss);
+        }
+
+        opts.forEach(o => {
+            const opt = document.createElement('div');
+            opt.className = 'negative-reason-option';
+            opt.textContent = o;
+            opt.dataset.value = o;
+            opt.style.padding = '10px 8px';
+            opt.style.cursor = 'pointer';
+            opt.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+            opt.style.color = '#fff';
+            opt.addEventListener('mouseenter', () => { opt.style.background = '#151515'; });
+            opt.addEventListener('mouseleave', () => { opt.style.background = 'transparent'; });
+            opt.addEventListener('click', function(e) {
+                selectedReason = this.dataset.value;
+                // Update the selected text while keeping the caret
+                if (selectedDisplay.firstChild && selectedDisplay.firstChild.nodeType === 3) {
+                    selectedDisplay.firstChild.nodeValue = selectedReason;
+                } else {
+                    selectedDisplay.insertBefore(document.createTextNode(selectedReason), caret);
+                }
+                optionsList.style.display = 'none';
+                // toggle other input visibility
+                if (selectedReason === 'Other') otherInput.style.display = '';
+                else otherInput.style.display = 'none';
+            });
+            optionsList.appendChild(opt);
+        });
+
+        // Ensure selectedDisplay shows the selectedReason text node before the caret
+        if (!(selectedDisplay.firstChild && selectedDisplay.firstChild.nodeType === 3)) {
+            selectedDisplay.insertBefore(document.createTextNode(selectedReason), caret);
+        } else {
+            selectedDisplay.firstChild.nodeValue = selectedReason;
+        }
+
+        selectedDisplay.addEventListener('click', function(e) {
+            e.stopPropagation();
+            optionsList.style.display = (optionsList.style.display === 'none') ? 'block' : 'none';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function docClose(e) {
+            if (optionsList.style.display === 'block') optionsList.style.display = 'none';
+        });
+
+        dropdown.appendChild(selectedDisplay);
+        dropdown.appendChild(optionsList);
+        reasonRow.appendChild(dropdown);
+
+        const otherInput = document.createElement('input');
+    otherInput.id = 'negativeQtyOther';
+    otherInput.placeholder = 'If Other, explain (optional)';
+    otherInput.style.padding = '8px';
+    otherInput.style.background = '#0f0f0f';
+    otherInput.style.color = '#fff';
+    otherInput.style.border = '1px solid #333';
+    otherInput.style.borderRadius = '6px';
+    otherInput.style.display = 'none';
+    otherInput.style.width = '100%';
+        reasonRow.appendChild(otherInput);
+
+        // otherInput visibility is toggled in option click handler above
+
+        content.appendChild(reasonRow);
+
+        const btnRow = document.createElement('div');
+        btnRow.style.display = 'flex';
+        btnRow.style.justifyContent = 'flex-end';
+        btnRow.style.gap = '10px';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'btn';
+        cancelBtn.style.background = '#333';
+        cancelBtn.style.color = '#fff';
+        cancelBtn.style.padding = '8px 12px';
+        cancelBtn.style.borderRadius = '6px';
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Continue';
+        confirmBtn.className = 'btn';
+        confirmBtn.style.background = '#ff9800';
+        confirmBtn.style.color = '#171717';
+        confirmBtn.style.padding = '8px 12px';
+        confirmBtn.style.borderRadius = '6px';
+
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(confirmBtn);
+        content.appendChild(btnRow);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        cancelBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+            if (onCancel) onCancel();
+        });
+
+        confirmBtn.addEventListener('click', function() {
+            const reason = (typeof selectedReason !== 'undefined' && selectedReason === 'Other') ? (otherInput.value.trim() || 'Other') : selectedReason;
+            modal.style.display = 'none';
+            if (onConfirm) onConfirm(reason);
+        });
+    }
+
+    // Show and set message (split into sentences / separate lines)
+    modal.style.display = 'flex';
+    const msgEl = document.getElementById('negativeQtyMsg');
+    if (msgEl) {
+        const sentences = [
+            `This will reduce the stock to (${String(qty)}).`,
+            'Are you sure you want to continue?'
+        ];
+        // Use innerHTML to preserve line breaks; safe since content is static apart from qty
+        msgEl.innerHTML = sentences.join('<br>');
     }
 }

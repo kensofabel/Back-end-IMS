@@ -223,9 +223,10 @@ createDefaultCategory($_SESSION['user_id']);
                             </select>
                             <select id="stockAlert">
                                 <option value="">All Stock</option>
+                                <option value="in">In Stock</option>
                                 <option value="low">Low Stock</option>
                                 <option value="out">Out of Stock</option>
-                                <option value="in">In Stock</option>
+                                <option value="estimated">Estimated</option>
                             </select>
                         </div>
                 </div>
@@ -250,7 +251,8 @@ createDefaultCategory($_SESSION['user_id']);
                         <tbody id="inventory-table-body">
                             <?php
                             // Query products and their variants. We'll display variants as separate rows and products without variants as single rows.
-                            $prodSql = "SELECT p.id AS product_id, p.name AS product_name, p.price AS product_price, p.cost AS product_cost, p.in_stock AS product_stock, p.low_stock AS low_stock, p.pos_available, p.track_stock AS track_stock, p.category_id, p.type, p.color, p.shape, p.image_url
+                            // Include is_composite so we can calculate estimated stock for composite products
+                            $prodSql = "SELECT p.id AS product_id, p.name AS product_name, p.price AS product_price, p.cost AS product_cost, p.in_stock AS product_stock, p.low_stock AS low_stock, p.pos_available, p.track_stock AS track_stock, p.category_id, p.type, p.color, p.shape, p.image_url, p.is_composite AS is_composite
                                         FROM products p ORDER BY p.name ASC";
 
                             if ($prodResult = $conn->query($prodSql)) {
@@ -290,11 +292,50 @@ createDefaultCategory($_SESSION['user_id']);
                                         }
                                         $parentStock = $totalVariantStock;
                                         $parentLowThreshold = (int) ($p['low_stock'] ?? 0);
-                                        // determine stock status for parent row (out/low/in)
-                                        if ($parentStock === 0) {
+
+                                        // If composite, compute estimated possible assemblies now so we can
+                                        // include an attribute on the parent row. Otherwise use parentStock.
+                                        $displayStock = $parentStock;
+                                        $isEstimated = false;
+                                        if (!empty($p['is_composite'])) {
+                                            $estimates = [];
+                                            $compSql = "SELECT component_product_id, component_variant_id, component_qty FROM product_components WHERE parent_product_id = " . (int)$p['product_id'];
+                                            $compRes = $conn->query($compSql);
+                                            if ($compRes && $compRes->num_rows > 0) {
+                                                while ($comp = $compRes->fetch_assoc()) {
+                                                    $needed = floatval($comp['component_qty']) ?: 0;
+                                                    if ($needed <= 0) { $estimates[] = 0; continue; }
+                                                    $availableRaw = null;
+                                                    if (!empty($comp['component_variant_id'])) {
+                                                        $cq = $conn->query("SELECT in_stock FROM product_variants WHERE id = " . intval($comp['component_variant_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                    } else if (!empty($comp['component_product_id'])) {
+                                                        $cq = $conn->query("SELECT in_stock FROM products WHERE id = " . intval($comp['component_product_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                    }
+                                                    $availableNum = 0.0;
+                                                    if ($availableRaw !== null && $availableRaw !== '') {
+                                                        if (preg_match('/^([0-9]+(?:\.[0-9]+)?)/', trim((string)$availableRaw), $m)) {
+                                                            $availableNum = floatval($m[1]);
+                                                        }
+                                                    }
+                                                    $possible = ($needed > 0) ? floor($availableNum / $needed) : 0;
+                                                    $estimates[] = (int)$possible;
+                                                }
+                                            }
+                                            if (!empty($estimates)) {
+                                                $displayStock = min($estimates);
+                                                $isEstimated = true;
+                                            }
+                                        }
+
+                                        // determine stock status for parent row (out/low/in) based on the
+                                        // displayStock (estimated or actual parent stock)
+                                        $statusBase = $displayStock;
+                                        if ($statusBase === 0) {
                                             $parentStockStatus = 'out';
                                             $parentLowFlag = '';
-                                        } elseif ($parentStock <= $parentLowThreshold && $parentLowThreshold > 0) {
+                                        } elseif ($statusBase <= $parentLowThreshold && $parentLowThreshold > 0) {
                                             $parentStockStatus = 'low';
                                             $parentLowFlag = 'low';
                                         } else {
@@ -306,7 +347,9 @@ createDefaultCategory($_SESSION['user_id']);
 
                                         // Parent row: includes a chevron toggle (structure only)
                                         // Add data-stock and data-low attributes so parent rows are filterable by stock
-                                        echo "<tr class='parent-row' data-product-id='" . (int)$p['product_id'] . "' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $parentStockStatus . "\" data-low=\"" . $parentLowFlag . "\">";
+                                        // Also include data-estimated if we computed an estimate.
+                                        $dataEstimatedAttr = $isEstimated ? " data-estimated='1'" : "";
+                                        echo "<tr class='parent-row' data-product-id='" . (int)$p['product_id'] . "' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $parentStockStatus . "\" data-low=\"" . $parentLowFlag . "\"" . $dataEstimatedAttr . ">";
                                         echo "<td style=\"text-align:center;\">";
                                         // Chevron toggle (will be wired by JS). Keep accessible label.
                                         // Chevron button placed before the checkbox but will be
@@ -336,7 +379,8 @@ createDefaultCategory($_SESSION['user_id']);
                                         echo "<td class='parent-price-cell'></td>";
                                         echo "<td class='parent-cost-cell'></td>";
                                         echo "<td class='parent-margin-cell'></td>";
-                                        echo "<td>" . $parentStock . "</td>";
+                                        echo "<td>" . htmlspecialchars((string)$displayStock, ENT_QUOTES, 'UTF-8') . "</td>";
+                                        // Indicator cell is created client-side by updateIndicatorColumn
                                         echo "</tr>\n";
 
                                         // Now render each variant as a hidden row tied to the parent product.
@@ -388,9 +432,7 @@ createDefaultCategory($_SESSION['user_id']);
                                             echo "<td>" . $displayCost . "</td>";
                                             echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
                                             echo "<td>" . $stock . "</td>";
-                                            if ($stockStatus === 'low') {
-                                                echo "<td class='stock-indicator-cell'><span class='low-stock-badge'>Low stock</span></td>";
-                                            }
+                                            // Indicator cell (low/estimated) is added by client JS; do not emit here.
                                             echo "</tr>\n";
                                         }
                                     } else {
@@ -418,9 +460,46 @@ createDefaultCategory($_SESSION['user_id']);
                                         } else {
                                             $margin = '-';
                                         }
-                                        if ($stock === 0) {
+                                        // If this product is a composite, compute estimated assemblies to
+                                        // influence displayed stock and row attributes.
+                                        $displayStock = $stock;
+                                        $isEstimated = false;
+                                        if (!empty($p['is_composite'])) {
+                                            $estimates = [];
+                                            $compSql = "SELECT component_product_id, component_variant_id, component_qty FROM product_components WHERE parent_product_id = " . (int)$p['product_id'];
+                                            $compRes = $conn->query($compSql);
+                                            if ($compRes && $compRes->num_rows > 0) {
+                                                while ($comp = $compRes->fetch_assoc()) {
+                                                    $needed = floatval($comp['component_qty']) ?: 0;
+                                                    if ($needed <= 0) { $estimates[] = 0; continue; }
+                                                    $availableRaw = null;
+                                                    if (!empty($comp['component_variant_id'])) {
+                                                        $cq = $conn->query("SELECT in_stock FROM product_variants WHERE id = " . intval($comp['component_variant_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                    } else if (!empty($comp['component_product_id'])) {
+                                                        $cq = $conn->query("SELECT in_stock FROM products WHERE id = " . intval($comp['component_product_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                    }
+                                                    $availableNum = 0.0;
+                                                    if ($availableRaw !== null && $availableRaw !== '') {
+                                                        if (preg_match('/^([0-9]+(?:\.[0-9]+)?)/', trim((string)$availableRaw), $m)) {
+                                                            $availableNum = floatval($m[1]);
+                                                        }
+                                                    }
+                                                    $possible = ($needed > 0) ? floor($availableNum / $needed) : 0;
+                                                    $estimates[] = (int)$possible;
+                                                }
+                                            }
+                                            if (!empty($estimates)) {
+                                                $displayStock = min($estimates);
+                                                $isEstimated = true;
+                                            }
+                                        }
+
+                                        // determine stock status based on displayStock
+                                        if ($displayStock === 0) {
                                             $stockStatus = 'out';
-                                        } elseif ($stock <= $low) {
+                                        } elseif ($displayStock <= $low) {
                                             $stockStatus = 'low';
                                         } else {
                                             $stockStatus = 'in';
@@ -428,7 +507,8 @@ createDefaultCategory($_SESSION['user_id']);
                                         $posAttr = isset($p['pos_available']) && $p['pos_available'] ? '1' : '0';
                                         $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
                                         $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
-                                        echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                        $dataEstimatedAttr = $isEstimated ? " data-estimated='1'" : "";
+                                        echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\"" . $dataEstimatedAttr . ">";
                                         echo "<td style=\"text-align:center;\">";
                                         echo "<label class='permission-checkbox table-checkbox' style='margin-left: 10px;display:inline-flex;justify-content:center;'>";
                                         echo "<input type='checkbox' class='row-select-checkbox' data-product-id='" . (int)$p['product_id'] . "' />";
@@ -449,13 +529,8 @@ createDefaultCategory($_SESSION['user_id']);
                                         echo "<td>" . $displayPrice . "</td>";
                                         echo "<td>" . $displayCost . "</td>";
                                         echo "<td>" . ($margin === '-' ? $margin : $margin . "%") . "</td>";
-                                        // Stock number cell (keeps numeric alignment)
-                                        echo "<td>" . $stock . "</td>";
-                                        // Only output an extra indicator cell when this row is low; otherwise
-                                        // do not output an extra td (we'll manage indicator column dynamically in JS)
-                                        if ($stockStatus === 'low') {
-                                            echo "<td class='stock-indicator-cell'><span class='low-stock-badge'>Low stock</span></td>";
-                                        }
+                                        echo "<td>" . htmlspecialchars((string)$displayStock, ENT_QUOTES, 'UTF-8') . "</td>";
+                                        // Indicator cell is handled client-side (updateIndicatorColumn).
                                         echo "</tr>\n";
                                     }
                                 }
@@ -984,8 +1059,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (stockVal) {
                 if (stockVal === 'low' && rowLow !== 'low') show = false;
-                if (stockVal === 'out' && rowStock !== 'out') show = false;
-                if (stockVal === 'in' && rowStock !== 'in') show = false;
+                else if (stockVal === 'out' && rowStock !== 'out') show = false;
+                else if (stockVal === 'in' && rowStock !== 'in') show = false;
+                else if (stockVal === 'estimated') {
+                    // Show rows that were marked as estimated (server set data-estimated='1')
+                    const isEstimated = (row.getAttribute('data-estimated') || '') === '1';
+                    if (!isEstimated) show = false;
+                }
             }
 
             if (q && !text.includes(q)) show = false;
@@ -1207,45 +1287,62 @@ document.addEventListener('DOMContentLoaded', function() {
         const allRows = Array.from(inventoryTableBody ? inventoryTableBody.querySelectorAll('tr') : []);
         const visibleRows = allRows.filter(r => r.style.display !== 'none');
 
-        const hasVisibleBadge = visibleRows.some(r => (r.getAttribute('data-low') || '') === 'low');
+        // Determine whether any visible row requires an indicator cell:
+        // either a low-stock badge or an estimated badge.
+        const hasVisibleBadge = visibleRows.some(r => {
+            const low = (r.getAttribute('data-low') || '') === 'low';
+            const est = (r.getAttribute('data-estimated') || '') === '1';
+            return low || est;
+        });
         const headerExists = !!theadRow.querySelector('th.stock-indicator-header');
 
-        if (hasVisibleBadge && !headerExists) {
-            // Create header cell and insert after the Stock header (7th th)
-            const th = document.createElement('th');
-            th.className = 'stock-indicator-header';
-            th.style.width = '110px';
-            th.style.textAlign = 'left';
-            th.style.paddingLeft = '0px';
-            th.innerHTML = '&nbsp;';
-            // Try to insert after 7th header if possible
-            const headers = Array.from(theadRow.children);
-            if (headers.length >= 7) {
-                const after = headers[6].nextSibling; // index 6 is the 7th th
-                theadRow.insertBefore(th, after);
-            } else {
-                theadRow.appendChild(th);
-            }
-        }
+        // Defer header insertion until after we ensure each visible row has an
+        // indicator cell. The later block below will create the header once if
+        // needed. This avoids duplicate insertion caused by checking
+        // headerExists before it's updated.
 
         if (hasVisibleBadge) {
-            // Ensure each visible row has an indicator cell. Server emits the
-            // indicator TD only for low rows; here we add empty indicator TDs
-            // to non-low rows so all rows on the page have the same column count.
+            // Ensure each visible row has an indicator cell. Fill it with
+            // the appropriate badge based on row attributes (low vs estimated).
             visibleRows.forEach(row => {
-                if (!row.querySelector('td.stock-indicator-cell')) {
-                    const td = document.createElement('td');
+                let td = row.querySelector('td.stock-indicator-cell');
+                if (!td) {
+                    td = document.createElement('td');
                     td.className = 'stock-indicator-cell';
-                    // prefer CSS but set a safe inline fallback to left-align and pad
                     td.style.textAlign = 'left';
                     td.style.paddingLeft = '8px';
                     td.style.whiteSpace = 'nowrap';
-                    td.innerHTML = '';
                     row.appendChild(td);
                 }
+                // Decide badge content
+                const isLow = (row.getAttribute('data-low') || '') === 'low';
+                const isEstimated = (row.getAttribute('data-estimated') || '') === '1';
+                if (isLow) {
+                    td.innerHTML = "<span class='low-stock-badge'>Low stock</span>";
+                } else if (isEstimated) {
+                    td.innerHTML = "<span class='estimated-badge low-stock-badge'>Estimated</span>";
+                } else {
+                    td.innerHTML = '';
+                }
             });
+            // Ensure header exists
+            if (!headerExists) {
+                const th = document.createElement('th');
+                th.className = 'stock-indicator-header';
+                th.style.width = '110px';
+                th.style.textAlign = 'left';
+                th.style.paddingLeft = '0px';
+                th.innerHTML = '&nbsp;';
+                const headers = Array.from(theadRow.children);
+                if (headers.length >= 7) {
+                    const after = headers[6].nextSibling;
+                    theadRow.insertBefore(th, after);
+                } else {
+                    theadRow.appendChild(th);
+                }
+            }
         } else if (headerExists) {
-            // Remove header and any indicator tds from visible rows when none are low
+            // Remove header and any indicator tds from visible rows when none are low/estimated
             const h = theadRow.querySelector('th.stock-indicator-header');
             if (h) h.remove();
             visibleRows.forEach(row => {
