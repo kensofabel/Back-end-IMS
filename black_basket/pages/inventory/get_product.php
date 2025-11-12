@@ -13,7 +13,9 @@ if (!isset($_GET['product_id']) || !is_numeric($_GET['product_id'])) {
 $pid = (int) $_GET['product_id'];
 
 try {
-    $stmt = $conn->prepare("SELECT id, name, sku, price, cost, in_stock, low_stock, type FROM products WHERE id = ? LIMIT 1");
+    // Include barcode in product selection so clients can prefill barcode field
+    // include track_stock so clients know whether stock fields should be shown
+    $stmt = $conn->prepare("SELECT id, name, sku, barcode, price, cost, in_stock, low_stock, track_stock, pos_available, type FROM products WHERE id = ? LIMIT 1");
     $stmt->bind_param('i', $pid);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -53,11 +55,14 @@ try {
         'id' => (int)$prod['id'],
         'name' => $prod['name'],
         'sku' => $prod['sku'],
-        'price' => $prod['price'],
-        'cost' => $prod['cost'],
-        'in_stock' => $prod['in_stock'],
-        'low_stock' => $prod['low_stock'],
-        'type' => $prod['type'],
+        'barcode' => isset($prod['barcode']) ? $prod['barcode'] : '',
+    'price' => $prod['price'],
+    'cost' => $prod['cost'],
+    'in_stock' => $prod['in_stock'],
+    'low_stock' => $prod['low_stock'],
+    'track_stock' => isset($prod['track_stock']) ? (int)$prod['track_stock'] : 0,
+    'pos_available' => isset($prod['pos_available']) ? (int)$prod['pos_available'] : 0,
+    'type' => $prod['type'],
         'variants' => $variants
     ];
 

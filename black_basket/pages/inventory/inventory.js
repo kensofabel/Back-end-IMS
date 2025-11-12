@@ -5825,3 +5825,523 @@ function showNegativeQuantityConfirm(qty, onConfirm, onCancel) {
         msgEl.innerHTML = sentences.join('<br>');
     }
 }
+
+// Make inventory table rows hoverable and open popup modal on row click
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const tbody = document.getElementById('inventory-table-body');
+        if (!tbody) return;
+
+        // inject minimal styles for hoverable rows (keeps visuals consistent)
+        try {
+            const css = `
+                .inventory-row-clickable { cursor: pointer; transition: background 120ms ease; }
+                .inventory-row-clickable:hover { background: #232323; }
+            `;
+            const s = document.createElement('style'); s.type = 'text/css'; s.appendChild(document.createTextNode(css));
+            document.head.appendChild(s);
+        } catch (e) { /* ignore styling failures */ }
+
+        // Helper to decide if click target is interactive (we should not open modal)
+        function isInteractiveTarget(el) {
+            if (!el) return false;
+            // inputs, selects, buttons, links or explicit controls should not trigger modal
+            if (el.closest && (el.closest('input, textarea, select, button, a') )) return true;
+            // row-level controls
+            if (el.classList && (el.classList.contains('row-select-checkbox') || el.classList.contains('category-select') || el.classList.contains('variant-toggle'))) return true;
+            return false;
+        }
+
+        // Click handler (delegated)
+        tbody.addEventListener('click', function(e) {
+            try {
+                // If click happened on an interactive element, ignore
+                if (isInteractiveTarget(e.target)) return;
+
+                const tr = e.target.closest && e.target.closest('tr');
+                if (!tr) return;
+
+                // Optionally ignore clicks on variant rows (if you don't want them opening modal)
+                // if (tr.classList.contains('variant-row')) return;
+
+                // Open the scanner/add-item modal in a friendly way
+                const modal = document.getElementById('scannerModal') || window.scannerModal;
+                if (modal) {
+                    // Ensure modal is visible (use same class as other open paths)
+                    modal.style.display = 'flex';
+                    try { modal.classList.add('show'); } catch (e) {}
+                    // Directly show Add Items panel WITHOUT transitions or intermediate tabs.
+                    // resetAddItemsAnim removes any pending animation classes so the panel
+                    // appears immediately without slide animations.
+                    try { if (typeof resetAddItemsAnim === 'function') resetAddItemsAnim(); } catch (e) {}
+                    // Avoid using showTab which may perform animations; directly
+                    // show the Add Items panel and hide other panels to prevent
+                    // any slide transitions.
+                    try {
+                        const addItemsPanel = document.getElementById('addItemsTabPanel');
+                        const scanPanelEl = document.getElementById('scanTabPanel');
+                        const manualPanelEl = document.getElementById('manualTabPanel');
+                        const createPanelEl = document.getElementById('createTabPanel');
+                        const barcodePanelEl = document.getElementById('barcodeResultsTabPanel');
+                        const modalTabs = document.querySelector('.modal-tabs');
+                        const modalContentElem = document.querySelector('.modal-content.scanner-modal');
+
+                        // Hide other panels
+                        try { if (scanPanelEl) scanPanelEl.style.display = 'none'; } catch (e) {}
+                        try { if (manualPanelEl) manualPanelEl.style.display = 'none'; } catch (e) {}
+                        try { if (createPanelEl) createPanelEl.style.display = 'none'; } catch (e) {}
+                        try { if (barcodePanelEl) barcodePanelEl.style.display = 'none'; } catch (e) {}
+
+                        // Ensure the addItems panel exists and activate it using classes
+                        // (avoid forcing inline sizing so the modal can autosize like the normal flow)
+                        if (addItemsPanel) {
+                            // Remove animation classes so it won't animate in
+                            try { addItemsPanel.classList.remove('modal-slide-in','modal-slide-left','fb-modal-in','fb-modal-out'); } catch (e) {}
+                            // Use class activation; remove any inline sizing/transition we may have applied
+                            try {
+                                addItemsPanel.classList.add('active');
+                                addItemsPanel.style.removeProperty('transition');
+                                addItemsPanel.style.removeProperty('display');
+                                addItemsPanel.style.removeProperty('width');
+                                addItemsPanel.style.removeProperty('height');
+                                addItemsPanel.style.removeProperty('opacity');
+                                addItemsPanel.style.removeProperty('pointer-events');
+                            } catch (e) { /* best-effort cleanup */ }
+                        }
+
+                        // Hide the tab buttons area using the modal-content helper class so overall modal layout behaves the same
+                        try { if (modalContentElem) modalContentElem.classList.add('hide-tabs'); } catch (e) {}
+                        // Remove any modal-content animation classes (keep hide-tabs)
+                        if (modalContentElem) {
+                            try { modalContentElem.classList.remove('modal-slide-in','modal-slide-left','fb-modal-in','fb-modal-out'); } catch (e) {}
+                        }
+
+                        // Update tab tracking state
+                        try { previousTab = currentTab || previousTab; currentTab = 'addItems'; } catch (e) {}
+                    } catch (e) { /* ignore any errors and fall back to showTab */
+                        try { if (typeof showTab === 'function') showTab('addItems', false); } catch (err) { /* ignore */ }
+                    }
+                    // Ensure add-items listeners attach (no-op if already attached)
+                    try { if (typeof window.ensureAttachAddItems === 'function') window.ensureAttachAddItems(); } catch (e) {}
+                    // Prefill Add Items form with product data when opened from a row click
+                    try {
+                        // Determine product id from row: parent rows have data-product-id, other rows may have checkbox dataset or data-parent-id
+                        let pid = tr.getAttribute('data-product-id') || null;
+                        if (!pid) {
+                            const cb = tr.querySelector('.row-select-checkbox');
+                            if (cb && cb.dataset && cb.dataset.productId) pid = cb.dataset.productId;
+                        }
+                        if (!pid) pid = tr.getAttribute('data-parent-id') || null;
+                        if (pid) {
+                            // mark panel with the product id so submit handler can detect edit vs create
+                            try { const addItemsPanel = document.getElementById('addItemsTabPanel'); if (addItemsPanel) addItemsPanel.setAttribute('data-edit-product-id', String(pid)); } catch(e){}
+
+                            fetch('get_product.php?product_id=' + encodeURIComponent(pid))
+                                .then(r => r.json())
+                                .then(data => {
+                                    console.log('get_product.php response for product_id=' + pid + ':', data);
+                                    try {
+                                        if (!data || !data.success || !data.product) return;
+                                        const p = data.product;
+                                        const panel = document.getElementById('addItemsTabPanel');
+                                        if (!panel) return;
+
+                                        // Basic fields
+                                        try { const nameEl = panel.querySelector('#inlineItemName'); if (nameEl) nameEl.value = p.name || ''; } catch(e){}
+                                        try { const catEl = panel.querySelector('#inlineItemCategory'); if (catEl) catEl.value = (tr.getAttribute('data-category') || catEl.value || ''); } catch(e){}
+                                        try {
+                                            const priceEl = panel.querySelector('#inlineItemPrice');
+                                            if (priceEl) {
+                                                if (p.price !== null && p.price !== '' && !isNaN(p.price)) {
+                                                    priceEl.value = '₱' + Number(p.price).toFixed(2);
+                                                } else if (String(p.price).toLowerCase() === 'variable') {
+                                                    // leave blank when price is 'variable'
+                                                    priceEl.value = '';
+                                                } else {
+                                                    priceEl.value = (p.price || '');
+                                                }
+                                            }
+                                        } catch(e){}
+                                        try {
+                                            const costEl = panel.querySelector('#inlineItemCost');
+                                            if (costEl) {
+                                                if (p.cost !== null && p.cost !== '' && !isNaN(p.cost)) costEl.value = '₱' + Number(p.cost).toFixed(2);
+                                                else costEl.value = (p.cost || '');
+                                            }
+                                        } catch(e){}
+                                        try { const skuEl = panel.querySelector('#inlineItemSKU'); if (skuEl) skuEl.value = p.sku || ''; } catch(e){}
+                                        // product-level barcode may not exist; try to set from first variant if available
+                                        try { const barcodeEl = panel.querySelector('#inlineItemBarcode'); if (barcodeEl) barcodeEl.value = (p.barcode || (p.variants && p.variants[0] && p.variants[0].barcode) || ''); } catch(e){}
+
+                                        // Track stock and stock fields
+                                        try {
+                                            const trackEl = panel.querySelector('#inlineTrackStockToggle');
+                                            const trackAttr = tr.getAttribute('data-track');
+                                            const trackChecked = (trackAttr === '1' || trackAttr === 'true' || !!p.track_stock);
+                                            if (trackEl) { trackEl.checked = !!trackChecked; trackEl.dispatchEvent(new Event('change')); }
+                                        } catch(e){}
+                                        try {
+                                            const inStockEl = panel.querySelector('#inlineInStock');
+                                            const lowEl = panel.querySelector('#inlineLowStock');
+                                            // Only populate stock fields when tracking is enabled
+                                            const trackEl = panel.querySelector('#inlineTrackStockToggle');
+                                            const trackCheckedLocal = (trackEl && trackEl.checked) || (!!p.track_stock && Number(p.track_stock) === 1);
+                                            // helper: parse numeric value + unit suffix
+                                            function splitNumericAndUnit(raw) {
+                                                if (raw === undefined || raw === null) return { value: '', unit: '- -' };
+                                                const s = String(raw).trim();
+                                                if (s === '') return { value: '', unit: '- -' };
+                                                const m = s.match(/^\s*([+-]?\d+(?:\.\d+)?)(?:\s*(.+))?$/);
+                                                if (m) return { value: m[1], unit: (m[2] || '- -').trim() };
+                                                // no numeric part: put entire string in unit and leave value empty
+                                                return { value: '', unit: s };
+                                            }
+                                            if (trackCheckedLocal) {
+                                                try {
+                                                    const parsedIn = splitNumericAndUnit(p.in_stock);
+                                                    const parsedLow = splitNumericAndUnit(p.low_stock);
+                                                    if (inStockEl) inStockEl.value = parsedIn.value;
+                                                    if (lowEl) lowEl.value = parsedLow.value;
+                                                    // set unit suffix in the unit-value element (do not put unit inside input value)
+                                                    try {
+                                                        const inUnitEl = inStockEl && inStockEl.parentElement && inStockEl.parentElement.querySelector('.unit-value');
+                                                        if (inUnitEl) {
+                                                            inUnitEl.textContent = parsedIn.unit || '- -';
+                                                            // Make the unit selector visible immediately when there's a meaningful unit
+                                                            try { const parentSel = inUnitEl.parentElement; if (parentSel && parsedIn.unit && parsedIn.unit !== '- -') parentSel.classList.add('show'); } catch (e) {}
+                                                        }
+                                                    } catch (e) {}
+                                                    try {
+                                                        const lowUnitEl = lowEl && lowEl.parentElement && lowEl.parentElement.querySelector('.unit-value');
+                                                        if (lowUnitEl) {
+                                                            lowUnitEl.textContent = parsedLow.unit || '- -';
+                                                            try { const parentSel2 = lowUnitEl.parentElement; if (parentSel2 && parsedLow.unit && parsedLow.unit !== '- -') parentSel2.classList.add('show'); } catch (e) {}
+                                                        }
+                                                    } catch (e) {}
+                                                } catch (e) { /* best-effort */ }
+                                            } else {
+                                                // if not tracking, ensure fields are hidden/cleared
+                                                try { if (inStockEl) inStockEl.value = ''; } catch(e){}
+                                                try { if (lowEl) lowEl.value = ''; } catch(e){}
+                                                try { const inUnitEl = inStockEl && inStockEl.parentElement && inStockEl.parentElement.querySelector('.unit-value'); if (inUnitEl) inUnitEl.textContent = '- -'; } catch(e){}
+                                                try { const lowUnitEl = lowEl && lowEl.parentElement && lowEl.parentElement.querySelector('.unit-value'); if (lowUnitEl) lowUnitEl.textContent = '- -'; } catch(e){}
+                                            }
+                                        } catch(e){}
+
+                                        // POS availability (row attribute preferred). Only check when explicitly 1.
+                                        try {
+                                            const posEl = panel.querySelector('#availablePOS');
+                                            const posAttr = tr.getAttribute('data-pos');
+                                            if (posEl) {
+                                                const posFromRow = (posAttr === '1' || posAttr === 'true');
+                                                const posFromApi = (typeof p.pos_available !== 'undefined' && Number(p.pos_available) === 1);
+                                                posEl.checked = posFromRow || posFromApi;
+                                            }
+                                        } catch(e){}
+
+                                        // Variants: clear existing and recreate from API product. Use existing addVariantRow() helper to ensure wiring.
+                                        try {
+                                            const variantsBody = document.getElementById('variantsTableBody');
+                                            if (variantsBody) {
+                                                console.log('Prefill: variantsBody found, variants count=', (p.variants && p.variants.length) || 0);
+                                                // show variants section only when API reports variants
+                                                if (p.variants && Array.isArray(p.variants) && p.variants.length) {
+                                                    // ensure variants UI is visible (force on the panel instance)
+                                                    try {
+                                                        if (typeof showVariantsSection === 'function') showVariantsSection();
+                                                    } catch(e) {}
+                                                    // clear any existing rows
+                                                    variantsBody.innerHTML = '';
+                                                    // Also explicitly ensure the price row is hidden on this panel instance
+                                                    try {
+                                                        const priceRowLocal = panel.querySelector('#priceRow');
+                                                        if (priceRowLocal) priceRowLocal.style.display = 'none';
+                                                    } catch (e) {}
+                                                    // Make sure the variants section container is visible (defensive)
+                                                    try {
+                                                        const variantsSectionLocal = panel.querySelector('#variantsSection');
+                                                        if (variantsSectionLocal) {
+                                                            variantsSectionLocal.style.display = 'block';
+                                                            void variantsSectionLocal.offsetHeight; // force reflow
+                                                        }
+                                                    } catch (e) {}
+                                                    // If parent product is tracking stock, move tracking to variants UI
+                                                    try {
+                                                        const variantsToggle = panel.querySelector('#variantsTrackStockToggle');
+                                                        const mainTrackToggle = panel.querySelector('#inlineTrackStockToggle');
+                                                        const parentTrackOn = !!p.track_stock && Number(p.track_stock) === 1;
+                                                        if (variantsToggle) {
+                                                            // Enable variant-level tracking when parent tracks stock
+                                                            variantsToggle.checked = !!parentTrackOn;
+                                                            // Trigger change so columns update accordingly
+                                                            variantsToggle.dispatchEvent(new Event('change'));
+                                                        }
+                                                        if (mainTrackToggle && parentTrackOn) {
+                                                            // Ensure parent toggle is unchecked when using variants mode
+                                                            mainTrackToggle.checked = false;
+                                                            mainTrackToggle.dispatchEvent(new Event('change'));
+                                                        }
+                                                    } catch (e) { /* non-critical */ }
+                                                    // For each variant, create a row and populate
+                                                    p.variants.forEach(function(v, idx) {
+                                                        try {
+                                                            // add a new row. Try multiple fallbacks in case the helper
+                                                            // isn't available in this execution context.
+                                                            if (typeof addVariantRow === 'function') {
+                                                                console.log('Prefill: calling addVariantRow() for variant idx=', idx);
+                                                                addVariantRow();
+                                                            } else if (window && typeof window.addVariantRow === 'function') {
+                                                                console.log('Prefill: calling window.addVariantRow() for variant idx=', idx);
+                                                                window.addVariantRow();
+                                                            } else {
+                                                                // Try clicking the UI add button if present (re-uses existing wiring)
+                                                                const addBtnLocal = (panel && panel.querySelector) ? panel.querySelector('.variants-add-btn') : document.querySelector('.variants-add-btn');
+                                                                if (addBtnLocal) {
+                                                                    try {
+                                                                        console.log('Prefill: triggering .variants-add-btn click for variant idx=', idx);
+                                                                        addBtnLocal.click();
+                                                                    } catch (e) {
+                                                                        console.log('Prefill: .variants-add-btn click failed', e);
+                                                                    }
+                                                                } else {
+                                                                    console.log('Prefill: addVariantRow and add button unavailable — falling back to manual row creation');
+                                                                    // Minimal inline fallback: create a row similar to addVariantRow
+                                                                    try {
+                                                                        const tableBodyLocal = variantsBody;
+                                                                        if (tableBodyLocal) {
+                                                                            const fallbackRow = document.createElement('tr');
+                                                                            fallbackRow.style.borderBottom = '1px solid #444';
+                                                                            fallbackRow.innerHTML = `
+                                                <td style="padding: 8px; text-align: center;">
+                                                    <input type="checkbox" class="variant-available" style="cursor: pointer;" checked>
+                                                </td>
+                                                <td style="padding: 8px;">
+                                                    <input type="text" class="variant-name" required style="width: 100%; padding: 6px; background: transparent; border: none; border-bottom: 1px solid #555; color: #dbdbdb; border-radius: 4px; font-size: 12px;">
+                                                </td>
+                                                <td style="padding: 8px;">
+                                                    <input type="text" class="variant-price" currency-localization="₱" style="width: 100%; padding: 6px; background: transparent; border: none; border-bottom: 1px solid #555; color: #dbdbdb; border-radius: 4px; font-size: 12px;">
+                                                </td>
+                                                <td style="padding: 8px;">
+                                                    <input type="text" class="variant-cost" currency-localization="₱" style="width: 100%; padding: 6px; background: transparent; border: none; border-bottom: 1px solid #555; color: #dbdbdb; border-radius: 4px; font-size: 12px;">
+                                                </td>
+                                                <td class="stock-column" style="padding: 8px; display: none;"></td>
+                                                <td class="stock-column" style="padding: 8px; display: none;"></td>
+                                                <td style="padding: 8px;">
+                                                    <input type="text" class="variant-sku" style="width: 100%; padding: 6px; background: transparent; border: none; border-bottom: 1px solid #555; color: #dbdbdb; border-radius: 4px; font-size: 12px;">
+                                                </td>
+                                                <td style="padding: 8px;">
+                                                    <input type="text" class="variant-barcode" style="width: 100%; padding: 6px; background: transparent; border: none; border-bottom: 1px solid #555; color: #dbdbdb; border-radius: 4px; font-size: 12px;">
+                                                </td>
+                                                <td style="padding: 8px; text-align: center;">
+                                                    <button type="button" class="delete-variant-btn" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s ease;">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            `;
+                                                                            tableBodyLocal.appendChild(fallbackRow);
+                                                                            // wire delete button
+                                                                            const dbtn = fallbackRow.querySelector('.delete-variant-btn');
+                                                                            if (dbtn) dbtn.addEventListener('click', function() { fallbackRow.remove(); });
+                                                                        }
+                                                                    } catch (e) { console.warn('Prefill manual row creation failed', e); }
+                                                                }
+                                                            }
+                                                            
+                                                            // populate the last inserted row
+                                                            const rows = Array.from(variantsBody.querySelectorAll('tr'));
+                                                            const r = rows[rows.length - 1];
+                                                            if (!r) {
+                                                                console.log('Prefill: variant row not found after addVariantRow (idx=' + idx + ')');
+                                                                return;
+                                                            }
+                                                            console.log('Prefill: populate variant row idx=', idx, 'name=', v && v.name);
+                                                            try { const avail = r.querySelector('.variant-available'); if (avail) avail.checked = (v.pos_available && Number(v.pos_available) === 1); } catch(e){}
+                                                            try { const nameIn = r.querySelector('.variant-name'); if (nameIn) { nameIn.value = v.name || ''; nameIn.setAttribute('data-auto-filled','1'); } } catch(e){}
+                                                            try { const priceIn = r.querySelector('.variant-price'); if (priceIn) { if (v.price !== null && v.price !== '' && !isNaN(v.price)) priceIn.value = '₱' + Number(v.price).toFixed(2); else if (String(v.price).toLowerCase() === 'variable') priceIn.value = ''; else priceIn.value = (v.price || ''); priceIn.setAttribute('data-auto-filled','1'); } } catch(e){}
+                                                            try { const costIn = r.querySelector('.variant-cost'); if (costIn) { if (v.cost !== null && v.cost !== '' && !isNaN(v.cost)) costIn.value = '₱' + Number(v.cost).toFixed(2); else costIn.value = (v.cost || ''); costIn.setAttribute('data-auto-filled','1'); } } catch(e){}
+                                                            try { const skuIn = r.querySelector('.variant-sku'); if (skuIn) { skuIn.value = v.sku || ''; skuIn.setAttribute('data-auto-filled','1'); } } catch(e){}
+                                                            try { const barcodeIn = r.querySelector('.variant-barcode'); if (barcodeIn) { barcodeIn.value = v.barcode || ''; barcodeIn.setAttribute('data-auto-filled','1'); } } catch(e){}
+                                                            // stock fields if present
+                                                            try {
+                                                                const stockIn = r.querySelector('.variant-stock');
+                                                                const lowIn = r.querySelector('.variant-low-stock');
+                                                                function splitNumericAndUnit(raw) {
+                                                                    if (raw === undefined || raw === null) return { value: '', unit: '- -' };
+                                                                    const s = String(raw).trim();
+                                                                    if (s === '') return { value: '', unit: '- -' };
+                                                                    const m = s.match(/^\s*([+-]?\d+(?:\.\d+)?)(?:\s*(.+))?$/);
+                                                                    if (m) return { value: m[1], unit: (m[2] || '- -').trim() };
+                                                                    return { value: '', unit: s };
+                                                                }
+                                                                if (stockIn) {
+                                                                    const parsed = splitNumericAndUnit(v.in_stock);
+                                                                    stockIn.value = parsed.value;
+                                                                    try {
+                                                                        const u = stockIn.parentElement && stockIn.parentElement.querySelector('.unit-value');
+                                                                        if (u) {
+                                                                            u.textContent = parsed.unit || '- -';
+                                                                            try { const parentSelV = u.parentElement; if (parentSelV && parsed.unit && parsed.unit !== '- -') parentSelV.classList.add('show'); } catch(e) {}
+                                                                        }
+                                                                    } catch(e){}
+                                                                }
+                                                                if (lowIn) {
+                                                                    const parsedL = splitNumericAndUnit(v.low_stock);
+                                                                    lowIn.value = parsedL.value;
+                                                                    try {
+                                                                        const u2 = lowIn.parentElement && lowIn.parentElement.querySelector('.unit-value');
+                                                                        if (u2) {
+                                                                            u2.textContent = parsedL.unit || '- -';
+                                                                            try { const parentSelV2 = u2.parentElement; if (parentSelV2 && parsedL.unit && parsedL.unit !== '- -') parentSelV2.classList.add('show'); } catch(e) {}
+                                                                        }
+                                                                    } catch(e){}
+                                                                }
+                                                            } catch(e){}
+                                                        } catch(err) { console.warn('populate variant row error', err); }
+                                                        // Log how many rows exist after adding
+                                                        try { console.log('Prefill: variantsTableBody now has', variantsBody.querySelectorAll('tr').length, 'rows'); } catch(e){}
+                                                    });
+                                                    // ensure variant stock columns reflect tracking state
+                                                    try { if (typeof toggleVariantsStockColumns === 'function') toggleVariantsStockColumns(); } catch(e){}
+                                                    // Attach unit selectors for any newly created variant stock/low-stock inputs
+                                                    try { if (typeof setupUnitSelector === 'function') setupUnitSelector(); } catch(e){}
+                                                    // Additional pass: some rows may have been created before stock inputs
+                                                    // existed (first-row created by addVariantRow when tracking was off).
+                                                    // Populate stock inputs and unit suffixes for any rows that
+                                                    // missed initial population (use p.variants data stored above).
+                                                    try {
+                                                        const allRows = Array.from(variantsBody.querySelectorAll('tr'));
+                                                        allRows.forEach(function(r, ridx) {
+                                                            try {
+                                                                const vdata = (p.variants && p.variants[ridx]) ? p.variants[ridx] : null;
+                                                                if (!vdata) return;
+                                                                // helper same as above
+                                                                function splitNumericAndUnit(raw) {
+                                                                    if (raw === undefined || raw === null) return { value: '', unit: '- -' };
+                                                                    const s = String(raw).trim();
+                                                                    if (s === '') return { value: '', unit: '- -' };
+                                                                    const m = s.match(/^\s*([+-]?\d+(?:\.\d+)?)(?:\s*(.+))?$/);
+                                                                    if (m) return { value: m[1], unit: (m[2] || '- -').trim() };
+                                                                    return { value: '', unit: s };
+                                                                }
+                                                                const stockIn = r.querySelector('.variant-stock');
+                                                                const lowIn = r.querySelector('.variant-low-stock');
+                                                                const parsed = splitNumericAndUnit(vdata.in_stock);
+                                                                const parsedL = splitNumericAndUnit(vdata.low_stock);
+                                                                if (stockIn) {
+                                                                    // only overwrite if empty to preserve any manual changes
+                                                                    if (!stockIn.value || stockIn.value.trim() === '') stockIn.value = parsed.value;
+                                                                    try {
+                                                                        const u = stockIn.parentElement && stockIn.parentElement.querySelector('.unit-value');
+                                                                        if (u) u.textContent = parsed.unit || '- -';
+                                                                        try { const parentSelV = u && u.parentElement; if (parentSelV && parsed.unit && parsed.unit !== '- -') parentSelV.classList.add('show'); } catch(e) {}
+                                                                    } catch(e){}
+                                                                }
+                                                                if (lowIn) {
+                                                                    if (!lowIn.value || lowIn.value.trim() === '') lowIn.value = parsedL.value;
+                                                                    try {
+                                                                        const u2 = lowIn.parentElement && lowIn.parentElement.querySelector('.unit-value');
+                                                                        if (u2) u2.textContent = parsedL.unit || '- -';
+                                                                        try { const parentSelV2 = u2 && u2.parentElement; if (parentSelV2 && parsedL.unit && parsedL.unit !== '- -') parentSelV2.classList.add('show'); } catch(e) {}
+                                                                    } catch(e){}
+                                                                }
+                                                            } catch(e) { /* per-row non-fatal */ }
+                                                        });
+                                                    } catch(e) { /* best-effort */ }
+                                                    // Final enforcement after DOM settled
+                                                    try {
+                                                        setTimeout(function() {
+                                                            try {
+                                                                const priceRowLocal = panel.querySelector('#priceRow');
+                                                                if (priceRowLocal) priceRowLocal.style.display = 'none';
+                                                            } catch(e){}
+                                                            try {
+                                                                const variantsSectionLocal = panel.querySelector('#variantsSection');
+                                                                if (variantsSectionLocal) variantsSectionLocal.style.display = 'block';
+                                                            } catch(e){}
+                                                            console.debug('Prefill: variants rows now =', variantsBody.querySelectorAll('tr').length);
+                                                        }, 0);
+                                                    } catch(e){}
+                                                } else {
+                                                    // No variants: ensure variants section hidden and reset price/cost to product-level
+                                                    try { hideVariantsSection(); } catch(e) {}
+                                                }
+                                            }
+                                        } catch(e) { console.warn('variants populate failed', e); }
+
+                                    } catch(err) { console.warn('prefill processing error', err); }
+                                })
+                                .catch(err => { console.warn('get_product fetch failed', err); });
+                        }
+                    } catch (e) { console.warn('prefill add items failed', e); }
+                    // If opened from a row click, adjust Add Items panel to act like an Edit flow:
+                    // - hide the inline/back button inside the panel
+                    // - change the header to 'Edit Item'
+                    // - change the main action button text to 'Save'
+                    try {
+                        const addItemsPanel = document.getElementById('addItemsTabPanel');
+                        if (addItemsPanel) {
+                            // mark that we opened it as an edit from a row
+                            addItemsPanel.setAttribute('data-row-edit', '1');
+                            // hide the back button if present
+                            try { const backBtn = addItemsPanel.querySelector('#backInlineAddItems'); if (backBtn) backBtn.style.display = 'none'; } catch (e) {}
+                            // update header text
+                            try { const header = addItemsPanel.querySelector('.modal-title'); if (header) header.textContent = 'Edit Item'; } catch (e) {}
+                            // update primary action button(s)
+                            try {
+                                // Try several selectors to find the submit button consistently
+                                const actionBtn = addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]');
+                                if (actionBtn) actionBtn.textContent = 'Save';
+                            } catch (e) {}
+
+                            // Setup a MutationObserver to restore the UI when the modal is closed
+                            try {
+                                const modalEl = document.getElementById('scannerModal') || window.scannerModal;
+                                if (modalEl && typeof MutationObserver !== 'undefined') {
+                                    const mo = new MutationObserver(function(muts) {
+                                        try {
+                                            // If modal is hidden or class 'show' removed, restore panel
+                                            if (modalEl.style.display === 'none' || !modalEl.classList.contains('show')) {
+                                                try { const bb = addItemsPanel.querySelector('#backInlineAddItems'); if (bb) bb.style.display = ''; } catch (e) {}
+                                                try { const h = addItemsPanel.querySelector('.modal-title'); if (h) h.textContent = 'Add new item'; } catch (e) {}
+                                                try { const a = addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]'); if (a) a.textContent = 'Add Item'; } catch (e) {}
+                                                try { addItemsPanel.removeAttribute('data-row-edit'); } catch (e) {}
+                                                try { mo.disconnect(); } catch (e) {}
+                                            }
+                                        } catch (e) { /* ignore */ }
+                                    });
+                                    mo.observe(modalEl, { attributes: true, attributeFilter: ['style', 'class'] });
+                                }
+                            } catch (e) { /* best-effort restore only */ }
+                        }
+                    } catch (e) { /* ignore UI tweak failures */ }
+                    // Focus first sensible input inside modal (best effort)
+                    setTimeout(function() {
+                        try {
+                            const el = modal.querySelector('input, button, textarea, select');
+                            if (el && typeof el.focus === 'function') el.focus();
+                        } catch (e) {}
+                    }, 60);
+                }
+            } catch (err) { console.warn('row click handler error', err); }
+        }, false);
+
+        // Add class to existing rows so they show hover cursor
+        Array.from(tbody.querySelectorAll('tr')).forEach(r => r.classList.add('inventory-row-clickable'));
+
+        // Watch for new rows added dynamically and mark them clickable as well
+        const mo = new MutationObserver(function(muts) {
+            muts.forEach(function(m) {
+                Array.from(m.addedNodes || []).forEach(function(node) {
+                    if (node && node.nodeType === 1 && node.tagName === 'TR') node.classList.add('inventory-row-clickable');
+                    // also handle rows wrapped inside fragments
+                    try {
+                        if (node && node.querySelectorAll) {
+                            Array.from(node.querySelectorAll('tr')).forEach(t => t.classList.add('inventory-row-clickable'));
+                        }
+                    } catch (e) {}
+                });
+            });
+        });
+        mo.observe(tbody, { childList: true, subtree: true });
+    } catch (e) { console.warn('init row-clickable failed', e); }
+});

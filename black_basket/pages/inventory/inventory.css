@@ -2113,3 +2113,8 @@ body #addItemsModal .modal-content.fb-modal-out {
 /* Ensure variant-toggle button doesn't disturb layout (checkbox alignment) */
 .inventory-table tr.parent-row td:first-child { position: relative; }
 .inventory-table tr.parent-row .variant-toggle { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
+
+/* Make certain inventory rows show pointer and a subtle hover background
+    when marked with the `inventory-row-clickable` class. */
+.inventory-table tbody tr.inventory-row-clickable { cursor: pointer; }
+.inventory-table tbody tr.inventory-row-clickable:hover { background: rgba(255,255,255,0.02); }

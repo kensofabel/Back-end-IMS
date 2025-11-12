@@ -1784,32 +1784,67 @@ document.addEventListener('DOMContentLoaded', function() {
                 var payloadLowStock = (trackStock && lowStock) ? lowStock : '';
                 // If we have composite components collected above, include them in the payload
                 var compositeFlag = (composite_components && composite_components.length) ? 1 : 0;
-                fetch('api.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        category,
-                        price,
-                        cost,
-                        track_stock: trackStock,
-                            variantsTrackStock: (document.getElementById('variantsTrackStockToggle') && document.getElementById('variantsTrackStockToggle').checked) ? 1 : 0,
-                        in_stock: payloadInStock,
-                        low_stock: payloadLowStock,
-                        pos_available: posAvailable,
-                        type,
-                        color,
-                        shape,
-                        image_url,
-                        sku,
-                        barcode,
-                        variants,
-                        composite_from_create: compositeFlag,
-                        composite_components: composite_components,
-                        // If coming from Create flow, mark type as composite so server can store appropriately
-                        type: (compositeFlag ? 'composite' : type)
-                    })
-                })
+                // If a file was chosen, use FormData so the file is uploaded via multipart/form-data.
+                (function() {
+                    var fileInputEl = document.getElementById('posProductImage');
+                    var useForm = fileInputEl && fileInputEl.files && fileInputEl.files.length > 0;
+                    if (useForm) {
+                        var fd = new FormData();
+                        fd.append('name', name);
+                        fd.append('category', category);
+                        fd.append('price', price);
+                        fd.append('cost', cost);
+                        fd.append('track_stock', trackStock);
+                        fd.append('variantsTrackStock', (document.getElementById('variantsTrackStockToggle') && document.getElementById('variantsTrackStockToggle').checked) ? 1 : 0);
+                        fd.append('in_stock', payloadInStock);
+                        fd.append('low_stock', payloadLowStock);
+                        fd.append('pos_available', posAvailable);
+                        // Always send the representation type (color_shape or image).
+                        // composite state is sent separately via composite_from_create/composite_components.
+                        fd.append('type', type);
+                        fd.append('color', color);
+                        fd.append('shape', shape);
+                        fd.append('image_url', image_url || '');
+                        fd.append('sku', sku);
+                        fd.append('barcode', barcode);
+                        // JSON-encode complex arrays
+                        try { fd.append('variants', JSON.stringify(variants || [])); } catch(e) { fd.append('variants', '[]'); }
+                        try { fd.append('composite_components', JSON.stringify(composite_components || [])); } catch(e) { fd.append('composite_components', '[]'); }
+                        fd.append('composite_from_create', compositeFlag ? 1 : 0);
+                        // Append file
+                        fd.append('image_file', fileInputEl.files[0]);
+
+                        return fetch('api.php', { method: 'POST', body: fd });
+                    } else {
+                        return fetch('api.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name,
+                                category,
+                                price,
+                                cost,
+                                track_stock: trackStock,
+                                variantsTrackStock: (document.getElementById('variantsTrackStockToggle') && document.getElementById('variantsTrackStockToggle').checked) ? 1 : 0,
+                                in_stock: payloadInStock,
+                                low_stock: payloadLowStock,
+                                pos_available: posAvailable,
+                                type,
+                                color,
+                                shape,
+                                image_url,
+                                sku,
+                                barcode,
+                                variants,
+                                composite_from_create: compositeFlag,
+                                composite_components: composite_components,
+                                // Send the representation type (color_shape or image). Composite-specific data
+                                // is provided in composite_from_create and composite_components.
+                                type: type
+                            })
+                        });
+                    }
+                })()
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -1869,6 +1904,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // Reset modal fields and visual state (keep modal-close timing above)
                         addItemsForm.reset();
+                        // If user created a composite from the inventory selection flow, clear those checkboxes
+                        // so the source selection doesn't remain checked after creating the composite.
+                        try {
+                            // Uncheck any visible row-select-checkboxes
+                            document.querySelectorAll('.row-select-checkbox:checked').forEach(function(cb) {
+                                try { cb.checked = false; } catch (e) {}
+                                try {
+                                    var pid = cb.dataset && cb.dataset.productId ? parseInt(cb.dataset.productId, 10) : null;
+                                    if (window.selectedProductIds && pid && !isNaN(pid)) window.selectedProductIds.delete(pid);
+                                } catch(e) {}
+                            });
+                            // Clear any pending create items cache
+                            try { window._pendingCreateItems = []; } catch(e) {}
+                            // If page-level helpers exist, refresh header checkbox / delete button state
+                            if (typeof updateSelectAllState === 'function') try { updateSelectAllState(); } catch(e) {}
+                            if (typeof updateDeleteButtonVisibility === 'function') try { updateDeleteButtonVisibility(); } catch(e) {}
+                        } catch (e) { console.warn('clear create selections error', e); }
                         var stockFieldsRow = document.getElementById('stockFieldsRow');
                         if (stockFieldsRow) stockFieldsRow.style.display = 'none';
                         document.querySelectorAll('.color-option').forEach(function(opt) {

@@ -248,11 +248,57 @@ switch ($method) {
         break;
 
     case 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
-        if (!$data) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Invalid input']);
-            exit;
+        // Accept both JSON POSTs (application/json) and multipart/form-data (FormData with file uploads).
+        $rawContentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : (isset($_SERVER['HTTP_CONTENT_TYPE']) ? $_SERVER['HTTP_CONTENT_TYPE'] : '');
+        if (!empty($_FILES) || stripos($rawContentType, 'multipart/form-data') !== false) {
+            // Data may come via $_POST when using FormData. Copy into $data array and preserve files in $_FILES.
+            $data = $_POST;
+            // If some fields were encoded as JSON strings (e.g. variants or composite_components), leave decoding to later normalization.
+        } else {
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!$data) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid input']);
+                exit;
+            }
+        }
+
+        // Handle file upload if present (expects file field name 'image_file') and populate $data['image_url'] with the saved relative path.
+        if (!empty($_FILES) && isset($_FILES['image_file']) && isset($_FILES['image_file']['error']) && $_FILES['image_file']['error'] === UPLOAD_ERR_OK) {
+            try {
+                $tmpName = $_FILES['image_file']['tmp_name'];
+                $origName = $_FILES['image_file']['name'];
+                $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                $allowed = ['jpg','jpeg','png','gif','webp','bmp'];
+                if (!in_array($ext, $allowed)) {
+                    // Unknown extension: still allow but normalize extension to original lower-case
+                }
+
+                // Build absolute target directory: two levels up from this file -> project root, then /upload/items
+                $uploadRoot = realpath(__DIR__ . '/../../upload');
+                if ($uploadRoot === false) {
+                    // fallback to path construction
+                    $uploadRoot = __DIR__ . '/../../upload';
+                }
+                $targetDir = $uploadRoot . DIRECTORY_SEPARATOR . 'items';
+                if (!is_dir($targetDir)) {
+                    @mkdir($targetDir, 0755, true);
+                }
+
+                // Generate a unique filename
+                $basename = time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                $targetPath = $targetDir . DIRECTORY_SEPARATOR . $basename;
+
+                if (move_uploaded_file($tmpName, $targetPath)) {
+                    // Save a web-accessible relative path (project-root-relative)
+                    $data['image_url'] = 'upload/items/' . $basename;
+                } else {
+                    // If file move failed, leave image_url untouched; client will get a server error later if needed
+                    error_log('[upload] move_uploaded_file failed for ' . $origName . ' to ' . $targetPath);
+                }
+            } catch (Exception $e) {
+                error_log('[upload] exception: ' . $e->getMessage());
+            }
         }
 
         // Lightweight action: update product-level track_stock from client toggles
@@ -844,8 +890,30 @@ switch ($method) {
         $type = isset($data['type']) ? $conn->real_escape_string($data['type']) : 'color_shape';
         $color = isset($data['color']) ? $conn->real_escape_string($data['color']) : '';
         $shape = isset($data['shape']) ? $conn->real_escape_string($data['shape']) : '';
-        $image_url = isset($data['image_url']) ? $conn->real_escape_string($data['image_url']) : '';
-        $variants = isset($data['variants']) ? $data['variants'] : [];
+        // Normalize image_url (may have been populated by the file upload handling above)
+        $image_url = isset($data['image_url']) ? $data['image_url'] : '';
+
+        // Normalize variants and composite_components: they may be JSON-encoded strings when sent via FormData
+        $variants = [];
+        if (isset($data['variants'])) {
+            if (is_string($data['variants'])) {
+                $decoded = json_decode($data['variants'], true);
+                $variants = is_array($decoded) ? $decoded : [];
+            } else if (is_array($data['variants'])) {
+                $variants = $data['variants'];
+            }
+        }
+        $composite_components = [];
+        if (isset($data['composite_components'])) {
+            if (is_string($data['composite_components'])) {
+                $decoded = json_decode($data['composite_components'], true);
+                $composite_components = is_array($decoded) ? $decoded : [];
+            } else if (is_array($data['composite_components'])) {
+                $composite_components = $data['composite_components'];
+            }
+        }
+        // Escape image_url for SQL use (after normalization)
+        $image_url = $conn->real_escape_string($image_url);
         $sku = isset($data['sku']) ? $conn->real_escape_string($data['sku']) : '';
         $barcode = isset($data['barcode']) ? $conn->real_escape_string($data['barcode']) : '';
         // If price is null, set to 'variable' (string)
@@ -981,7 +1049,6 @@ switch ($method) {
 
             // If composite components were included (Create -> Add flow), persist them into a dedicated
             // product_components table so components can be reused by many composites.
-            $composite_components = isset($data['composite_components']) ? $data['composite_components'] : [];
             if (!empty($composite_components) && is_array($composite_components)) {
                 foreach ($composite_components as $comp) {
                     $cname = isset($comp['name']) ? $conn->real_escape_string($comp['name']) : '';
