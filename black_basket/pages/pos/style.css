@@ -33,35 +33,471 @@
     font-size: 1.2rem;
 }
 
+/* search row contains category toggle and search input */
+.search-row {
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.category-toggle-container {
+    position: relative;
+    /* use flex so we can align children properly */
+    display: flex;
+    align-items: center; /* vertically center the toggle and keep it left-aligned */
+    justify-content: space-between;
+}
+.category-toggle {
+    position: relative;
+    /* use flex so we can align children properly */
+    display: flex;
+    align-items: center; /* vertically center the toggle and keep it left-aligned */
+    justify-content: flex-start;
+    background: #181818;
+    border: 1px solid #555;
+    border-radius: 8px;
+    box-sizing: border-box;
+    cursor: pointer;
+    padding: 11px 14px;
+    cursor: pointer;
+    color: #e6e6e6; 
+    font-size: 14px;
+}
+.category-toggle:hover { background: #121212; border: 1px solid #777; }
+/* ensure no unexpected icons appear inside the toggle button */
+.category-toggle i { display: none !important; }
+
+.category-toggle { z-index: 2; }
+
+/* make the category toggle compact so search input can be longer */
+.category-toggle { min-width:200px; }
+
+/* label and chevron spacing inside the toggle */
+.category-toggle .toggle-label { 
+    flex: 1 1 auto;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.category-toggle .toggle-chevron {
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* search input wrapper so we can position the icon inside the field */
+.search-input-wrapper {
+    padding: 12px 0  12px; /* left padding to accommodate icon */
+    position: relative;
+    flex: 1 1 auto; /* make the search input take remaining space */
+    display: flex;
+    align-items: center;
+}
+.search-input-wrapper .fa-search {
+    position: absolute;
+    left: 12px;
+    color: rgba(255,255,255,0.45);
+    pointer-events: none; /* icon should not intercept clicks */
+    font-size: 0.95rem;
+}
+
+/* Scan button placed between toggle and search input */
+.scan-btn {
+    background: #181818;
+    border: 1px solid #555;
+    color: #e6e6e6;
+    border-radius: 8px;
+    padding: 5px 0 5px 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.95rem; 
+    min-width: 44px;
+    height: 40px;
+    position: relative;
+    z-index: 3; /* keep scan button above the toggle so its icon is visible */
+}
+
+.scan-btn i { font-size: 16px; }
+.scan-btn:hover { background: #121212; border: 1px solid #777; }
+
+/* search toggle button (icon-only) */
+.search-toggle {
+    background: #181818 !important;
+    border: 1px solid #555 !important;
+    position: absolute;
+    border-radius: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.65);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.search-toggle:hover {
+    background: #121212 !important;
+    border: 1px solid #777 !important;
+}
+
+.search-toggle i { font-size: 14px; }
+
+/* collapsed default: hide the actual text input and show only the icon; keep toggles visible */
+.search-row:not(.search-open) .search-input-wrapper input {
+    width: 36px;
+    padding-left: 20px; /* keep a bit of left padding so icon sits nicely */
+    transition: width 220ms ease, opacity 220ms ease, padding 220ms ease;
+    opacity: 0;
+    pointer-events: none;
+}
+.search-row:not(.search-open) .search-input-wrapper { width: auto; }
+
+/* when opened, hide other controls and expand input to the left (takes remaining space) */
+.search-row.search-open .category-toggle-container,
+.search-row.search-open .scan-btn {
+    display: none;
+}
+.search-row.search-open .search-toggle { display: none; }
+.search-row.search-open .search-input-wrapper input {
+    opacity: 1;
+    pointer-events: auto;
+    width: 300px !important; /* expanded width; will push left if there's room */
+    padding-left: 20px !important;
+    transition: width 220ms ease, opacity 220ms ease;
+}
+
+    /* right-side search submit button (hidden by default, shown when open) */
+    .search-submit {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: rgba(255,255,255,0.9);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        padding: 0;
+    }
+    .search-submit i { font-size: 14px; }
+    .search-row.search-open .search-submit { display: inline-flex; }
+
+    /* add right padding to input when the submit icon is visible */
+    .search-row.search-open .search-input-wrapper input { padding-right: 44px; }
+
+/* on very small screens make the expanded input full width */
+@media (max-width: 700px) {
+    .search-row.search-open .search-input-wrapper input { width: calc(100% ); }
+}
+
+/* make the input longer and leave space for the icon */
+#product-search {
+    padding: 12px 12px 12px 36px; /* left padding to accommodate icon */
+    background: #121212;
+    color: #fff;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+/* Slightly increase left margin between toggle and input on narrow screens */
+.search-row .category-toggle-container { flex: 0 0 auto; }
+.category-list {
+    position: absolute;
+    left: 0;
+    top: 0;
+    /* match the search input background */
+    background: #121212;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    list-style: none;
+    font-size: 14px;
+    min-width: 200px; /* make dropdown longer */
+    max-width: 360px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    z-index: 3000;
+    display: none;
+    max-height: 320px; /* cap height and allow scroll for many categories */
+    overflow-y: auto;
+}
+.category-list li {
+    padding: 10px 14px;
+    cursor: pointer;
+    color: #e6e6e6;
+    font-size: 0.98rem;
+}
+.category-list li:hover, .category-list li.active { background:#1f1f1f; color:#fff; }
+.category-list[aria-hidden="false"] { display:block; }
+
+.product-selection {
+    padding-right: 5px;
+}
+
 .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 15px;
-    max-height: 400px;
-    overflow-y: auto;
+    padding-top: 10px; /* give top-row cards room to expand on hover so they don't get hidden by fixed header */
+    padding-right: 10px;
+    max-height: 450px;
+    /* Keep scrollbar visible to avoid layout shift when content changes */
+    overflow-y: scroll;
+    overflow-x: hidden;
+    /* Reserve scrollbar gutter when supported so content width remains stable */
+    scrollbar-gutter: stable both-edges;
 }
 
+/* Make scrollbar track transparent and give a subtle thumb for product grid and cart lists */
+.product-grid, .cart-items {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: rgba(255,255,255,0.12) transparent; /* thumb then track */
+}
+
+.product-grid::-webkit-scrollbar,
+.cart-items::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+.product-grid::-webkit-scrollbar-track,
+.cart-items::-webkit-scrollbar-track {
+    background: transparent;
+}
+.product-grid::-webkit-scrollbar-thumb,
+.cart-items::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08);
+    border-radius: 8px;
+    border: 2px solid transparent; /* padding effect */
+}
+.product-grid::-webkit-scrollbar-thumb:hover,
+.cart-items::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.14);
+}
+
+/* Price input modal styles */
+.price-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+.price-modal-overlay.visible { display: flex; }
+.price-modal {
+    background: #111;
+    color: #fff;
+    padding: 18px;
+    border-radius: 10px;
+    width: 320px;
+    max-width: calc(100% - 40px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+.price-modal h3 { margin: 0 0 8px 0; color: #ffb347; }
+.price-modal-body { display:flex; flex-direction:column; gap:8px; margin-bottom: 12px; }
+.price-modal-body label { font-size: 0.9rem; color: #ddd; }
+.price-modal-body input { padding: 8px 10px; border-radius: 6px; border: 1px solid #333; background: #222; color: #fff; }
+.price-modal-error { color: #ff6b6b; font-size: 0.85rem; min-height: 18px; }
+.price-modal-actions { display:flex; gap:8px; justify-content:flex-end; }
+.price-modal .btn { padding: 8px 12px; border-radius:6px; border: none; cursor: pointer; background: #333; color: #fff; }
+.price-modal .btn.primary { background: #ff9800; color: #111; }
+
+/* currency display inside modal: prefix + amount that updates live */
+.price-display { display:flex; justify-content:flex-end; align-items:baseline; gap:8px; padding:6px 4px; }
+.price-display .currency { color:#ffd18a; font-size:1.1rem; }
+.price-display .amount { font-size:1.6rem; font-weight:700; color:#fff; }
+
+/* New keypad/modal styles */
+.price-modal-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.price-modal-header .price-modal-title { font-weight:700; color:#ffd18a; font-size:1rem; text-align:right; flex:1; }
+.price-btn { background:#2a2a2a; color:#fff; border:1px solid #333; padding:8px 10px; border-radius:6px; cursor:pointer; }
+.price-btn.icon { font-size:18px; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; }
+.price-modal-body input#price-modal-input { font-size:1.6rem; text-align:right; padding:10px; }
+.price-key-actions { display:flex; gap:8px; justify-content:center; margin-bottom:6px; }
+.price-keypad { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+.price-keypad .key { padding:12px 6px; font-size:1.1rem; border-radius:8px; background:#1f1f1f; border:1px solid #333; color:#fff; cursor:pointer; }
+.price-keypad .key:active { transform: translateY(1px); }
+.price-modal-actions { margin-top:12px; display:flex; justify-content:center; }
+.price-modal .price-btn.primary { width:100%; padding:12px; font-weight:700; }
+
 .product-card {
-    background: #181818;
+    background: #232323;
     padding: 15px;
     border-radius: 10px;
     text-align: center;
-    transition: transform 0.2s ease;
+    transition: box-shadow 0.18s ease, border-color 0.18s ease;
+    border: 2px solid transparent;
+    position: relative; /* ensure z-index works and card can be stacked above header */
+    z-index: 1;
+    /* Make cards square: width defines size and aspect-ratio keeps height equal */
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: visible; /* allow background shape/image to expand beyond card when hovered */
+    will-change: transform;
+}
+
+.card-top {
+    flex: 0 0 auto;
+}
+.card-middle {
+    /* occupy the remaining space and center the badge within it */
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.card-middle.column {
+    flex-direction: column;
+    gap: 8px;
+}
+
+.card-details {
+    text-align: center;
+    line-height: 1.1;
+    padding: 0 6px;
+    max-width: 90%;
+    box-sizing: border-box;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.card-bottom {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+}
+.product-price {
+    font-weight: 700;
+    color: #ff9800;
+    margin-top: 6px;
+}
+
+/* Background element filling the whole card */
+.card-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform-origin: center center;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+    pointer-events: none; /* ensure overlay receives clicks */
+}
+.card-overlay {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Shape variants applied to the bg */
+.card-bg.bg-shape.square { border-radius: 10px; }
+.card-bg.bg-shape.rounded { border-radius: 14px; }
+.card-bg.bg-shape.circle { border-radius: 50%; }
+.card-bg.bg-image { border-radius: 10px; background-size: cover; background-position: center; }
+
+/* Put text above gradient */
+.card-overlay .card-middle, .card-overlay .card-bottom { position: relative; z-index: 2; }
+
+/* Shape and image rendering inside card-top */
+.shape-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+.shape {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+}
+.shape.circle { border-radius: 50%; }
+.shape.square { border-radius: 6px; }
+.shape.rounded { border-radius: 14px; }
+.image-container {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+    height:100%;
+}
+.image-container img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
 }
 
 .product-card:hover {
-    transform: translateY(-2px);
+    /* keep card stable; visual hover moves to the background shape/image */
+    outline: none;
+    z-index: 2000; /* lift hovered card above siblings so expanded bg isn't clipped by adjacent elements */
+}
+
+.product-card:focus {
+    outline: none;
+}
+
+/* Hover and focus effects apply to the background element (shape/image) so the overlay content remains stable */
+.product-card:hover .card-bg,
+.product-card:focus .card-bg {
+    transform: scale(1.04);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    filter: brightness(1.03);
+}
+
+/* stock-status small badge styles */
+.stock-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.stock-status.out-of-stock {
+    background: #e53e3e;
+    color: #fff;
+}
+.stock-status.low-stock {
+    background: #ffb341;
+    color: #232323;
 }
 
 .product-card h4 {
     color: #fff;
     margin-bottom: 8px;
     font-size: 1rem;
+    white-space: normal; /* allow wrapping */
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    display: block;
 }
 
 .product-card p {
     color: #dbdbdb;
-    margin-bottom: 10px;
+    margin: 6px 0;
     font-size: 0.9rem;
 }
 
@@ -85,6 +521,92 @@
     overflow-y: auto;
     margin-bottom: 20px;
 }
+
+/* Favourite (heart) toggle on product cards
+   Hidden by default to reduce visual clutter. Appears on hover/focus or when active. */
+.fav-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #fff;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.18s ease, transform 0.12s ease, opacity 0.12s ease;
+    opacity: 0; /* hidden by default */
+    transform: scale(0.9);
+    pointer-events: none; /* disable when hidden so clicks go to the card */
+}
+.fav-toggle:active { transform: scale(0.96); }
+.fav-toggle .fa-heart { color: rgba(255,255,255,0.85); }
+.fav-toggle.fav-active { background: rgba(255,255,255,0.08); }
+.fav-toggle.fav-active .fa-heart { color: #ff9800; }
+
+/* Reveal on card hover, focus, or when already favourited */
+.product-card:hover .fav-toggle,
+.product-card:focus .fav-toggle,
+.product-card:focus-within .fav-toggle,
+.fav-toggle.fav-active {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+
+/* No-products (empty / error) UI shown inside the product grid when there are no items */
+.no-products {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 28px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));
+    border: 1px solid rgba(255,255,255,0.03);
+    color: #d6d6d6;
+    text-align: center;
+}
+.no-products .no-products-illustration {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,152,0,0.08);
+}
+.no-products .no-products-illustration i {
+    font-size: 30px;
+    color: #ff9800;
+}
+.no-products h3 { margin: 0; color: #fff; font-size: 1.15rem; }
+.no-products p { margin: 0; color: #bfbfbf; max-width: 520px; }
+.no-products .no-products-actions { display:flex; gap:10px; margin-top:6px; }
+.no-products .no-products-btn { padding:8px 12px; border-radius:8px; text-decoration:none; border:1px solid rgba(255,255,255,0.04); background: #1f1f1f; color:#fff; cursor:pointer; }
+.no-products .no-products-btn.open-inventory { background: #ff9800; color:#111; border: none; }
+.no-products.error .no-products-illustration { background: rgba(255,76,76,0.08); }
+.no-products.error .no-products-illustration i { color: #ff4c4c; }
+
+/* Make the empty/error card span the entire product grid column area so it doesn't appear thin */
+.product-grid > .no-products,
+.product-grid > .no-products.error {
+    width: 100%;
+    grid-column: 1 / -1; /* span all grid columns */
+    max-width: none; /* allow full width */
+    align-self: stretch; /* stretch vertically if needed */
+    padding-left: 18px;
+    padding-right: 18px;
+}
+.no-products p { max-width: 900px; }
+
 
 .cart-item {
     display: flex;

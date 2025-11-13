@@ -35,12 +35,36 @@ session_start();
                     <div class="pos-section">
                         <h3>Product Search</h3>
                         <div class="search-box">
-                            <input type="text" id="product-search" placeholder="search product...">
-                            <i class="fas fa-search"></i>
+                            <div class="search-row">
+                                <div class="category-toggle-container">
+                                    <button id="category-toggle" class="category-toggle">
+                                        <span class="toggle-label">All Items</span>
+                                        <span class="toggle-chevron">▾</span>
+                                    </button>
+                                    <ul id="category-list" class="category-list" aria-hidden="true">
+                                        <li data-category="all" class="active">All Items</li>
+                                        <!-- additional categories can be injected dynamically -->
+                                    </ul>
+                                </div>
+
+                                <button id="scan-btn" class="scan-btn" aria-label="Scan barcode" title="Scan barcode">
+                                    <i class="fas fa-barcode"></i>
+                                </button>
+
+                                <div class="search-input-wrapper">
+                                    <button id="search-toggle" class="search-toggle" aria-label="Open search">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                    <input type="text" id="product-search" placeholder="search product...">
+                                    <button id="search-submit" class="search-submit" aria-label="Search now" title="Search">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="pos-section">
+                    <div class="pos-section product-selection">
                         <h3>Available Products</h3>
                         <div class="product-grid" id="product-grid">
                             <!-- Products will be loaded here -->
