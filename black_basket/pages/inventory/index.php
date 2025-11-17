@@ -30,7 +30,7 @@ createDefaultCategory($_SESSION['user_id']);
             justify-content: center;
             /* space between icon and label */
             gap: 8px;
-            radius: 6px;
+            border-radius: 6px;
             /* Match common button sizing used across the toolbar */
             height: 35px;
             padding: 6px 20px;
@@ -181,6 +181,10 @@ createDefaultCategory($_SESSION['user_id']);
                 <button class="btn btn-outline" id="importBtn" title="Import"><i class="fa fa-download"></i></button>
                 <button class="btn btn-outline" id="exportBtn" title="Export"><i class="fa fa-upload"></i></button>
             </div>
+            <!-- Hidden import form used by the Import button and empty-state import action -->
+            <form id="importForm" action="import_items.php" method="post" enctype="multipart/form-data" style="display:none;">
+                <input type="file" name="import_file" id="importFileInput" accept=".csv,text/csv" />
+            </form>
         </div>
                 
                 <!-- Filter Controls -->
@@ -194,7 +198,7 @@ createDefaultCategory($_SESSION['user_id']);
                         
                         <!-- Search Box (visible when expanded) -->
                         <div class="search-box">
-                            <input type="text" id="search-inventory" placeholder="Search products...">
+                            <input type="text" id="search-inventory" placeholder="Search items...">
                             <i class="fas fa-search"></i>
                         </div>
                     </div>
@@ -252,11 +256,15 @@ createDefaultCategory($_SESSION['user_id']);
                             <?php
                             // Query products and their variants. We'll display variants as separate rows and products without variants as single rows.
                             // Include is_composite so we can calculate estimated stock for composite products
-                            $prodSql = "SELECT p.id AS product_id, p.name AS product_name, p.price AS product_price, p.cost AS product_cost, p.in_stock AS product_stock, p.low_stock AS low_stock, p.pos_available, p.track_stock AS track_stock, p.category_id, p.type, p.color, p.shape, p.image_url, p.is_composite AS is_composite
+                            $prodSql = "SELECT p.id AS product_id, p.name AS product_name, p.sku AS product_sku, p.barcode AS product_barcode, p.price AS product_price, p.cost AS product_cost, p.in_stock AS product_stock, p.low_stock AS low_stock, p.pos_available, p.track_stock AS track_stock, p.category_id, p.type, p.color, p.shape, p.image_url, p.is_composite AS is_composite
                                         FROM products p ORDER BY p.name ASC";
 
+                            // Track whether any products were rendered so we can show
+                            // a friendly empty-state when the inventory is empty.
+                            $hasProducts = false;
                             if ($prodResult = $conn->query($prodSql)) {
                                 while ($p = $prodResult->fetch_assoc()) {
+                                    $hasProducts = true;
                                     // Fetch variants for this product
                                     $variants = [];
                                     $vSql = "SELECT id, name, sku, barcode, price, cost, in_stock, low_stock, pos_available FROM product_variants WHERE product_id = " . (int)$p['product_id'] . " ORDER BY name ASC";
@@ -349,7 +357,9 @@ createDefaultCategory($_SESSION['user_id']);
                                         // Add data-stock and data-low attributes so parent rows are filterable by stock
                                         // Also include data-estimated if we computed an estimate.
                                         $dataEstimatedAttr = $isEstimated ? " data-estimated='1'" : "";
-                                        echo "<tr class='parent-row' data-product-id='" . (int)$p['product_id'] . "' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $parentStockStatus . "\" data-low=\"" . $parentLowFlag . "\"" . $dataEstimatedAttr . ">";
+                                        $prodSkuAttr = htmlspecialchars((string)($p['product_sku'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                        $prodBarcodeAttr = htmlspecialchars((string)($p['product_barcode'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                        echo "<tr class='parent-row' data-product-id='" . (int)$p['product_id'] . "' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $parentStockStatus . "\" data-low=\"" . $parentLowFlag . "\" data-sku=\"" . $prodSkuAttr . "\" data-barcode=\"" . $prodBarcodeAttr . "\"" . $dataEstimatedAttr . ">";
                                         echo "<td style=\"text-align:center;\">";
                                         // Chevron toggle (will be wired by JS). Keep accessible label.
                                         // Chevron button placed before the checkbox but will be
@@ -419,7 +429,9 @@ createDefaultCategory($_SESSION['user_id']);
                                             $posAttr = isset($v['pos_available']) && $v['pos_available'] ? '1' : '0';
                                             $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
 
-                                            echo "<tr class='variant-row' data-parent-id='" . (int)$p['product_id'] . "' style='display:none;' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\">";
+                                            $varSkuAttr = htmlspecialchars((string)($v['sku'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                            $varBarcodeAttr = htmlspecialchars((string)($v['barcode'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                            echo "<tr class='variant-row' data-parent-id='" . (int)$p['product_id'] . "' style='display:none;' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\" data-sku=\"" . $varSkuAttr . "\" data-barcode=\"" . $varBarcodeAttr . "\">";
                                             // Variant rows are not selectable; output an empty cell to
                                             // preserve table alignment. Add a class for future styling.
                                             echo "<td class='variant-checkbox-cell' style=\"text-align:center;\">&nbsp;</td>";
@@ -508,7 +520,9 @@ createDefaultCategory($_SESSION['user_id']);
                                         $trackAttr = isset($p['track_stock']) && $p['track_stock'] ? '1' : '0';
                                         $catIdAttr = isset($p['category_id']) && $p['category_id'] ? (int)$p['category_id'] : '';
                                         $dataEstimatedAttr = $isEstimated ? " data-estimated='1'" : "";
-                                        echo "<tr data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\"" . $dataEstimatedAttr . ">";
+                                        $prodSkuAttr = htmlspecialchars((string)($p['product_sku'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                        $prodBarcodeAttr = htmlspecialchars((string)($p['product_barcode'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                        echo "<tr data-product-id='" . (int)$p['product_id'] . "' data-category=\"" . $categoryName . "\" data-category-id=\"" . $catIdAttr . "\" data-stock=\"" . $stockStatus . "\" data-low=\"" . ($stockStatus === 'low' ? 'low' : '') . "\" data-pos=\"" . $posAttr . "\" data-track=\"" . $trackAttr . "\" data-sku=\"" . $prodSkuAttr . "\" data-barcode=\"" . $prodBarcodeAttr . "\"" . $dataEstimatedAttr . ">";
                                         echo "<td style=\"text-align:center;\">";
                                         echo "<label class='permission-checkbox table-checkbox' style='margin-left: 10px;display:inline-flex;justify-content:center;'>";
                                         echo "<input type='checkbox' class='row-select-checkbox' data-product-id='" . (int)$p['product_id'] . "' />";
@@ -535,6 +549,25 @@ createDefaultCategory($_SESSION['user_id']);
                                     }
                                 }
                                 $prodResult->free();
+                            }
+
+                            // If there are no products, show an empty-state row with actions
+                            if (empty($hasProducts)) {
+                                echo '<tr class="empty-state">';
+                                echo '<td colspan="7" style="padding:40px;text-align:center;">';
+                                echo '<div style="max-width:760px;margin:0 auto;">';
+                                echo '<h3 style="margin:0 0 8px 0;color:#e6e6e6;">No items in inventory yet</h3>';
+                                echo '<p style="margin:0 0 16px 0;color:#9e9e9e;">Add items manually, or import from a spreadsheet to get started.</p>';
+                                echo '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+                                echo '<button class="btn btn-primary" id="emptyAddItemBtn" type="button"><i class="fa fa-plus"></i> Add Item</button>';
+                                echo '<button class="btn btn-outline" id="emptyImportBtn" type="button"><i class="fa fa-file-import"></i> Import Items</button>';
+                                echo '<a class="btn btn-outline" href="download_sample.php" id="downloadSampleLink" style="display:inline-flex;align-items:center;gap:8px;">';
+                                echo '<i class="fa fa-file-csv"></i> Download sample CSV</a>';
+                                echo '</div>';
+                                echo '<p style="margin-top:12px;color:#7f8c8d;font-size:0.95rem;">Tip: The sample file contains header columns you can edit in Excel. Save as CSV before uploading.</p>';
+                                echo '</div>';
+                                echo '</td>';
+                                echo '</tr>';
                             }
                             ?>
                         </tbody>
@@ -1045,7 +1078,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const rows = Array.from(document.querySelectorAll('#inventory-table-body tr'));
         const catVal = categoryFilter ? categoryFilter.value.trim().toLowerCase() : '';
         const stockVal = stockFilter ? stockFilter.value : '';
-        const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            const qRaw = searchInput ? searchInput.value.trim() : '';
+            const q = qRaw.toLowerCase();
         const typeState = toggleButton ? toggleButton.getAttribute('data-current') : 'all';
 
         rows.forEach(row => {
@@ -1068,7 +1102,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            if (q && !text.includes(q)) show = false;
+            // Support special searches: "sku:VALUE" and "barcode:VALUE" (case-insensitive)
+            const skuPrefix = 'sku:';
+            const barcodePrefix = 'barcode:';
+            let matched = false;
+            const rowSku = (row.getAttribute('data-sku') || '').toLowerCase();
+            const rowBarcode = (row.getAttribute('data-barcode') || '').toLowerCase();
+
+            if (q.startsWith(skuPrefix)) {
+                const v = q.slice(skuPrefix.length).trim();
+                if (v === '' || (rowSku && rowSku.indexOf(v) !== -1)) matched = true;
+            } else if (q.startsWith(barcodePrefix)) {
+                const v = q.slice(barcodePrefix.length).trim();
+                if (v === '' || (rowBarcode && rowBarcode.indexOf(v) !== -1)) matched = true;
+            } else {
+                // Default behavior: match visible text OR SKU OR barcode
+                if (q === '' || text.includes(q) || (rowSku && rowSku.indexOf(q) !== -1) || (rowBarcode && rowBarcode.indexOf(q) !== -1)) matched = true;
+            }
+
+            if (!matched) show = false;
 
             // itemTypeToggle enforcement
             if (typeState === 'pos') {
@@ -1574,6 +1626,43 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+</script>
+<script>
+// Wire import/download/empty-state actions
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        var importBtn = document.getElementById('importBtn');
+        var importFileInput = document.getElementById('importFileInput');
+        var importForm = document.getElementById('importForm');
+        if (importBtn && importFileInput) {
+            importBtn.addEventListener('click', function() { importFileInput.click(); });
+        }
+        if (importFileInput && importForm) {
+            importFileInput.addEventListener('change', function() { if (importFileInput.files && importFileInput.files.length) importForm.submit(); });
+        }
+
+        var emptyImportBtn = document.getElementById('emptyImportBtn');
+        if (emptyImportBtn && importFileInput) {
+            emptyImportBtn.addEventListener('click', function() { importFileInput.click(); });
+        }
+        var emptyAddItemBtn = document.getElementById('emptyAddItemBtn');
+        var addProductBtn = document.getElementById('addProductBtn');
+        if (emptyAddItemBtn && addProductBtn) {
+            emptyAddItemBtn.addEventListener('click', function() { addProductBtn.click(); });
+        }
+        // Prevent clicks on the empty-state row from bubbling up to table-level
+        // handlers that may open edit/create modals. Buttons inside the empty
+        // row will still receive events because stopPropagation is applied on
+        // the row itself, not on the button elements.
+        try {
+            var emptyStateRow = document.querySelector('#inventory-table-body tr.empty-state');
+            if (emptyStateRow) {
+                emptyStateRow.addEventListener('click', function(ev) { ev.stopPropagation(); });
+                emptyStateRow.addEventListener('dblclick', function(ev) { ev.stopPropagation(); });
+            }
+        } catch (e) { /* ignore */ }
+    } catch (e) { console.warn('import handlers init failed', e); }
+});
 </script>
 <script>
 // Checkbox select-all behavior

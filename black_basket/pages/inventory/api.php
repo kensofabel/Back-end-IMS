@@ -10,7 +10,9 @@ require_once '../../config/db.php';
 function recompute_parent_cost($conn, $parent_id) {
     $pid = intval($parent_id);
     if ($pid <= 0) return 0.0;
-    $sql = "SELECT IFNULL(SUM(COALESCE(pc.component_cost, COALESCE(pv.cost, p2.cost),0) * COALESCE(pc.component_qty,0)),0) AS total"
+    // New schema: product_components no longer stores component_cost/name/sku.
+    // Compute parent cost from referenced variant.cost or product.cost multiplied by component_qty.
+    $sql = "SELECT IFNULL(SUM(COALESCE(pv.cost, p2.cost,0) * COALESCE(pc.component_qty,0)),0) AS total"
         . " FROM product_components pc LEFT JOIN products p2 ON pc.component_product_id = p2.id LEFT JOIN product_variants pv ON pc.component_variant_id = pv.id"
         . " WHERE pc.parent_product_id = " . $pid;
     $res = $conn->query($sql);
@@ -838,6 +840,170 @@ switch ($method) {
             }
         }
 
+        // Update product (edit) - supports updating product fields and variants
+        if (isset($data['action']) && $data['action'] === 'update_product') {
+            $product_id = isset($data['product_id']) ? intval($data['product_id']) : 0;
+            if ($product_id <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid product id']);
+                exit;
+            }
+
+            // Accept same fields as creation but perform UPDATEs. Variants handling:
+            // - $data['variants'] may be an array of variant objects. If a variant has an 'id' > 0, update it.
+            // - If a variant has no 'id' or id==0, insert it as new.
+            // - $data['deleted_variants'] may be an array of variant ids to remove.
+
+            $name = isset($data['name']) ? $conn->real_escape_string($data['name']) : null;
+            $category = isset($data['category']) ? $conn->real_escape_string($data['category']) : null;
+            $price = null;
+            if (isset($data['price']) && $data['price'] === 'variable') $price = 'variable';
+            else if (isset($data['price']) && $data['price'] !== '') $price = floatval($data['price']);
+            $cost = isset($data['cost']) && $data['cost'] !== '' ? floatval($data['cost']) : null;
+            $track_stock = isset($data['track_stock']) ? intval($data['track_stock']) : 0;
+            $variantsTrackStock = isset($data['variantsTrackStock']) ? intval($data['variantsTrackStock']) : 0;
+            if ($variantsTrackStock === 1) $track_stock = 1;
+            $in_stock = isset($data['in_stock']) ? trim($data['in_stock']) : null;
+            if ($track_stock === 0) $in_stock = null; else if ($in_stock === '' || $in_stock === '0 - -') $in_stock = null;
+            $low_stock = isset($data['low_stock']) ? trim($data['low_stock']) : null;
+            if ($track_stock === 0) $low_stock = null; else if ($low_stock === '' || $low_stock === '0 - -') $low_stock = null;
+            $pos_available = isset($data['pos_available']) ? intval($data['pos_available']) : 1;
+            $type = isset($data['type']) ? $conn->real_escape_string($data['type']) : 'color_shape';
+            $color = isset($data['color']) ? $conn->real_escape_string($data['color']) : '';
+            $shape = isset($data['shape']) ? $conn->real_escape_string($data['shape']) : '';
+            $image_url = isset($data['image_url']) ? $conn->real_escape_string($data['image_url']) : '';
+
+            // Safety: if an image was uploaded or an image_url is present, prefer
+            // the 'image' representation even if the client did not explicitly
+            // send type='image'. This prevents cases where FormData omitted
+            // the 'type' field but the file was successfully received.
+            if (!empty($image_url) && ($type === '' || $type === 'color_shape')) {
+                $type = 'image';
+            }
+            // If the representation is image, clear any color/shape values
+            // so the product doesn't retain color/shape metadata.
+            if ($type === 'image') {
+                $color = '';
+                $shape = '';
+            }
+            $sku = isset($data['sku']) ? $conn->real_escape_string($data['sku']) : '';
+            $barcode = isset($data['barcode']) ? $conn->real_escape_string($data['barcode']) : '';
+
+            // Resolve category id (create if missing)
+            $category_id = null;
+            if ($category && $category !== '') {
+                $cat_sql = "SELECT id FROM categories WHERE name='" . $conn->real_escape_string($category) . "' LIMIT 1";
+                $cat_res = $conn->query($cat_sql);
+                if ($cat_res && $cat_res->num_rows > 0) {
+                    $category_id = $cat_res->fetch_assoc()['id'];
+                } else {
+                    $cat_ins = "INSERT INTO categories (name) VALUES ('" . $conn->real_escape_string($category) . "')";
+                    if (!$conn->query($cat_ins)) {
+                        http_response_code(500); echo json_encode(['error' => $conn->error]); exit;
+                    }
+                    $category_id = $conn->insert_id;
+                }
+            }
+
+            $conn->begin_transaction();
+            try {
+                // Build update SQL parts
+                $sets = [];
+                if ($name !== null) $sets[] = "name='" . $name . "'";
+                if ($category !== null) $sets[] = "category_id=" . ($category_id ? intval($category_id) : 'NULL');
+                if ($price !== null) $sets[] = ( $price === 'variable' ? "price='variable'" : "price=" . floatval($price) );
+                if ($cost !== null) $sets[] = "cost=" . floatval($cost);
+                if ($sku !== '') $sets[] = "sku='" . $sku . "'";
+                if ($barcode !== '') $sets[] = "barcode='" . $barcode . "'";
+                $sets[] = "track_stock=" . intval($track_stock);
+                $sets[] = "pos_available=" . intval($pos_available);
+                $sets[] = "type='" . $type . "'";
+                $sets[] = "color='" . $color . "'";
+                $sets[] = "shape='" . $shape . "'";
+                $sets[] = "image_url='" . $image_url . "'";
+                if ($in_stock !== null) $sets[] = "in_stock='" . $conn->real_escape_string($in_stock) . "'"; else $sets[] = "in_stock=NULL";
+                if ($low_stock !== null) $sets[] = "low_stock='" . $conn->real_escape_string($low_stock) . "'"; else $sets[] = "low_stock=NULL";
+
+                if (!empty($sets)) {
+                    $upd_sql = "UPDATE products SET " . implode(', ', $sets) . " WHERE id=" . intval($product_id);
+                    if (!$conn->query($upd_sql)) throw new Exception($conn->error);
+                }
+
+                // Handle deleted variants
+                if (isset($data['deleted_variants']) && is_array($data['deleted_variants'])) {
+                    $delIds = array_map('intval', $data['deleted_variants']);
+                    foreach ($delIds as $did) {
+                        if ($did > 0) {
+                            $dsql = "DELETE FROM product_variants WHERE id=" . $did . " AND product_id=" . intval($product_id);
+                            if (!$conn->query($dsql)) throw new Exception($conn->error);
+                            insert_audit_log($conn, 'Variant Deleted', 'Variant ID ' . $did . ' from product ' . $product_id);
+                        }
+                    }
+                }
+
+                // Handle variants (update existing or insert new)
+                $variants = [];
+                if (isset($data['variants'])) {
+                    if (is_string($data['variants'])) $variants = json_decode($data['variants'], true) ?: [];
+                    else if (is_array($data['variants'])) $variants = $data['variants'];
+                }
+                foreach ($variants as $variant) {
+                    $vid = isset($variant['id']) ? intval($variant['id']) : 0;
+                    $vname = isset($variant['name']) ? $conn->real_escape_string($variant['name']) : '';
+                    $vprice = (isset($variant['price']) && $variant['price'] !== '') ? ( $variant['price'] === 'variable' ? 'variable' : floatval($variant['price']) ) : null;
+                    $vcost = isset($variant['cost']) && $variant['cost'] !== '' ? floatval($variant['cost']) : 0;
+                    $vin_stock = isset($variant['in_stock']) ? trim($variant['in_stock']) : null; if ($vin_stock === '' || $vin_stock === '0 - -') $vin_stock = null;
+                    $vlow_stock = isset($variant['low_stock']) ? trim($variant['low_stock']) : null; if ($vlow_stock === '' || $vlow_stock === '0 - -') $vlow_stock = null;
+                    $vsku = isset($variant['sku']) ? $conn->real_escape_string($variant['sku']) : '';
+                    $vbarcode = isset($variant['barcode']) ? $conn->real_escape_string($variant['barcode']) : '';
+                    $vpos_available = isset($variant['pos_available']) ? intval($variant['pos_available']) : 1;
+
+                    if ($vid && $vid > 0) {
+                        // Update
+                        $vsets = [];
+                        if ($vname !== '') $vsets[] = "name='" . $vname . "'";
+                        if ($vprice !== null) $vsets[] = ($vprice === 'variable') ? "price='variable'" : ("price=" . floatval($vprice));
+                        $vsets[] = "cost=" . floatval($vcost);
+                        $vsets[] = ($vin_stock !== null) ? "in_stock='" . $conn->real_escape_string($vin_stock) . "'" : "in_stock=NULL";
+                        $vsets[] = ($vlow_stock !== null) ? "low_stock='" . $conn->real_escape_string($vlow_stock) . "'" : "low_stock=NULL";
+                        if ($vsku !== '') $vsets[] = "sku='" . $vsku . "'";
+                        if ($vbarcode !== '') $vsets[] = "barcode='" . $vbarcode . "'";
+                        $vsets[] = "pos_available=" . intval($vpos_available);
+                        if (!empty($vsets)) {
+                            $vupd = "UPDATE product_variants SET " . implode(', ', $vsets) . " WHERE id=" . intval($vid) . " AND product_id=" . intval($product_id);
+                            if (!$conn->query($vupd)) throw new Exception($conn->error);
+                            insert_audit_log($conn, 'Variant Edited', ($vname !== '' ? $vname : 'Variant') . ' (' . $vsku . ')');
+                        }
+                    } else {
+                        // Insert new variant
+                        $vprice_sql = ($vprice === 'variable') ? "'variable'" : ($vprice !== null ? floatval($vprice) : 'NULL');
+                        $vin_sql = ($vin_stock !== null) ? "'" . $conn->real_escape_string($vin_stock) . "'" : 'NULL';
+                        $vlow_sql = ($vlow_stock !== null) ? "'" . $conn->real_escape_string($vlow_stock) . "'" : 'NULL';
+                        $ins = "INSERT INTO product_variants (product_id, name, price, cost, in_stock, low_stock, sku, barcode, pos_available) VALUES (" .
+                            intval($product_id) . ", '" . $vname . "', " . $vprice_sql . ", " . floatval($vcost) . ", " . $vin_sql . ", " . $vlow_sql . ", '" . $vsku . "', '" . $vbarcode . "', " . intval($vpos_available) . ")";
+                        if (!$conn->query($ins)) throw new Exception($conn->error);
+                        $newVid = $conn->insert_id;
+                        insert_audit_log($conn, 'Variant Added', $vname . ' (' . $vsku . ') to parent id ' . $product_id);
+                    }
+                }
+
+                // Commit transaction
+                $conn->commit();
+
+                // Record product edit audit
+                $auditDetails = ($name !== null ? $name : '') . ($sku !== '' ? ' (' . $sku . ')' : '');
+                insert_audit_log($conn, 'Item Edited', $auditDetails);
+
+                echo json_encode(['success' => true, 'product_id' => $product_id]);
+                exit;
+            } catch (Exception $e) {
+                $conn->rollback();
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+        }
+
         // Duplicate SKU error (does not block flow, just returns error)
         $sku = isset($data['sku']) ? $conn->real_escape_string($data['sku']) : '';
         if ($sku !== '') {
@@ -892,6 +1058,16 @@ switch ($method) {
         $shape = isset($data['shape']) ? $conn->real_escape_string($data['shape']) : '';
         // Normalize image_url (may have been populated by the file upload handling above)
         $image_url = isset($data['image_url']) ? $data['image_url'] : '';
+        // If an image_url was provided (file upload succeeded or URL given),
+        // prefer image representation and clear color/shape so they are not
+        // stored alongside an image-based product.
+        if (!empty($image_url) && ($type === '' || $type === 'color_shape')) {
+            $type = 'image';
+        }
+        if ($type === 'image') {
+            $color = '';
+            $shape = '';
+        }
 
         // Normalize variants and composite_components: they may be JSON-encoded strings when sent via FormData
         $variants = [];
@@ -1081,14 +1257,12 @@ switch ($method) {
                     }
 
                     // Insert into product_components (parent_product_id references created product)
-                    $ins = "INSERT INTO product_components (parent_product_id, component_variant_id, component_product_id, component_name, component_sku, component_qty, component_cost) VALUES ("
+                    // New schema stores references only; name/sku/cost are resolved from referenced rows.
+                    $ins = "INSERT INTO product_components (parent_product_id, component_variant_id, component_product_id, component_qty) VALUES ("
                         . intval($product_id) . ", "
                         . ($component_variant_id ? intval($component_variant_id) : 'NULL') . ", "
-                        . ($component_product_id ? intval($component_product_id) : 'NULL') . ", '"
-                        . $cname . "', '"
-                        . $csku . "', "
-                        . ($component_qty !== null ? $conn->real_escape_string((string)$component_qty) : 'NULL') . ", "
-                        . ($ccost !== null ? $conn->real_escape_string((string)$ccost) : 'NULL') . ")";
+                        . ($component_product_id ? intval($component_product_id) : 'NULL') . ", "
+                        . ($component_qty !== null ? $conn->real_escape_string((string)$component_qty) : 'NULL') . ")";
                     if (!$conn->query($ins)) throw new Exception($conn->error);
                 }
 

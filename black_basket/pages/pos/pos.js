@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 let icon = 'fa-box';
                 let title = 'Nothing to sell yet';
-                let paragraph = 'Products for the POS are currently unavailable. Make sure items are marked <code>pos_available = 1</code> and have inventory quantity &gt; 0.';
+                let paragraph = 'Products for the POS are currently unavailable. <br> Make sure you have added products marked as "Available in POS" in Inventory. <br> Use the button below to open Inventory and add items to start selling.';
 
                 if (q && q.length > 0) {
                     // no results for a search

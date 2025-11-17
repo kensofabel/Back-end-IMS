@@ -73,19 +73,24 @@ try {
     // If product is composite, include component rows from product_components table
     $components = [];
     try {
-        $compSql = "SELECT pc.component_product_id, pc.component_variant_id, pc.component_qty, pc.component_cost, pc.component_name, pc.component_sku FROM product_components pc WHERE pc.parent_product_id = ? ORDER BY pc.id ASC";
+        // New product_components schema: component_cost/name/sku are not stored here.
+        // Select only references and qty; resolve metadata from products/product_variants below.
+        $compSql = "SELECT pc.component_product_id, pc.component_variant_id, pc.component_qty FROM product_components pc WHERE pc.parent_product_id = ? ORDER BY pc.id ASC";
         if ($cstmt = $conn->prepare($compSql)) {
             $cstmt->bind_param('i', $pid);
             $cstmt->execute();
             $cres = $cstmt->get_result();
+            // We'll compute a derived cost from components (sum of component cost * qty)
+            $computedCost = 0.0;
             while ($c = $cres->fetch_assoc()) {
                 $comp = [
                     'component_product_id' => $c['component_product_id'] !== null ? (int)$c['component_product_id'] : null,
                     'component_variant_id' => $c['component_variant_id'] !== null ? (int)$c['component_variant_id'] : null,
                     'component_qty' => $c['component_qty'] !== null ? $c['component_qty'] : null,
-                    'component_cost' => $c['component_cost'] !== null ? $c['component_cost'] : null,
-                    'component_name' => $c['component_name'] !== null ? $c['component_name'] : '',
-                    'component_sku' => $c['component_sku'] !== null ? $c['component_sku'] : ''
+                    // We'll resolve these from referenced rows below
+                    'component_cost' => null,
+                    'component_name' => '',
+                    'component_sku' => ''
                 ];
 
                 // Enrich component with product/variant metadata when available
@@ -122,6 +127,10 @@ try {
                                 'price' => $vr['price'],
                                 'cost' => $vr['cost']
                             ];
+                            // Resolve component display fields from variant
+                            $comp['component_name'] = isset($vr['name']) ? $vr['name'] : '';
+                            $comp['component_sku'] = isset($vr['sku']) ? $vr['sku'] : '';
+                            $comp['component_cost'] = isset($vr['cost']) ? $vr['cost'] : null;
                         }
                         $vstmt->close();
                     }
@@ -140,12 +149,39 @@ try {
                                 'price' => $pprow['price'],
                                 'cost' => $pprow['cost']
                             ];
+                            $comp['component_name'] = isset($pprow['name']) ? $pprow['name'] : '';
+                            $comp['component_sku'] = isset($pprow['sku']) ? $pprow['sku'] : '';
+                            $comp['component_cost'] = isset($pprow['cost']) ? $pprow['cost'] : null;
                         }
                         $ppStmt->close();
                     }
                 }
 
+                // Accumulate computed cost where possible
+                $compQty = $comp['component_qty'] !== null ? floatval($comp['component_qty']) : 0.0;
+                $compCost = $comp['component_cost'] !== null ? floatval($comp['component_cost']) : 0.0;
+                $computedCost += ($compCost * $compQty);
+
                 $components[] = $comp;
+            }
+
+            // If composite product and parent cost missing/zero, prefer computed cost from components
+            if (!empty($components) && isset($product['is_composite']) && intval($product['is_composite']) === 1) {
+                $parentCostIsEmpty = ($product['cost'] === null || $product['cost'] === '' || floatval($product['cost']) == 0);
+                if ($parentCostIsEmpty) {
+                    $product['cost'] = $computedCost;
+                }
+                // If SKU/name missing on parent, attempt to fallback to first component's values
+                if ((empty($product['sku']) || $product['sku'] === null) && count($components) > 0) {
+                    foreach ($components as $cc) {
+                        if (!empty($cc['component_sku'])) { $product['sku'] = $cc['component_sku']; break; }
+                    }
+                }
+                if ((empty($product['name']) || $product['name'] === null) && count($components) > 0) {
+                    foreach ($components as $cc) {
+                        if (!empty($cc['component_name'])) { $product['name'] = $cc['component_name']; break; }
+                    }
+                }
             }
             $cstmt->close();
         }

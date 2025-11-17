@@ -419,6 +419,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                                         else statusText = 'In stock';
                                                     }
                                                 }
+                                                            // mark this panel as showing a composite product so later
+                                                            // handlers can detect composite-edit flows
+                                                            try { if (panel) panel.setAttribute('data-is-composite', '1'); } catch(e) {}
                                                 if (pStatus) pStatus.textContent = statusText;
                                                 try { parentNode.setAttribute('data-in-stock', foundAny ? String(sum) : ''); } catch (e) {}
                                             }
@@ -1106,8 +1109,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 mainTrackStockToggle.dispatchEvent(new Event('change'));
             }
             
-            // Always add a variant row when opening variants section
-            addVariantRow();
+            // Only add an initial variant row if there are no rows yet (prevents duplicates on prefill)
+            try {
+                const vb = document.getElementById('variantsTableBody');
+                if (vb && vb.querySelectorAll('tr').length === 0) addVariantRow();
+            } catch (e) { try { addVariantRow(); } catch(er) {} }
+
+            // Persist last state (open)
+            try { localStorage.setItem('bb_variants_section_visible', '1'); } catch(e) {}
         }
     }
 
@@ -1163,6 +1172,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (tableBody) {
                 tableBody.innerHTML = '';
             }
+            // Persist last state (closed)
+            try { localStorage.setItem('bb_variants_section_visible', '0'); } catch(e) {}
         }
     }
     
@@ -1263,14 +1274,36 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
                 
+                // If this row represents an existing variant (has id), mark it for deletion so server removes it
+                var existingVariantId = null;
+                try { existingVariantId = row.getAttribute && row.getAttribute('data-variant-id') ? parseInt(row.getAttribute('data-variant-id'), 10) : null; } catch(e) { existingVariantId = null; }
+
+                function performRemove() {
+                    // If it was an existing variant, append a hidden input to the inline form so server knows to delete it
+                    try {
+                        if (existingVariantId && !isNaN(existingVariantId)) {
+                            var formEl = document.getElementById('inlineAddItemsForm') || document.querySelector('#inlineAddItemsForm');
+                            if (formEl) {
+                                var hid = document.createElement('input');
+                                hid.type = 'hidden';
+                                hid.name = 'deleted_variants[]';
+                                hid.value = String(existingVariantId);
+                                formEl.appendChild(hid);
+                            }
+                        }
+                    } catch(e) { console.warn('mark deleted variant failed', e); }
+                    // Remove the row from DOM
+                    try { row.remove(); } catch(e) { try { row.parentNode && row.parentNode.removeChild(row); } catch(er) {} }
+                }
+
                 // Show confirmation dialog if row has data
                 if (hasData) {
                     if (confirm('Are you sure you want to delete this variant? All entered data will be lost.')) {
-                        row.remove();
+                        performRemove();
                     }
                 } else {
                     // No data, delete immediately
-                    row.remove();
+                    performRemove();
                 }
             });
         }
@@ -5442,6 +5475,208 @@ document.addEventListener('DOMContentLoaded', function () {
                 form.requestSubmit();
             };
         }
+        // Intercept form submit for Edit mode and send to API as update_product
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                try {
+                    var editId = addItemsPanel ? addItemsPanel.getAttribute('data-edit-product-id') : null;
+                    var isEdit = addItemsPanel ? addItemsPanel.getAttribute('data-row-edit') === '1' : false;
+                    if (!isEdit || !editId) {
+                        // Not edit mode - allow normal modal submit handling
+                        return;
+                    }
+                    // In edit mode: prevent default submission and POST via fetch
+                    e.preventDefault();
+                    var fd = new FormData();
+                    // Map modal form fields to API field names the server expects
+                    try {
+                        // product-level fields (read from modal inputs)
+                        var nameEl = document.getElementById('inlineItemName');
+                        var categoryEl = document.getElementById('inlineItemCategory');
+                        var priceEl = document.getElementById('inlineItemPrice');
+                        var costEl = document.getElementById('inlineItemCost');
+                        var trackEl = document.getElementById('inlineTrackStockToggle');
+                        var inStockEl = document.getElementById('inlineInStock');
+                        var lowStockEl = document.getElementById('inlineLowStock');
+                        var skuEl = document.getElementById('inlineItemSKU');
+                        var barcodeEl = document.getElementById('inlineItemBarcode');
+                        var variantsTrackEl = document.getElementById('variantsTrackStockToggle');
+                        var posAvailEl = document.getElementById('availablePOS');
+
+                        if (nameEl) fd.append('name', nameEl.value);
+                        if (categoryEl) fd.append('category', categoryEl.value);
+                        if (priceEl) fd.append('price', (priceEl.value || '').toString().replace(/[^0-9.\-]/g, '') );
+                        if (costEl) fd.append('cost', (costEl.value || '').toString().replace(/[^0-9.\-]/g, '') );
+                        fd.append('track_stock', trackEl && trackEl.checked ? '1' : '0');
+                        fd.append('variantsTrackStock', variantsTrackEl && variantsTrackEl.checked ? '1' : '0');
+                        if (inStockEl) {
+                            var inStockUnitEl = document.getElementById('inlineInStockUnit') || (inStockEl.parentElement ? inStockEl.parentElement.querySelector('.unit-value') : null);
+                            var inStockVal = (inStockEl.value || '').toString().trim();
+                            if (inStockUnitEl) {
+                                var suf = (inStockUnitEl.textContent || '').toString().trim();
+                                if (suf && suf !== '- -') inStockVal = (inStockVal ? inStockVal + ' ' : '') + suf;
+                            }
+                            fd.append('in_stock', inStockVal);
+                        }
+                        if (lowStockEl) {
+                            var lowStockUnitEl = document.getElementById('inlineLowStockUnit') || (lowStockEl.parentElement ? lowStockEl.parentElement.querySelector('.unit-value') : null);
+                            var lowStockVal = (lowStockEl.value || '').toString().trim();
+                            if (lowStockUnitEl) {
+                                var lsf = (lowStockUnitEl.textContent || '').toString().trim();
+                                if (lsf && lsf !== '- -') lowStockVal = (lowStockVal ? lowStockVal + ' ' : '') + lsf;
+                            }
+                            fd.append('low_stock', lowStockVal);
+                        }
+                        if (skuEl) fd.append('sku', skuEl.value);
+                        if (barcodeEl) fd.append('barcode', barcodeEl.value);
+                        fd.append('pos_available', posAvailEl && posAvailEl.checked ? '1' : '0');
+
+                        // color & shape (POS representation). Try to read selected options in modal.
+                        try {
+                            var selColor = (addItemsPanel && addItemsPanel.querySelector('.color-option.selected')) ? addItemsPanel.querySelector('.color-option.selected').dataset.color : '';
+                            var selShape = (addItemsPanel && addItemsPanel.querySelector('.shape-option.selected')) ? addItemsPanel.querySelector('.shape-option.selected').dataset.shape : '';
+                            if (selColor) fd.append('color', selColor);
+                            if (selShape) fd.append('shape', selShape);
+                        } catch (e) {}
+
+                        // Attach any files or additional form inputs. Some image inputs (like #posProductImage)
+                        // do not have a name attribute and therefore won't be included by FormData(form).
+                        // Build nativeFormData then selectively append keys we didn't manually set above.
+                        var nativeFormData = new FormData(form);
+                        // Ensure we don't duplicate keys we already set; include 'type' and 'image_url' in skip list
+                        var skipKeys = ['name','category','price','cost','track_stock','variantsTrackStock','in_stock','low_stock','sku','barcode','pos_available','color','shape','type','image_url'];
+                        for (var pair of nativeFormData.entries()) {
+                            var k = pair[0], v = pair[1];
+                            if (skipKeys.indexOf(k) !== -1) continue;
+                            fd.append(k, v);
+                        }
+
+                        // Explicitly handle image upload when user selected a file via the image tab
+                        try {
+                            var fileInputEl = document.getElementById('posProductImage');
+                            var imageUrlEl = document.getElementById('productImageUrl') || document.querySelector('input[name="productImageUrl"]') || document.querySelector('.product-image-url input');
+                            var fileAppended = false;
+                            if (fileInputEl && fileInputEl.files && fileInputEl.files.length > 0) {
+                                try { fd.append('image_file', fileInputEl.files[0]); fileAppended = true; } catch(e) { console.warn('append image_file failed', e); }
+                            }
+                            var imgUrlVal = '';
+                            if (imageUrlEl && (imageUrlEl.value || '').toString().trim() !== '') imgUrlVal = (imageUrlEl.value || '').toString().trim();
+                            if (!fileAppended && imgUrlVal !== '') {
+                                try { fd.append('image_url', imgUrlVal); } catch(e) {}
+                            }
+                            // If either file or image URL present, mark representation type as 'image'
+                            if (fileAppended || imgUrlVal !== '') {
+                                try { fd.append('type', 'image'); } catch(e) {}
+                            }
+                        } catch(e) { console.warn('image attach logic failed', e); }
+
+                        // always include required action and product id
+                        fd.append('action', 'update_product');
+                        fd.append('product_id', String(editId));
+
+                    } catch (errMap) {
+                        console.warn('Field mapping failed', errMap);
+                    }
+
+                    // Serialize variant rows using the classes used by the modal generator
+                    try {
+                        var variantsBody = document.getElementById('variantsTableBody');
+                        var variantsArr = [];
+                        if (variantsBody) {
+                            var rows = variantsBody.querySelectorAll('tr');
+                            rows.forEach(function(r) {
+                                var v = {};
+                                // id if present
+                                var vid = r.getAttribute('data-variant-id') || r.dataset && r.dataset.variantId;
+                                if (vid) v.id = parseInt(vid, 10);
+                                // available
+                                var avail = r.querySelector('input.variant-available');
+                                if (avail) v.pos_available = avail.checked ? 1 : 0;
+                                // name, price, cost, sku, barcode
+                                var vname = r.querySelector('input.variant-name'); if (vname) v.name = vname.value;
+                                var vpriceEl = r.querySelector('input.variant-price'); if (vpriceEl) v.price = (vpriceEl.value || '').toString().replace(/[^0-9.\-]/g, '');
+                                var vcostEl = r.querySelector('input.variant-cost'); if (vcostEl) v.cost = (vcostEl.value || '').toString().replace(/[^0-9.\-]/g, '');
+                                var vstockEl = r.querySelector('input.variant-stock'); if (vstockEl) {
+                                    var vstockUnit = vstockEl.parentElement ? vstockEl.parentElement.querySelector('.unit-value') : null;
+                                    var vstockVal = (vstockEl.value || '').toString().trim();
+                                    if (vstockUnit) {
+                                        var vsuf = (vstockUnit.textContent || '').toString().trim();
+                                        if (vsuf && vsuf !== '- -') vstockVal = (vstockVal ? vstockVal + ' ' : '') + vsuf;
+                                    }
+                                    v.in_stock = vstockVal;
+                                }
+                                var vlowEl = r.querySelector('input.variant-low-stock'); if (vlowEl) {
+                                    var vlowUnit = vlowEl.parentElement ? vlowEl.parentElement.querySelector('.unit-value') : null;
+                                    var vlowVal = (vlowEl.value || '').toString().trim();
+                                    if (vlowUnit) {
+                                        var vlsuf = (vlowUnit.textContent || '').toString().trim();
+                                        if (vlsuf && vlsuf !== '- -') vlowVal = (vlowVal ? vlowVal + ' ' : '') + vlsuf;
+                                    }
+                                    v.low_stock = vlowVal;
+                                }
+                                var vskuEl = r.querySelector('input.variant-sku'); if (vskuEl) v.sku = vskuEl.value;
+                                var vbarcodeEl = r.querySelector('input.variant-barcode'); if (vbarcodeEl) v.barcode = vbarcodeEl.value;
+                                // Only include variant if it has a name or sku or other meaningful field
+                                if (v.name || v.sku || v.barcode || typeof v.price !== 'undefined' || typeof v.cost !== 'undefined') {
+                                    variantsArr.push(v);
+                                }
+                            });
+                        }
+                        if (variantsArr.length > 0) {
+                            // Deduplicate variants by id or sku to avoid accidental duplicate inserts
+                            try {
+                                var deduped = [];
+                                var seenIds = {};
+                                var seenSkus = {};
+                                variantsArr.forEach(function(v) {
+                                    var keep = true;
+                                    if (v.id && v.id > 0) {
+                                        if (seenIds[v.id]) keep = false; else seenIds[v.id] = true;
+                                    }
+                                    var sk = (v.sku || '').toString().trim();
+                                    if (sk) {
+                                        if (seenSkus[sk]) keep = false; else seenSkus[sk] = true;
+                                    }
+                                    if (keep) deduped.push(v);
+                                });
+                                fd.append('variants', JSON.stringify(deduped));
+                            } catch (e) {
+                                fd.append('variants', JSON.stringify(variantsArr));
+                            }
+                        }
+
+                        // deleted variants: hidden inputs inside the form named deleted_variants[] may exist
+                        var deletedInputs = form.querySelectorAll('input[name="deleted_variants[]"]');
+                        if (deletedInputs && deletedInputs.length) {
+                            deletedInputs.forEach(function(di) { fd.append('deleted_variants[]', di.value); });
+                        }
+                    } catch (errVar) { console.warn('Variant serialization failed', errVar); }
+
+                    // POST to API endpoint
+                    fetch('./api.php', {
+                        method: 'POST',
+                        body: fd,
+                        credentials: 'same-origin'
+                    }).then(function(resp) { return resp.json(); }).then(function(json) {
+                        if (json && json.success) {
+                            // Close modal/panel and refresh to reflect edits
+                            try { showTab(previousTab || 'scan'); } catch(e) {}
+                            // give server a moment then reload
+                            setTimeout(function() { location.reload(); }, 250);
+                        } else {
+                            // Show error - try to surface message from server
+                            var msg = (json && json.error) ? json.error : 'Failed to save changes';
+                            alert(msg);
+                        }
+                    }).catch(function(err) {
+                        console.error('update_product request failed', err);
+                        alert('Failed to save changes (network error)');
+                    });
+                } catch (err) {
+                    console.error('edit submit handler error', err);
+                }
+            });
+        }
         // Form submit: let the modal's own submit handler (defined in popupmodal.php)
         // control success vs error behavior. We only wire the submit button to
         // requestSubmit so the modal script can handle server responses and
@@ -5456,6 +5691,20 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('ensureAttachAddItems error', e);
         }
     };
+    // Restore persisted variants-section visibility when attaching listeners (only for non-edit flows)
+    try {
+        const persisted = localStorage.getItem('bb_variants_section_visible');
+        if (typeof persisted !== 'undefined' && persisted !== null) {
+            const addItemsPanel = document.getElementById('addItemsTabPanel');
+            if (addItemsPanel && addItemsPanel.getAttribute('data-row-edit') !== '1') {
+                if (persisted === '1') {
+                    try { showVariantsSection(); } catch(e) {}
+                } else {
+                    try { hideVariantsSection(); } catch(e) {}
+                }
+            }
+        }
+    } catch(e) {}
     // Ensure the back button on the barcode results always returns to previous tab
     const backBarcodeBtnGlobal = document.getElementById('backFromBarcodeResults');
     if (backBarcodeBtnGlobal) {
@@ -6652,7 +6901,41 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                     const shapeOpt = shapeCandidates.find(s => (s.dataset && s.dataset.shape && s.dataset.shape.toString().toLowerCase()) === shapeVal.toLowerCase());
                                                                     if (shapeOpt) {
                                                                         try { shapeOpt.click(); } catch (e) { /* best-effort */ }
-                                                                        try { shapeOpt.classList.add('selected'); shapeOpt.style.border = '2px solid #ff9800'; } catch(e) {}
+                                                                        try {
+                                                                            shapeOpt.classList.add('selected');
+                                                                            // For triangle-shaped options we must not overwrite the
+                                                                            // border-left/right triangle construction by setting
+                                                                            // a generic border. Instead, highlight by changing
+                                                                            // the triangle's border-bottom color and add a subtle
+                                                                            // outline via boxShadow so the shape remains the same size.
+                                                                            if ((shapeOpt.dataset && shapeOpt.dataset.shape) === 'triangle') {
+                                                                                // Triangles are drawn with left/right transparent borders
+                                                                                // and a colored bottom border. Avoid setting a generic
+                                                                                // `border` (it creates a rectangular outline). Clear
+                                                                                // any generic border and only set the triangle borders.
+                                                                                try { shapeOpt.style.border = 'none'; } catch(e) {}
+                                                                                try { shapeOpt.style.boxShadow = ''; } catch(e) {}
+                                                                                // ensure left/right transparent borders are present
+                                                                                shapeOpt.style.borderLeft = '12px solid transparent';
+                                                                                shapeOpt.style.borderRight = '12px solid transparent';
+                                                                                // Try to use the prefilling color (if available) so the
+                                                                                // triangle matches the chosen color. Prefer the computed
+                                                                                // background of any selected color-option; fallback to
+                                                                                // the accent color.
+                                                                                try {
+                                                                                    var colorEl = panel.querySelector('.color-option.selected') || panel.querySelector('.color-option[data-color="' + colorVal + '"]');
+                                                                                    var colorCss = null;
+                                                                                    if (colorEl && window.getComputedStyle) {
+                                                                                        colorCss = window.getComputedStyle(colorEl).backgroundColor || null;
+                                                                                    }
+                                                                                    shapeOpt.style.borderBottom = '20px solid ' + (colorCss || '#ff9800');
+                                                                                } catch(e) {
+                                                                                    shapeOpt.style.borderBottom = '20px solid #ff9800';
+                                                                                }
+                                                                            } else {
+                                                                                shapeOpt.style.border = '2px solid #ff9800';
+                                                                            }
+                                                                        } catch(e) {}
                                                                     }
                                                                 }
                                                                 // Also set global-like visible markers so popupmodal submission picks them up
@@ -7402,6 +7685,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                 return;
                                                             }
                                                             console.log('Prefill: populate variant row idx=', idx, 'name=', v && v.name);
+                                                            // Ensure the variant row carries the source variant id so later edits update instead of inserting
+                                                            try {
+                                                                var variantIdVal = (v && (v.id || v.variant_id || v.variantId || v.variantID || v.variantId)) || null;
+                                                                if (!variantIdVal && v && v.variant_id === 0 && v.id === 0) variantIdVal = null;
+                                                                if (variantIdVal) {
+                                                                    try { r.setAttribute('data-variant-id', String(variantIdVal)); } catch(e) {}
+                                                                }
+                                                            } catch(e) { console.warn('set data-variant-id failed', e); }
                                                             try { const avail = r.querySelector('.variant-available'); if (avail) avail.checked = (v.pos_available && Number(v.pos_available) === 1); } catch(e){}
                                                             try { const nameIn = r.querySelector('.variant-name'); if (nameIn) { nameIn.value = v.name || ''; nameIn.setAttribute('data-auto-filled','1'); } } catch(e){}
                                                             try { const priceIn = r.querySelector('.variant-price'); if (priceIn) { if (v.price !== null && v.price !== '' && !isNaN(v.price)) priceIn.value = '₱' + Number(v.price).toFixed(2); else if (String(v.price).toLowerCase() === 'variable') priceIn.value = ''; else priceIn.value = (v.price || ''); priceIn.setAttribute('data-auto-filled','1'); } } catch(e){}
@@ -7551,12 +7842,17 @@ document.addEventListener('DOMContentLoaded', function() {
                             } catch (e) {}
 
                             // Make the inline cost input readonly during Edit flow and mark inlineCostFixed
+                            // This should only happen when editing a composite item
                             try {
-                                const costElLocal = addItemsPanel.querySelector('#inlineItemCost') || document.getElementById('inlineItemCost');
-                                if (costElLocal) {
-                                    try { costElLocal.readOnly = true; costElLocal.setAttribute('readonly','readonly'); } catch(e) {}
+                                var isCompositeEdit = false;
+                                try { isCompositeEdit = !!(addItemsPanel && addItemsPanel.getAttribute && addItemsPanel.getAttribute('data-is-composite') === '1'); } catch(e) { isCompositeEdit = false; }
+                                if (isCompositeEdit) {
+                                    const costElLocal = addItemsPanel.querySelector('#inlineItemCost') || document.getElementById('inlineItemCost');
+                                    if (costElLocal) {
+                                        try { costElLocal.readOnly = true; costElLocal.setAttribute('readonly','readonly'); } catch(e) {}
+                                    }
+                                    try { window._inlineCostFixed = true; } catch(e) {}
                                 }
-                                try { window._inlineCostFixed = true; } catch(e) {}
                             } catch(e) {}
                             // Patch: Cancel button closes modal directly
                             try {
