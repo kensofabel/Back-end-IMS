@@ -1624,14 +1624,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const exportBtn = document.getElementById('exportBtn');
         if (importBtn) importBtn.style.display = anyChecked ? 'none' : '';
         if (exportBtn) exportBtn.style.display = anyChecked ? 'none' : '';
-        // Change the Add Item button label to Create Item when any item is checked
+        // Change the Add Item button label to Create Item only when two or more
+        // visible rows are selected. Keep Delete/import/export behavior unchanged.
         try {
             const addBtn = document.getElementById('addProductBtn');
             if (addBtn) {
-                if (anyChecked) {
+                // Count number of visible checked boxes (on current page / filter)
+                const selectedCount = visibleCheckboxes.filter(cb => cb.checked).length;
+                if (selectedCount >= 2) {
                     // keep the same icon, change label to "Create Item"
                     addBtn.innerHTML = '<i class="fa fa-plus"></i> Create Item';
                 } else {
+                    // For 0 or 1 selected items, show normal Add Item label
                     addBtn.innerHTML = '<i class="fa fa-plus"></i> Add Item';
                 }
             }

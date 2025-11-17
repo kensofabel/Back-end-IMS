@@ -426,6 +426,49 @@ document.addEventListener('DOMContentLoaded', function () {
                                     }
                                 }
                             } catch (e) { console.error('delegated parent recalc failed', e); }
+                                                        // Restore inline cost readonly state if we captured it in the snapshot
+                                                        try {
+                                                            const mainCostInput = panel.querySelector('#inlineItemCost') || document.getElementById('inlineItemCost');
+                                                            if (mainCostInput && typeof snap.inlineCostReadOnly !== 'undefined' && snap.inlineCostReadOnly !== null) {
+                                                                try {
+                                                                    if (snap.inlineCostReadOnly) {
+                                                                        mainCostInput.readOnly = true; mainCostInput.setAttribute('readonly','readonly');
+                                                                    } else {
+                                                                        mainCostInput.readOnly = false; try { mainCostInput.removeAttribute('readonly'); } catch(e) {}
+                                                                    }
+                                                                } catch(e) {}
+                                                            }
+                                                        } catch(e) {}
+                                                        // Restore create-item search visibility and add-variant button visibility
+                                                        try {
+                                                            const createSearchEl = panel.querySelector('#createItemSearch') || document.getElementById('createItemSearch');
+                                                            if (createSearchEl && typeof snap.createSearchVisible !== 'undefined' && snap.createSearchVisible !== null) {
+                                                                try { createSearchEl.style.display = snap.createSearchVisible ? '' : 'none'; } catch(e) {}
+                                                            }
+                                                        } catch(e) {}
+                                                        try {
+                                                            const addVariantBtnEl = (panel && panel.querySelector) ? panel.querySelector('.variants-add-btn') : document.querySelector('.variants-add-btn');
+                                                            if (addVariantBtnEl && typeof snap.addVariantBtnVisible !== 'undefined' && snap.addVariantBtnVisible !== null) {
+                                                                try { addVariantBtnEl.style.display = snap.addVariantBtnVisible ? '' : 'none'; } catch(e) {}
+                                                            }
+                                                        } catch(e) {}
+
+                                                        // Restore name-dropdown visibility and clear composite-hide flag
+                                                        try {
+                                                            const nameDropdown = document.getElementById('nameDropdown');
+                                                            if (nameDropdown && typeof snap.inlineNameDropdownVisible !== 'undefined' && snap.inlineNameDropdownVisible !== null) {
+                                                                try {
+                                                                    if (snap.inlineNameDropdownVisible) {
+                                                                        nameDropdown.classList.add('show');
+                                                                        nameDropdown.style.display = '';
+                                                                    } else {
+                                                                        nameDropdown.classList.remove('show');
+                                                                        nameDropdown.style.display = 'none';
+                                                                    }
+                                                                } catch(e) {}
+                                                            }
+                                                        } catch(e) {}
+                                                        try { window._hideNameAutocompleteForComposite = false; } catch(e) {}
 
                             // restore row UI
                             const cols = node.querySelectorAll('.br-col');
@@ -655,6 +698,32 @@ document.addEventListener('DOMContentLoaded', function () {
     setupCurrencyInputs();
     
     // Category Autocomplete Functionality
+
+    // Disable/enable Create-tab Next button based on number of component rows
+    function updateCreateNextButtonState() {
+        try {
+            const createNextBtn = document.querySelector('#createTabPanel #nextBtn');
+            const body = document.getElementById('createComponentsBody');
+            if (!createNextBtn) return;
+            const count = body ? body.querySelectorAll('tr').length : 0;
+            // Require two or more items to enable Next
+            createNextBtn.disabled = !(count >= 2);
+        } catch (e) { console.warn('updateCreateNextButtonState failed', e); }
+    }
+
+    // Observe create components body for changes so Next button updates automatically
+    try {
+        const createBody = document.getElementById('createComponentsBody');
+        if (createBody && typeof MutationObserver !== 'undefined') {
+            const moCreate = new MutationObserver(function(muts) {
+                try { updateCreateNextButtonState(); } catch(e) {}
+            });
+            moCreate.observe(createBody, { childList: true, subtree: false });
+        }
+    } catch (e) { console.warn('create body observer failed', e); }
+
+    // Initialize Create-tab Next button state on load
+    try { updateCreateNextButtonState(); } catch(e) {}
     function setupCategoryAutocomplete() {
         const categoryInput = document.getElementById('inlineItemCategory');
         const categoryDropdown = document.getElementById('categoryDropdown');
@@ -871,10 +940,10 @@ document.addEventListener('DOMContentLoaded', function () {
         // Show dropdown with "Add Variants" option
         function showDropdown() {
             // If we're in the Create->Add flow where track toggles and cost
-            // are locked/hidden, do not show the Add Variants dropdown. This
-            // avoids offering variant creation when the flow expects a single
-            // item continuation.
-            if (window && (window._hideTrackToggle || window._inlineCostFixed)) return;
+            // are locked/hidden, or when editing a composite, do not show
+            // the Add Variants/name dropdown. This avoids offering variant
+            // creation when the flow expects a composite components view.
+            if (window && (window._hideTrackToggle || window._inlineCostFixed || window._hideNameAutocompleteForComposite)) return;
             nameDropdown.innerHTML = '';
             
             // Position dropdown below the input field
@@ -953,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Event listeners
         nameInput.addEventListener('focus', () => {
-            if (nameInput.value.trim() !== '' && !isVariantsMode && !(window && (window._hideTrackToggle || window._inlineCostFixed))) {
+            if (nameInput.value.trim() !== '' && !isVariantsMode && !(window && (window._hideTrackToggle || window._inlineCostFixed || window._hideNameAutocompleteForComposite))) {
                 showDropdown();
             }
         });
@@ -965,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (typingTimer) clearTimeout(typingTimer);
             if (hideTimer) clearTimeout(hideTimer);
             
-            if (searchTerm !== '' && !isVariantsMode && !(window && (window._hideTrackToggle || window._inlineCostFixed))) {
+            if (searchTerm !== '' && !isVariantsMode && !(window && (window._hideTrackToggle || window._inlineCostFixed || window._hideNameAutocompleteForComposite))) {
                 // Show dropdown immediately only if not in variants mode
                 showDropdown();
                 
@@ -5023,18 +5092,38 @@ function showTab(tabName, transition = true) {
             addItemsPanel.classList.add('slide-in');
             addItemsPanel.classList.add('active');
             // Ensure back and cancel buttons are clickable (attach handlers here to guarantee wiring)
-            try {
+                    try {
                 const backBtn = addItemsPanel.querySelector('#backInlineAddItems');
                 const cancelBtn = addItemsPanel.querySelector('.cancel-secondary');
                 if (backBtn) {
                     backBtn.style.pointerEvents = 'auto';
                     backBtn.style.zIndex = 9999;
-                    backBtn.onclick = function(e) { e.preventDefault(); showTab(previousTab); };
+                    backBtn.onclick = function(e) {
+                        e.preventDefault();
+                        try {
+                            const panel = document.getElementById('addItemsTabPanel');
+                            // Prefer snapshot.previousTab but sanitize it so we never navigate
+                            // back into `addItems` itself. Fall back to modalCurrentTab or 'scan'.
+                            let snapPrev = panel && panel._snapshot && panel._snapshot.modalPreviousTab ? panel._snapshot.modalPreviousTab : previousTab;
+                            if (snapPrev === 'addItems' && panel && panel._snapshot && panel._snapshot.modalCurrentTab) snapPrev = panel._snapshot.modalCurrentTab;
+                            if (!snapPrev || snapPrev === 'addItems') snapPrev = 'scan';
+                            showTab(snapPrev, false);
+                        } catch (err) { showTab(previousTab || 'scan', false); }
+                    };
                 }
                 if (cancelBtn) {
                     cancelBtn.style.pointerEvents = 'auto';
                     cancelBtn.style.zIndex = 9999;
-                    cancelBtn.onclick = function(e) { e.preventDefault(); showTab(previousTab); };
+                    cancelBtn.onclick = function(e) {
+                        e.preventDefault();
+                        try {
+                            const panel = document.getElementById('addItemsTabPanel');
+                            let snapPrev = panel && panel._snapshot && panel._snapshot.modalPreviousTab ? panel._snapshot.modalPreviousTab : previousTab;
+                            if (snapPrev === 'addItems' && panel && panel._snapshot && panel._snapshot.modalCurrentTab) snapPrev = panel._snapshot.modalCurrentTab;
+                            if (!snapPrev || snapPrev === 'addItems') snapPrev = 'scan';
+                            showTab(snapPrev, false);
+                        } catch (err) { showTab(previousTab || 'scan', false); }
+                    };
                 }
             } catch (e) { console.error('attach back handlers error', e); }
             if (prevPanel) {
@@ -5832,6 +5921,418 @@ document.addEventListener('DOMContentLoaded', function() {
         const tbody = document.getElementById('inventory-table-body');
         if (!tbody) return;
 
+        // Helper: snapshot and restore modal panel state (in-memory snapshot of fields + UI)
+        function snapshotModalState(panel) {
+            if (!panel) return null;
+            try {
+                const fields = Array.from(panel.querySelectorAll('input, textarea, select')).map(el => ({ el: el, value: el.value, checked: el.checked, type: el.type }));
+                const variantsBody = document.getElementById('variantsTableBody');
+                const variantsHTML = variantsBody ? variantsBody.innerHTML : null;
+                const priceRow = panel.querySelector('#priceRow');
+                const priceRowDisplay = priceRow ? priceRow.style.display : null;
+                // keep references to original children so we can restore layout after an edit
+                const priceRowChildren = priceRow ? Array.from(priceRow.children) : null;
+                const variantsSection = panel.querySelector('#variantsSection');
+                const variantsSectionDisplay = variantsSection ? variantsSection.style.display : null;
+                const inlineTrack = panel.querySelector('#inlineTrackStockToggle');
+                const inlineTrackChecked = inlineTrack ? !!inlineTrack.checked : null;
+                const variantsTrackToggle = panel.querySelector('#variantsTrackStockToggle');
+                const variantsTrackChecked = variantsTrackToggle ? !!variantsTrackToggle.checked : null;
+                const panelPosContainer = panel.querySelector('#posOptionsContainer');
+                const posDisplay = panelPosContainer ? panelPosContainer.style.display : null;
+                // determine currently active POS tab (colorShape or image)
+                let activePosTab = null;
+                try {
+                    const activeBtn = panel.querySelector('.pos-tab-btn.active') || document.querySelector('.pos-tab-btn.active');
+                    if (activeBtn && activeBtn.dataset && activeBtn.dataset.tab) activePosTab = activeBtn.dataset.tab;
+                    else {
+                        // fallback: check which panel is visible/active
+                        const cs = panel.querySelector('#colorShapeTab');
+                        const it = panel.querySelector('#imageTab');
+                        if (cs && (cs.classList.contains('active') || cs.style.display === 'block')) activePosTab = 'colorShape';
+                        else if (it && (it.classList.contains('active') || it.style.display === 'block')) activePosTab = 'image';
+                    }
+                } catch (e) { activePosTab = null; }
+                let chevron = panel.querySelector('#posToggleChevron'); if (!chevron) chevron = document.getElementById('posToggleChevron');
+                const chevronDisplay = chevron ? chevron.style.display : null;
+                const selectedColors = Array.from(panel.querySelectorAll('.color-option.selected')).map(c => c.dataset && c.dataset.color ? c.dataset.color : null);
+                const selectedShapes = Array.from(panel.querySelectorAll('.shape-option.selected')).map(s => s.dataset && s.dataset.shape ? s.dataset.shape : null);
+                // Capture inline styles for color/shape options so transform/size/border restore exactly
+                const colorOptionStyles = Array.from(panel.querySelectorAll('.color-option')).map(o => ({ color: o.dataset && o.dataset.color ? o.dataset.color : null, style: o.getAttribute('style') || '' }));
+                const shapeOptionStyles = Array.from(panel.querySelectorAll('.shape-option')).map(o => ({ shape: o.dataset && o.dataset.shape ? o.dataset.shape : null, style: o.getAttribute('style') || '' }));
+                const imageUrlInput = panel.querySelector('#productImageUrl') || document.querySelector('input[name="productImageUrl"]');
+                const uploadedPreview = panel.querySelector('#uploadedImagePreview') || document.getElementById('uploadedImagePreview');
+                const uploadedArea = panel.querySelector('#uploadedImageArea');
+                const uploadArea = panel.querySelector('#imageUploadArea');
+                const canvas = panel.querySelector('#imageCropCanvas');
+                let canvasData = null;
+                try { if (canvas && typeof canvas.toDataURL === 'function') canvasData = canvas.toDataURL('image/png'); } catch (e) {}
+                // record whether the inline item cost input is readonly so we can restore it
+                const inlineCostEl = panel.querySelector('#inlineItemCost') || document.getElementById('inlineItemCost');
+                const inlineCostReadOnly = inlineCostEl ? (inlineCostEl.readOnly === true || inlineCostEl.hasAttribute('readonly')) : null;
+                // record visibility of name-autocomplete, name-dropdown and add-variant button so we can restore
+                const createSearchEl = document.getElementById('createItemSearch') || panel.querySelector('#createItemSearch');
+                const createSearchVisible = createSearchEl ? (createSearchEl.style.display !== 'none') : null;
+                const nameDropdownEl = document.getElementById('nameDropdown');
+                const inlineNameDropdownVisible = nameDropdownEl ? (nameDropdownEl.classList && nameDropdownEl.classList.contains('show')) : null;
+                const addVariantBtnEl = document.querySelector('.variants-add-btn') || (panel && panel.querySelector && panel.querySelector('.variants-add-btn'));
+                const addVariantBtnVisible = addVariantBtnEl ? (addVariantBtnEl.style.display !== 'none') : null;
+                // capture create-flow flags and visibility so we can fully restore Create mode after editing
+                        const createFlowFlags = (function() {
+                    try {
+                        const inlineHideFlag = !!window._hideTrackToggle;
+                        const inlineCostFixedFlag = !!window._inlineCostFixed;
+                        const inlineTrackGroup = (function() { const el = document.getElementById('inlineTrackStockToggle'); return el ? (el.closest && el.closest('.form-group') ? el.closest('.form-group') : (el.parentElement && el.parentElement.parentElement)) : null; })();
+                        const inlineTrackGroupVisibility = inlineTrackGroup ? inlineTrackGroup.style.visibility : null;
+                        const inlineTrackGroupDisplay = inlineTrackGroup ? inlineTrackGroup.style.display : null;
+                        const variantsTrackContainer = (function() { const v = document.getElementById('variantsTrackStockToggle'); return v ? (v.parentElement && v.parentElement.parentElement) : null; })();
+                        const variantsTrackContainerVisibility = variantsTrackContainer ? variantsTrackContainer.style.visibility : null;
+                        const variantsTrackContainerDisplay = variantsTrackContainer ? variantsTrackContainer.style.display : null;
+                        const stockFieldsRow = document.getElementById('stockFieldsRow');
+                        const stockFieldsRowDisplay = stockFieldsRow ? stockFieldsRow.style.display : null;
+                        return {
+                            hideTrackToggle: inlineHideFlag,
+                            inlineCostFixed: inlineCostFixedFlag,
+                            inlineTrackGroupVisibility: inlineTrackGroupVisibility,
+                            inlineTrackGroupDisplay: inlineTrackGroupDisplay,
+                            variantsTrackContainerVisibility: variantsTrackContainerVisibility,
+                            variantsTrackContainerDisplay: variantsTrackContainerDisplay,
+                            stockFieldsRowDisplay: stockFieldsRowDisplay
+                        };
+                    } catch (e) { return { hideTrackToggle: !!window._hideTrackToggle, inlineCostFixed: !!window._inlineCostFixed }; }
+                })();
+
+                return {
+                    fields, variantsHTML, variantsSectionDisplay, inlineTrackChecked, variantsTrackChecked, priceRowDisplay, posDisplay, chevronDisplay, activePosTab, selectedColors, selectedShapes,
+                    colorOptionStyles, shapeOptionStyles,
+                    // record modal tab state (current and previous) so we can restore tab (scan/manual/create/addItems)
+                    modalCurrentTab: (typeof currentTab !== 'undefined') ? currentTab : null,
+                    modalPreviousTab: (typeof previousTab !== 'undefined') ? previousTab : null,
+                    image: { urlInput: imageUrlInput ? imageUrlInput.value : null, previewSrc: uploadedPreview ? uploadedPreview.src : null, uploadedAreaVisible: uploadedArea ? uploadedArea.style.display : null, uploadAreaVisible: uploadArea ? uploadArea.style.display : null, canvasData },
+                    createFlowFlags,
+                    inlineCostReadOnly,
+                    createSearchVisible,
+                    inlineNameDropdownVisible,
+                    addVariantBtnVisible,
+                    priceRowChildren
+                };
+            } catch (e) { console.warn('snapshotModalState failed', e); return null; }
+        }
+
+        function restoreModalState(panel, snap) {
+            if (!panel || !snap) return;
+            try {
+                // restore inputs
+                if (Array.isArray(snap.fields)) {
+                    snap.fields.forEach(f => {
+                        try {
+                            if (!f || !f.el) return;
+                            if (f.type === 'checkbox' || f.type === 'radio') {
+                                try { f.el.checked = !!f.checked; } catch (e) {}
+                            } else {
+                                try { f.el.value = (typeof f.value !== 'undefined' && f.value !== null) ? f.value : ''; } catch (e) {}
+                            }
+                        } catch (e) {}
+                    });
+                }
+                // restore variants HTML
+                try {
+                    const variantsBody = document.getElementById('variantsTableBody');
+                    if (variantsBody && typeof snap.variantsHTML === 'string') variantsBody.innerHTML = snap.variantsHTML;
+                } catch (e) {}
+
+                // restore variants section visibility and track toggles
+                try {
+                    const variantsSection = panel.querySelector('#variantsSection');
+                    if (variantsSection && typeof snap.variantsSectionDisplay !== 'undefined') variantsSection.style.display = snap.variantsSectionDisplay || 'none';
+                    // restore price row display
+                    try {
+                        const priceRow = panel.querySelector('#priceRow');
+                        if (priceRow && typeof snap.priceRowDisplay !== 'undefined') priceRow.style.display = snap.priceRowDisplay || 'flex';
+                    } catch (ee) {}
+                    const inlineTrack = panel.querySelector('#inlineTrackStockToggle');
+                    if (inlineTrack && typeof snap.inlineTrackChecked !== 'undefined') { inlineTrack.checked = !!snap.inlineTrackChecked; try { inlineTrack.dispatchEvent(new Event('change')); } catch(e){} }
+                    const variantsTrackToggle = panel.querySelector('#variantsTrackStockToggle');
+                    if (variantsTrackToggle && typeof snap.variantsTrackChecked !== 'undefined') { variantsTrackToggle.checked = !!snap.variantsTrackChecked; try { variantsTrackToggle.dispatchEvent(new Event('change')); } catch(e){} }
+                } catch (e) {}
+
+                // restore pos container display, active tab and chevron
+                try {
+                    const panelPosContainer = panel.querySelector('#posOptionsContainer');
+                    if (panelPosContainer && typeof snap.posDisplay !== 'undefined') panelPosContainer.style.display = snap.posDisplay || 'none';
+                    // restore active POS tab (colorShape or image)
+                    try {
+                        if (snap.activePosTab) {
+                            const tabBtn = panel.querySelector('.pos-tab-btn[data-tab="' + snap.activePosTab + '"]') || document.querySelector('.pos-tab-btn[data-tab="' + snap.activePosTab + '"]');
+                            if (tabBtn) {
+                                try { tabBtn.click(); } catch (e) {
+                                    // fallback: manual toggle
+                                    try {
+                                        panel.querySelectorAll('.pos-tab-btn').forEach(b => { b.classList.remove('active'); b.style.background = '#333'; b.style.color = '#dbdbdb'; });
+                                        tabBtn.classList.add('active'); tabBtn.style.background = '#ff9800'; tabBtn.style.color = '#171717';
+                                        panel.querySelectorAll('.pos-tab-panel').forEach(pp => { pp.style.display = 'none'; pp.classList.remove('active'); });
+                                        const tp = panel.querySelector('#' + snap.activePosTab + 'Tab'); if (tp) { tp.style.display = 'block'; tp.classList.add('active'); }
+                                    } catch (er) {}
+                                }
+                            }
+                        }
+                    } catch (e) { /* non-critical */ }
+                    let chevron = panel.querySelector('#posToggleChevron'); if (!chevron) chevron = document.getElementById('posToggleChevron');
+                    if (chevron && typeof snap.chevronDisplay !== 'undefined') chevron.style.display = snap.chevronDisplay || 'none';
+                } catch (e) {}
+
+                // restore priceRow original children/layout if we captured it
+                try {
+                    if (snap && snap.priceRowChildren && Array.isArray(snap.priceRowChildren)) {
+                        try {
+                            const priceRow = panel.querySelector('#priceRow');
+                            if (priceRow) {
+                                // Clear and re-append original nodes (this will move nodes back if they were relocated)
+                                priceRow.innerHTML = '';
+                                snap.priceRowChildren.forEach(function(node) {
+                                    try { priceRow.appendChild(node); } catch(e) {}
+                                });
+                                // Ensure the restored priceRow children have expected flex layout
+                                try {
+                                    const cols = Array.from(priceRow.children || []);
+                                    if (cols.length === 3) {
+                                        try { cols[0].style.flex = '1.45'; } catch(e) {}
+                                        try { cols[1].style.flex = '1.45'; } catch(e) {}
+                                        try { cols[2].style.flex = '2'; } catch(e) {}
+                                    }
+                                    // clear any composite-specific alignment tweaks
+                                    priceRow.style.alignItems = '';
+                                    priceRow.style.justifyContent = 'space-between';
+                                } catch(e) {}
+                            }
+                        } catch(e) {}
+                    }
+                } catch(e) {}
+
+                // restore create-flow flags and visibility if captured
+                try {
+                    if (snap && snap.createFlowFlags) {
+                        try { window._hideTrackToggle = !!snap.createFlowFlags.hideTrackToggle; } catch(e){}
+                        try { window._inlineCostFixed = !!snap.createFlowFlags.inlineCostFixed; } catch(e){}
+                        const inlineTrackGroup = (function() { const el = document.getElementById('inlineTrackStockToggle'); return el ? (el.closest && el.closest('.form-group') ? el.closest('.form-group') : (el.parentElement && el.parentElement.parentElement)) : null; })();
+                        if (inlineTrackGroup) {
+                            try {
+                                if (typeof snap.createFlowFlags.inlineTrackGroupVisibility !== 'undefined') inlineTrackGroup.style.visibility = snap.createFlowFlags.inlineTrackGroupVisibility || '';
+                                if (typeof snap.createFlowFlags.inlineTrackGroupDisplay !== 'undefined') inlineTrackGroup.style.display = snap.createFlowFlags.inlineTrackGroupDisplay || '';
+                            } catch(e){}
+                        }
+                        const variantsTrackContainer = (function() { const v = document.getElementById('variantsTrackStockToggle'); return v ? (v.parentElement && v.parentElement.parentElement) : null; })();
+                        if (variantsTrackContainer) {
+                            try {
+                                if (typeof snap.createFlowFlags.variantsTrackContainerVisibility !== 'undefined') variantsTrackContainer.style.visibility = snap.createFlowFlags.variantsTrackContainerVisibility || '';
+                                if (typeof snap.createFlowFlags.variantsTrackContainerDisplay !== 'undefined') variantsTrackContainer.style.display = snap.createFlowFlags.variantsTrackContainerDisplay || '';
+                            } catch(e){}
+                        }
+                        const stockFieldsRow = document.getElementById('stockFieldsRow');
+                        if (stockFieldsRow && typeof snap.createFlowFlags.stockFieldsRowDisplay !== 'undefined') stockFieldsRow.style.display = snap.createFlowFlags.stockFieldsRowDisplay || '';
+                        try { const inlineTrackEl = panel.querySelector('#inlineTrackStockToggle') || document.getElementById('inlineTrackStockToggle'); if (inlineTrackEl) inlineTrackEl.dispatchEvent(new Event('change')); } catch(e){}
+                        try { const variantsTrackEl = panel.querySelector('#variantsTrackStockToggle') || document.getElementById('variantsTrackStockToggle'); if (variantsTrackEl) variantsTrackEl.dispatchEvent(new Event('change')); } catch(e){}
+                    }
+                } catch(e){}
+
+                // restore selected color/shape and their inline styles
+                try {
+                    const allColorOpts = Array.from(panel.querySelectorAll('.color-option'));
+                    // first restore styles for each option from snapshot if available
+                    try {
+                        if (Array.isArray(snap.colorOptionStyles)) {
+                            snap.colorOptionStyles.forEach(sobj => {
+                                try {
+                                    if (!sobj || !sobj.color) return;
+                                    const el = panel.querySelector('.color-option[data-color="' + sobj.color + '"]') || Array.from(allColorOpts).find(x => x.dataset && x.dataset.color && x.dataset.color.toString().toLowerCase() === sobj.color.toString().toLowerCase());
+                                    if (el) el.setAttribute('style', sobj.style || '');
+                                } catch(e) {}
+                            });
+                        }
+                    } catch(e) {}
+                    // clear selected classes
+                    allColorOpts.forEach(o => { o.classList.remove('selected'); });
+                    // reapply selection markers from snapshot
+                    if (Array.isArray(snap.selectedColors) && snap.selectedColors.length) {
+                        snap.selectedColors.forEach(cval => {
+                            try {
+                                if (!cval) return;
+                                const opt = panel.querySelector('.color-option[data-color="' + cval + '"]') || Array.from(allColorOpts).find(x => x.dataset && x.dataset.color && x.dataset.color.toString().toLowerCase() === cval.toString().toLowerCase());
+                                if (opt) opt.classList.add('selected');
+                            } catch(e){}
+                        });
+                    }
+
+                    const allShapeOpts = Array.from(panel.querySelectorAll('.shape-option'));
+                    // restore shape inline styles
+                    try {
+                        if (Array.isArray(snap.shapeOptionStyles)) {
+                            snap.shapeOptionStyles.forEach(sobj => {
+                                try {
+                                    if (!sobj || !sobj.shape) return;
+                                    const el = panel.querySelector('.shape-option[data-shape="' + sobj.shape + '"]') || Array.from(allShapeOpts).find(x => x.dataset && x.dataset.shape && x.dataset.shape.toString().toLowerCase() === sobj.shape.toString().toLowerCase());
+                                    if (el) el.setAttribute('style', sobj.style || '');
+                                } catch(e) {}
+                            });
+                        }
+                    } catch(e) {}
+                    // clear selected classes
+                    allShapeOpts.forEach(o => { o.classList.remove('selected'); });
+                    if (Array.isArray(snap.selectedShapes) && snap.selectedShapes.length) {
+                        snap.selectedShapes.forEach(sval => {
+                            try {
+                                if (!sval) return;
+                                const opt = panel.querySelector('.shape-option[data-shape="' + sval + '"]') || Array.from(allShapeOpts).find(x => x.dataset && x.dataset.shape && x.dataset.shape.toString().toLowerCase() === sval.toString().toLowerCase());
+                                if (opt) opt.classList.add('selected');
+                            } catch(e){}
+                        });
+                    }
+                } catch (e) {}
+
+                // restore image UI
+                try {
+                    const imageUrlInput = panel.querySelector('#productImageUrl') || document.querySelector('input[name="productImageUrl"]');
+                    if (imageUrlInput && snap.image && typeof snap.image.urlInput !== 'undefined') imageUrlInput.value = snap.image.urlInput || '';
+                    const uploadedPreview = panel.querySelector('#uploadedImagePreview') || document.getElementById('uploadedImagePreview');
+                    if (uploadedPreview && snap.image && typeof snap.image.previewSrc !== 'undefined') uploadedPreview.src = snap.image.previewSrc || '';
+                    const uploadedArea = panel.querySelector('#uploadedImageArea');
+                    const uploadArea = panel.querySelector('#imageUploadArea');
+                    if (uploadedArea && snap.image && typeof snap.image.uploadedAreaVisible !== 'undefined') uploadedArea.style.display = snap.image.uploadedAreaVisible || 'none';
+                    if (uploadArea && snap.image && typeof snap.image.uploadAreaVisible !== 'undefined') uploadArea.style.display = snap.image.uploadAreaVisible || '';
+                    const canvas = panel.querySelector('#imageCropCanvas');
+                    if (canvas && snap.image && snap.image.canvasData) {
+                        const ctx = canvas.getContext && canvas.getContext('2d');
+                        if (ctx) {
+                            const img = new Image();
+                            img.onload = function() { try { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0,canvas.width,canvas.height); } catch(e){} };
+                            img.src = snap.image.canvasData;
+                        }
+                    }
+                } catch (e) {}
+                // restore header and primary action text according to create-flow flags
+                try {
+                    try {
+                        const addItemsPanel = panel || document.getElementById('addItemsTabPanel');
+                        const header = addItemsPanel ? addItemsPanel.querySelector('.modal-title') : null;
+                        const actionBtn = addItemsPanel ? addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]') : null;
+                        if (snap && snap.createFlowFlags && snap.createFlowFlags.hideTrackToggle) {
+                            if (header) header.textContent = 'Create an Item';
+                            if (actionBtn) actionBtn.textContent = 'Add Item';
+                        } else {
+                            if (header) header.textContent = 'Add new item';
+                            if (actionBtn) actionBtn.textContent = 'Add Item';
+                        }
+                    } catch(e) { /* best-effort */ }
+                } catch(e) {}
+                // restore name-autocomplete, create-search and add-variant button visibility if captured
+                try {
+                    try {
+                        const createSearchEl = document.getElementById('createItemSearch') || panel.querySelector('#createItemSearch');
+                        if (createSearchEl && typeof snap.createSearchVisible !== 'undefined') createSearchEl.style.display = snap.createSearchVisible ? '' : 'none';
+                    } catch(e) {}
+                    try {
+                        const addVariantBtnEl = (panel && panel.querySelector) ? panel.querySelector('.variants-add-btn') : document.querySelector('.variants-add-btn');
+                        if (addVariantBtnEl && typeof snap.addVariantBtnVisible !== 'undefined') addVariantBtnEl.style.display = snap.addVariantBtnVisible ? '' : 'none';
+                    } catch(e) {}
+                    try {
+                        const nameDropdown = document.getElementById('nameDropdown');
+                        if (nameDropdown && typeof snap.inlineNameDropdownVisible !== 'undefined') {
+                            if (snap.inlineNameDropdownVisible) {
+                                nameDropdown.classList.add('show');
+                                nameDropdown.style.display = '';
+                            } else {
+                                nameDropdown.classList.remove('show');
+                                nameDropdown.style.display = 'none';
+                            }
+                        }
+                            // Re-enable name-autocomplete behavior by calling helper or simulating input
+                        try {
+                                // Ensure composite suppression cleared before re-enabling
+                                try { window._hideNameAutocompleteForComposite = false; } catch(e) {}
+                                // Also clear inline-cost/track suppression so name dropdown logic isn't blocked
+                                try { window._inlineCostFixed = false; } catch(e) {}
+                                try { window._hideTrackToggle = false; } catch(e) {}
+
+                                if (typeof window.resetNameDropdownState === 'function') {
+                                    try { window.resetNameDropdownState(); } catch(e) {}
+                                } else {
+                                    const nameInput = document.getElementById('inlineItemName');
+                                    try {
+                                        if (nameInput) {
+                                            // Focus + dispatch input to trigger any listeners (best-effort)
+                                            try { nameInput.focus(); } catch(e) {}
+                                            try { nameInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
+                                        }
+                                    } catch(e) {}
+                                }
+                                // Re-run the setup to ensure listeners are attached and dropdown appended
+                                try { if (typeof setupNameAutocomplete === 'function') setupNameAutocomplete(); } catch(e) {}
+                                    // Fallback: ensure a minimal autocomplete handler is present if full setup didn't attach
+                                    try {
+                                        const nameInput = document.getElementById('inlineItemName');
+                                        const nameDropdown = document.getElementById('nameDropdown');
+                                        if (nameInput && nameDropdown && !nameInput._fallbackAutocompleteBound) {
+                                            const fallbackHandler = function(e) {
+                                                try {
+                                                    const val = (nameInput.value || '').trim();
+                                                    if (!val) {
+                                                        nameDropdown.classList.remove('show');
+                                                        nameDropdown.style.display = 'none';
+                                                        return;
+                                                    }
+                                                    if (window && (window._hideTrackToggle || window._inlineCostFixed || window._hideNameAutocompleteForComposite)) return;
+                                                    // Build minimal dropdown content (Add Variants)
+                                                    nameDropdown.innerHTML = '';
+                                                    const addVariantsOption = document.createElement('div');
+                                                    addVariantsOption.className = 'name-option add-variants';
+                                                    addVariantsOption.innerHTML = `
+                                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                                                            <div style="display: flex; flex-direction: column;">
+                                                                <span>Have variants?</span>
+                                                                <span class="name-helper">Otherwise, Ignore this</span>
+                                                            </div>
+                                                            <span class="name-variants-indicator">+ Add Variants</span>
+                                                        </div>
+                                                    `;
+                                                    addVariantsOption.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+                                                    addVariantsOption.addEventListener('click', function(ev){ ev.preventDefault(); try { showVariantsSection(); } catch(e){} nameDropdown.classList.remove('show'); nameDropdown.style.display = 'none'; });
+                                                    nameDropdown.appendChild(addVariantsOption);
+                                                    nameDropdown.classList.add('show'); nameDropdown.style.display = '';
+                                                } catch (e) { /* ignore fallback errors */ }
+                                            };
+                                            // Also bind focus to trigger when field has value
+                                            nameInput.addEventListener('input', fallbackHandler);
+                                            nameInput.addEventListener('focus', fallbackHandler);
+                                            nameInput._fallbackAutocompleteBound = true;
+                                        }
+                                    } catch(e) {}
+
+                            // Ensure the Add Variant button is visible and wired
+                            try {
+                                const addVariantBtn = (panel && panel.querySelector) ? panel.querySelector('.variants-add-btn') : document.querySelector('.variants-add-btn');
+                                if (addVariantBtn) {
+                                    if (typeof snap.addVariantBtnVisible !== 'undefined') addVariantBtn.style.display = snap.addVariantBtnVisible ? '' : 'none';
+                                    // Rebind click handler if missing
+                                    if (!addVariantBtn._hasVariantsHandler) {
+                                        try { addVariantBtn.addEventListener('click', function(){ try { addVariantRow(); } catch(e){} }); addVariantBtn._hasVariantsHandler = true; } catch(e) {}
+                                    }
+                                }
+                            } catch(e) {}
+                        } catch(e) {}
+                    } catch(e) {}
+                } catch(e) {}
+            } catch (e) { console.warn('restoreModalState failed', e); }
+            // Restore modal tab (previous tab preferred)
+            try {
+                const targetTab = (snap && snap.modalPreviousTab) ? snap.modalPreviousTab : ((snap && snap.modalCurrentTab) ? snap.modalCurrentTab : null);
+                if (typeof showTab === 'function' && targetTab) {
+                    try { showTab(targetTab, false); } catch (e) { /* best-effort */ }
+                }
+            } catch (e) { /* ignore */ }
+            // clear composite-specific suppression so name-autocomplete is allowed again
+            try { window._hideNameAutocompleteForComposite = false; } catch(e) {}
+        }
+
         // inject minimal styles for hoverable rows (keeps visuals consistent)
         try {
             const css = `
@@ -5846,8 +6347,18 @@ document.addEventListener('DOMContentLoaded', function() {
         function isInteractiveTarget(el) {
             if (!el) return false;
             // inputs, selects, buttons, links or explicit controls should not trigger modal
-            if (el.closest && (el.closest('input, textarea, select, button, a') )) return true;
-            // row-level controls
+            try {
+                if (el.closest && (el.closest('input, textarea, select, button, a'))) return true;
+            } catch (e) {}
+            // If click is anywhere inside the table cell that contains the row checkbox,
+            // treat it as interactive so clicking the checkbox area doesn't open the modal.
+            try {
+                if (el.closest) {
+                    const td = el.closest('td');
+                    if (td && td.querySelector && td.querySelector('input.row-select-checkbox')) return true;
+                }
+            } catch (e) {}
+            // explicit row-level control classes
             if (el.classList && (el.classList.contains('row-select-checkbox') || el.classList.contains('category-select') || el.classList.contains('variant-toggle'))) return true;
             return false;
         }
@@ -5935,6 +6446,49 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (pid) {
                             // mark panel with the product id so submit handler can detect edit vs create
                             try { const addItemsPanel = document.getElementById('addItemsTabPanel'); if (addItemsPanel) addItemsPanel.setAttribute('data-edit-product-id', String(pid)); } catch(e){}
+
+                            // Snapshot the current modal state before we prefill/edit it.
+                            try {
+                                // Ensure Add Items panel is visible/active before snapshot (fixes case when modal currently on create/scan/manual)
+                                try { if (typeof showTab === 'function') showTab('addItems', false); } catch (e) {}
+                                const panelEl = document.getElementById('addItemsTabPanel');
+                                if (panelEl && typeof panelEl._snapshot === 'undefined') {
+                                    // Capture snapshot BEFORE we change global create-flow flags so we can restore them later
+                                    try { panelEl._snapshot = snapshotModalState(panelEl); } catch (e) { console.warn('create snapshot failed', e); }
+                                    // Now ensure the edit UI is fully visible: restore any Create-flow transient UI and force-clear flags for edit
+                                    try { if (typeof restoreCreateAddState === 'function') restoreCreateAddState(); } catch (e) {}
+                                    try {
+                                        try { window._hideTrackToggle = false; } catch (e) {}
+                                        try { window._inlineCostFixed = false; } catch (e) {}
+                                        // Unhide track toggle groups if they were hidden by Create flow
+                                        try {
+                                            const inlineTrackGroup = (function() { const el = document.getElementById('inlineTrackStockToggle'); return el ? (el.closest('.form-group') || (el.parentElement && el.parentElement.parentElement)) : null; })();
+                                            if (inlineTrackGroup) inlineTrackGroup.style.visibility = '';
+                                        } catch (e) {}
+                                        try {
+                                            const variantsContainer = (function() { const v = document.getElementById('variantsTrackStockToggle'); return v ? (v.parentElement && v.parentElement.parentElement) : null; })();
+                                            if (variantsContainer) variantsContainer.style.visibility = '';
+                                        } catch (e) {}
+                                        try { const stockFieldsRow = document.getElementById('stockFieldsRow'); if (stockFieldsRow) stockFieldsRow.style.display = ''; } catch (e) {}
+                                    } catch (e) { console.warn('force restore create-flow UI failed', e); }
+
+                                    // After snapshot, hide variant/track-stock/pos UI for edit flow (we hide after snapshot so original state is preserved)
+                                    try {
+                                        // hide variants section during edit and show priceRow
+                                        const variantsSection = panelEl.querySelector('#variantsSection');
+                                        if (variantsSection) variantsSection.style.display = 'none';
+                                        try { const priceRow = panelEl.querySelector('#priceRow'); if (priceRow) priceRow.style.display = 'flex'; } catch(e) {}
+                                        // turn off track stock toggles
+                                        const inlineTrack = panelEl.querySelector('#inlineTrackStockToggle');
+                                        if (inlineTrack) { inlineTrack.checked = false; try { inlineTrack.dispatchEvent(new Event('change')); } catch(e){} }
+                                        const variantsTrackToggle = panelEl.querySelector('#variantsTrackStockToggle');
+                                        if (variantsTrackToggle) { variantsTrackToggle.checked = false; try { variantsTrackToggle.dispatchEvent(new Event('change')); } catch(e){} }
+                                        // hide POS options
+                                        const posCheckbox = panelEl.querySelector('#availablePOS');
+                                        if (posCheckbox) { posCheckbox.checked = false; }
+                                    } catch (er) { console.warn('apply edit UI changes failed', er); }
+                                }
+                            } catch (e) { console.warn('snapshot capture failed', e); }
 
                             fetch('get_product.php?product_id=' + encodeURIComponent(pid))
                                 .then(r => r.json())
@@ -6038,6 +6592,699 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 posEl.checked = posFromRow || posFromApi;
                                             }
                                         } catch(e){}
+
+                                        // Prefill POS options tab based on product type or available image/shape
+                                        try {
+                                            const panelPosContainer = panel.querySelector('#posOptionsContainer');
+                                            const posCheckboxLocal = panel.querySelector('#availablePOS');
+                                            // make POS options visible when POS is enabled for this product
+                                            if (panelPosContainer && posCheckboxLocal && posCheckboxLocal.checked) {
+                                                panelPosContainer.style.display = 'block';
+                                            }
+
+                                            // Determine target tab from p.type or row attributes or presence of image/shape
+                                            const typeVal = (p.type || tr.getAttribute('data-type') || '').toString().toLowerCase();
+                                            const hasShape = (p.shape || tr.getAttribute('data-shape')) ? true : false;
+                                            const hasColor = (p.color || tr.getAttribute('data-color')) ? true : false;
+                                            const hasImage = (p.image_url || tr.getAttribute('data-image') || '').toString().trim() !== '';
+
+                                            let targetTab = null;
+                                            if (typeVal.indexOf('shape') !== -1 || typeVal.indexOf('color') !== -1 || (hasShape || hasColor)) {
+                                                targetTab = 'colorShape';
+                                            } else if (typeVal.indexOf('image') !== -1 || hasImage) {
+                                                targetTab = 'image';
+                                            }
+
+                                            if (targetTab) {
+                                                // find the corresponding tab button inside this panel and activate it
+                                                const tabBtn = panel.querySelector('.pos-tab-btn[data-tab="' + (targetTab === 'colorShape' ? 'colorShape' : 'image') + '"]');
+                                                if (tabBtn) {
+                                                    try { tabBtn.click(); } catch (e) {
+                                                        // fallback: directly toggle classes/panels similar to setupPOSOptions
+                                                        try {
+                                                            panel.querySelectorAll('.pos-tab-btn').forEach(b => { b.classList.remove('active'); b.style.background = '#333'; b.style.color = '#dbdbdb'; });
+                                                            tabBtn.classList.add('active'); tabBtn.style.background = '#ff9800'; tabBtn.style.color = '#171717';
+                                                            panel.querySelectorAll('.pos-tab-panel').forEach(pp => { pp.style.display = 'none'; pp.classList.remove('active'); });
+                                                            const tp = panel.querySelector('#' + targetTab + 'Tab'); if (tp) { tp.style.display = 'block'; tp.classList.add('active'); }
+                                                        } catch (er) { /* best-effort */ }
+                                                    }
+                                                }
+                                                // Also prefill visuals: color/shape selection or product image
+                                                try {
+                                                    // small delay to ensure panels have been toggled
+                                                    setTimeout(function() {
+                                                        try {
+                                                            if (targetTab === 'colorShape') {
+                                                                // Prefill color if available (case-insensitive match)
+                                                                const colorVal = (p.color || tr.getAttribute('data-color') || '').toString().trim();
+                                                                if (colorVal) {
+                                                                    const colorCandidates = Array.from(panel.querySelectorAll('.color-option'));
+                                                                    const colorOpt = colorCandidates.find(c => (c.dataset && c.dataset.color && c.dataset.color.toString().toLowerCase()) === colorVal.toLowerCase());
+                                                                    if (colorOpt) {
+                                                                        try { colorOpt.click(); } catch (e) { /* best-effort */ }
+                                                                        try { colorOpt.classList.add('selected'); colorOpt.style.border = '2px solid #ff9800'; } catch(e) {}
+                                                                    }
+                                                                }
+                                                                // Prefill shape if available (case-insensitive match)
+                                                                const shapeVal = (p.shape || tr.getAttribute('data-shape') || '').toString().trim();
+                                                                if (shapeVal) {
+                                                                    const shapeCandidates = Array.from(panel.querySelectorAll('.shape-option'));
+                                                                    const shapeOpt = shapeCandidates.find(s => (s.dataset && s.dataset.shape && s.dataset.shape.toString().toLowerCase()) === shapeVal.toLowerCase());
+                                                                    if (shapeOpt) {
+                                                                        try { shapeOpt.click(); } catch (e) { /* best-effort */ }
+                                                                        try { shapeOpt.classList.add('selected'); shapeOpt.style.border = '2px solid #ff9800'; } catch(e) {}
+                                                                    }
+                                                                }
+                                                                // Also set global-like visible markers so popupmodal submission picks them up
+                                                                try { if (typeof document !== 'undefined') {
+                                                                    // set any visible lastSelected variables if present on window
+                                                                    try { window.lastSelectedColor = colorVal || window.lastSelectedColor; } catch(e) {}
+                                                                    try { window.lastSelectedShape = shapeVal || window.lastSelectedShape; } catch(e) {}
+                                                                }} catch(e) {}
+                                                            } else if (targetTab === 'image') {
+                                                                // Prefill uploaded image preview if an image URL exists
+                                                                const imgUrl = (p.image_url || tr.getAttribute('data-image') || '').toString().trim();
+                                                                if (imgUrl) {
+                                                                    try {
+                                                                        const uploadedArea = panel.querySelector('#uploadedImageArea');
+                                                                        const uploadArea = panel.querySelector('#imageUploadArea');
+                                                                        const canvas = panel.querySelector('#imageCropCanvas');
+                                                                        if (canvas && typeof CanvasRenderingContext2D !== 'undefined') {
+                                                                            const ctx = canvas.getContext('2d');
+                                                                            const img = new Image();
+                                                                            img.crossOrigin = 'Anonymous';
+                                                                            // Try multiple candidate URLs to handle relative path issues
+                                                                            const candidates = (function(url) {
+                                                                                const out = [];
+                                                                                if (!url) return out;
+                                                                                out.push(url);
+                                                                                // ensure no leading slash then try with root-prefix
+                                                                                const trimmed = url.replace(/^\/+/, '');
+                                                                                out.push('/' + trimmed);
+                                                                                // try current directory base (use first path segment as app root)
+                                                                                try {
+                                                                                    const pathParts = window.location.pathname.split('/').filter(Boolean);
+                                                                                    if (pathParts.length) {
+                                                                                        const appRoot = '/' + pathParts[0];
+                                                                                        out.push(window.location.origin + appRoot + '/' + trimmed);
+                                                                                    }
+                                                                                } catch (ee) {}
+                                                                                // full origin + trimmed
+                                                                                out.push(window.location.origin + '/' + trimmed);
+                                                                                // unique
+                                                                                return out.filter((v,i,a) => v && a.indexOf(v) === i);
+                                                                            })(imgUrl);
+
+                                                                            let tryIndex = 0;
+                                                                            function tryLoadNext() {
+                                                                                if (tryIndex >= candidates.length) {
+                                                                                    console.warn('all image candidate loads failed for', imgUrl, candidates);
+                                                                                    // show uploaded area fallback
+                                                                                    if (uploadedArea) uploadedArea.style.display = 'flex';
+                                                                                    if (uploadArea) uploadArea.style.display = 'none';
+                                                                                    try {
+                                                                                        const imageUrlInput = panel.querySelector('#productImageUrl') || document.querySelector('input[name="productImageUrl"]') || panel.querySelector('.product-image-url input');
+                                                                                        if (imageUrlInput) imageUrlInput.value = imgUrl;
+                                                                                    } catch(e) {}
+                                                                                    try { const uploadedPreview = panel.querySelector('#uploadedImagePreview') || document.getElementById('uploadedImagePreview'); if (uploadedPreview) uploadedPreview.src = imgUrl; } catch(e) {}
+                                                                                    return;
+                                                                                }
+                                                                                const candidate = candidates[tryIndex++];
+                                                                                img.onload = function() {
+                                                                                    try {
+                                                                                        const cw = canvas.width; const ch = canvas.height;
+                                                                                        const ratio = Math.max(cw / img.width, ch / img.height);
+                                                                                        const iw = img.width * ratio; const ih = img.height * ratio;
+                                                                                        const sx = (cw - iw) / 2; const sy = (ch - ih) / 2;
+                                                                                        ctx.clearRect(0,0,cw,ch);
+                                                                                        ctx.drawImage(img, sx, sy, iw, ih);
+                                                                                        if (uploadedArea) uploadedArea.style.display = 'flex';
+                                                                                        if (uploadArea) uploadArea.style.display = 'none';
+                                                                                        try {
+                                                                                            const imageUrlInput = panel.querySelector('#productImageUrl') || document.querySelector('input[name="productImageUrl"]') || panel.querySelector('.product-image-url input');
+                                                                                            if (imageUrlInput) imageUrlInput.value = imgUrl;
+                                                                                        } catch(e) {}
+                                                                                        try {
+                                                                                            const uploadedPreview = panel.querySelector('#uploadedImagePreview') || document.getElementById('uploadedImagePreview');
+                                                                                            if (uploadedPreview) uploadedPreview.src = candidate;
+                                                                                        } catch(e) {}
+                                                                                    } catch (e) { console.warn('draw image failed', e); }
+                                                                                };
+                                                                                img.onerror = function() {
+                                                                                    // try next candidate
+                                                                                    tryLoadNext();
+                                                                                };
+                                                                                // start load attempt
+                                                                                try { img.src = candidate; } catch (e) { tryLoadNext(); }
+                                                                            }
+                                                                            // begin attempts
+                                                                            tryLoadNext();
+                                                                        } else {
+                                                                            // fallback: show uploaded area if we can't draw
+                                                                            if (uploadedArea) uploadedArea.style.display = 'flex';
+                                                                            if (uploadArea) uploadArea.style.display = 'none';
+                                                                            try {
+                                                                                const imageUrlInput = panel.querySelector('#productImageUrl') || document.querySelector('input[name="productImageUrl"]') || panel.querySelector('.product-image-url input');
+                                                                                if (imageUrlInput) imageUrlInput.value = imgUrl;
+                                                                            } catch(e) {}
+                                                                            try { const uploadedPreview = panel.querySelector('#uploadedImagePreview') || document.getElementById('uploadedImagePreview'); if (uploadedPreview) uploadedPreview.src = imgUrl; } catch(e) {}
+                                                                        }
+                                                                    } catch (e) { console.warn('prefill image failed', e); }
+                                                                }
+                                                            }
+                                                        } catch (e) { /* ignore visual prefills */ }
+                                                    }, 40);
+                                                } catch(e) { console.warn('prefill visuals failed', e); }
+                                            }
+                                        } catch(e) { console.warn('prefill POS tab failed', e); }
+                                        // If this product is a composite, alter the price/cost row to show the Create components
+                                        try {
+                                            const isComposite = (p.is_composite && (Number(p.is_composite) === 1)) || (tr.getAttribute && (tr.getAttribute('data-is-composite') === '1'));
+                                            if (isComposite) {
+                                                try {
+                                                    const panel = document.getElementById('addItemsTabPanel');
+                                                    const priceRow = panel ? panel.querySelector('#priceRow') : null;
+                                                    if (priceRow) {
+                                                        // Build left column showing a lightweight read-only view of the Create table
+                                                        const leftCol = document.createElement('div');
+                                                        // Do NOT use 'form-group' here so modal/global .form-group rules
+                                                        // do not affect the cloned create-table layout.
+                                                        leftCol.className = 'create-components-view';
+                                                        leftCol.style.flex = '2';
+                                                        // (No header label — show the create table starting at this position)
+                                                        // Reduce top padding so the table appears higher in the column
+                                                        leftCol.style.marginTop = '0px';
+                                                        leftCol.style.paddingTop = '0px';
+                                                        leftCol.style.transform = 'translateY(-10px)';
+                                                        const viewWrap = document.createElement('div');
+                                                        // Make the cloned create-table body scroll at a smaller
+                                                        // height than the original so it becomes scrollable
+                                                        // earlier on constrained modal heights.
+                                                        viewWrap.style.maxHeight = '250px';
+                                                        viewWrap.style.overflow = 'hidden';
+                                                        viewWrap.style.background = 'transparent';
+                                                        viewWrap.style.paddingTop = '0px';
+                                                        viewWrap.style.marginBottom = '15px';
+
+                                                        // Prefer cloning the real create table container so styling and footer
+                                                        // match exactly. This clones only the `.create-table-container`
+                                                        // (header table, scrollable body, footer) and strips IDs to
+                                                        // avoid duplicate-id collisions. Next/Skip buttons are outside
+                                                        // this container and will not be included.
+                                                        const sourceContainer = document.querySelector('.create-table-container');
+                                                        if (sourceContainer) {
+                                                            try {
+                                                                const cloned = sourceContainer.cloneNode(true);
+                                                                // Remove internal IDs to avoid duplicate IDs in the DOM
+                                                                Array.from(cloned.querySelectorAll('[id]')).forEach(function(el) {
+                                                                    try { el.removeAttribute('id'); } catch (e) {}
+                                                                });
+                                                                // Ensure the clone is visually adapted for the read-only view.
+                                                                // Do NOT apply a full border to the outer container because
+                                                                // the footer should remain outside the bordered area. Instead
+                                                                // we'll apply borders to the header table and the body
+                                                                // container so the visual border wraps header+body only.
+                                                                cloned.style.background = 'transparent';
+                                                                cloned.style.paddingTop = '0px';
+                                                                cloned.style.marginTop = '0px';
+                                                                cloned.style.boxSizing = 'border-box';
+                                                                cloned.classList.add('composite-create-clone');
+                                                                // Remove any .form-group classes inside the clone so global
+                                                                // product-form styles (labels/inputs) do not leak into the
+                                                                // cloned table area.
+                                                                try {
+                                                                    Array.from(cloned.querySelectorAll('.form-group')).forEach(function(el){
+                                                                        try { el.classList.remove('form-group'); } catch(e) {}
+                                                                    });
+                                                                    if (cloned.classList && cloned.classList.contains('form-group')) cloned.classList.remove('form-group');
+                                                                } catch(e) {}
+                                                                // Add breathing space between the scrollable table body and the footer
+                                                                try {
+                                                                    const clonedFooter = cloned.querySelector('.create-table-footer');
+                                                                    if (clonedFooter) {
+                                                                        clonedFooter.style.marginTop = '20px';
+                                                                        clonedFooter.style.marginBottom = '10px';
+                                                                    }
+                                                                } catch (e) {}
+                                                                // Make the cloned table's body scroll earlier than the original by
+                                                                // reducing its max-height. Target the inner body container so
+                                                                // header/footer remain fixed and only the list scrolls. Also
+                                                                // darken the clone body background to visually separate it.
+                                                                try {
+                                                                    const clonedBodyContainer = cloned.querySelector('.create-table-body-container');
+                                                                    // Header table (fixed header) — apply top/left/right border and top radius
+                                                                    try {
+                                                                        const headerTable = cloned.querySelector('table');
+                                                                        if (headerTable) {
+                                                                            headerTable.style.borderTop = '1px solid #333';
+                                                                            headerTable.style.borderLeft = '1px solid #333';
+                                                                            headerTable.style.borderRight = '1px solid #333';
+                                                                            headerTable.style.borderTopLeftRadius = '8px';
+                                                                            headerTable.style.borderTopRightRadius = '8px';
+                                                                            headerTable.style.borderCollapse = 'separate';
+                                                                            // Slightly darken header background to match body
+                                                                            try { const thead = headerTable.querySelector('thead'); if (thead) thead.style.background = '#141414'; } catch(e){}
+                                                                        }
+                                                                    } catch(e){}
+                                                                    if (clonedBodyContainer) {
+                                                                        clonedBodyContainer.style.maxHeight = '150px';
+                                                                        clonedBodyContainer.style.overflow = 'auto';
+                                                                        clonedBodyContainer.style.background = '#141414';
+                                                                        // Apply left/right/top/bottom borders so header+body appear enclosed
+                                                                        clonedBodyContainer.style.borderLeft = '1px solid #333';
+                                                                        clonedBodyContainer.style.borderRight = '1px solid #333';
+                                                                        clonedBodyContainer.style.borderTop = '1px solid #333';
+                                                                        clonedBodyContainer.style.borderBottom = '1px solid #333';
+                                                                        clonedBodyContainer.style.borderBottomLeftRadius = '8px';
+                                                                        clonedBodyContainer.style.borderBottomRightRadius = '8px';
+                                                                        clonedBodyContainer.style.boxSizing = 'border-box';
+                                                                    }
+                                                                    // Ensure footer remains visually separate (no enclosing border)
+                                                                    try {
+                                                                        const clonedFooter = cloned.querySelector('.create-table-footer');
+                                                                        if (clonedFooter) {
+                                                                            clonedFooter.style.background = 'transparent';
+                                                                            clonedFooter.style.marginTop = '0';
+                                                                        }
+                                                                    } catch(e){}
+                                                                } catch (e) {}
+                                                                // Attach any prefetched components (from product payload) so
+                                                                // the setup IIFE can prefill them after wiring helpers.
+                                                                try { cloned._prefillComponents = (p && p.components) ? p.components : null; } catch(e) {}
+                                                                viewWrap.appendChild(cloned);
+                                                                // Wire a localized autocomplete for the cloned create table so
+                                                                // users can search/add components while editing composites.
+                                                                try {
+                                                                    (function setupCloneAutocomplete(cloneRoot) {
+                                                                        if (!cloneRoot) return;
+                                                                        const input = cloneRoot.querySelector('input[placeholder="Item search"]');
+                                                                        const tbody = cloneRoot.querySelector('tbody');
+                                                                        const footer = cloneRoot.querySelector('.create-table-footer');
+                                                                        if (!input || !tbody || !footer) return;
+
+                                                                        // Find the footer total element (matches original's min-width:120px)
+                                                                        let totalEl = footer.querySelector('[style*="min-width:120px"]');
+                                                                        if (!totalEl) totalEl = footer.querySelector('div');
+                                                                        // Hide the cloned footer total and any textual label containing
+                                                                        // the word "total" (e.g. "Total cost:") — the aggregated
+                                                                        // component cost will be shown in the main item's Cost input.
+                                                                        try { if (totalEl) totalEl.style.display = 'none'; } catch(e) {}
+                                                                        try {
+                                                                            Array.from(footer.querySelectorAll('*')).forEach(function(el){
+                                                                                try {
+                                                                                    const txt = (el.textContent || '').trim().toLowerCase();
+                                                                                    if (txt && txt.indexOf('total') !== -1) {
+                                                                                        el.style.display = 'none';
+                                                                                    }
+                                                                                } catch(e) {}
+                                                                            });
+                                                                        } catch(e) {}
+
+                                                                        // Create dropdown element for clone
+                                                                        const dropdown = document.createElement('div');
+                                                                        dropdown.className = 'create-dropdown composite-clone-dropdown';
+                                                                        // Use fixed positioning so the dropdown aligns to the input
+                                                                        // relative to the viewport (works inside modal scrolls/transforms)
+                                                                        dropdown.style.position = 'fixed';
+                                                                        dropdown.style.zIndex = 99999;
+                                                                        dropdown.style.display = 'none';
+                                                                        document.body.appendChild(dropdown);
+
+                                                                        // Small currency formatter
+                                                                        function formatCurrency(n) {
+                                                                            const num = parseFloat(n) || 0;
+                                                                            return '₱' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                                        }
+
+                                                                        function escapeHtml(s) { return String(s).replace(/[&<>'"`]/g, function(ch){ return '&#' + ch.charCodeAt(0) + ';'; }); }
+
+                                                                        // Create a component row inside the clone
+                                                                        function createComponentRow(name, qty, cost, sku) {
+                                                                            const tr = document.createElement('tr');
+                                                                            tr.className = 'component-row';
+                                                                            tr.style.borderBottom = '1px solid #2b2b2b';
+                                                                            tr.innerHTML = `
+                                                                                <td style="padding:8px; color:#dbdbdb;">
+                                                                                    <div class="comp-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                                                                        <div class="comp-name-text">${escapeHtml(name)}</div>
+                                                                                        ${sku ? `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">SKU: ${escapeHtml(sku)}</div>` : ''}
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="number" min="0" value="${qty}" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
+                                                                                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-cost" currency-localization="₱" readonly value="${'₱' + Number(cost).toFixed(2)}" style="width:100%; background:#171717; border: none; color:#fff; cursor:default; pointer-events: none; text-align:right;" /></td>
+                                                                                <td style="padding:8px; width:45px; text-align:center;"><button class="comp-remove btn" title="Remove" style="background:transparent; border:none; color:#bbb; font-size:18px; line-height:1; width:30px; height:34px; display:inline-flex; align-items:center; justify-content:center;">🗑</button></td>
+                                                                            `;
+                                                                            // attach listeners
+                                                                            try { tr.querySelector('.comp-qty').addEventListener('input', recalcTotal); } catch(e){}
+                                                                            const rem = tr.querySelector('.comp-remove');
+                                                                            if (rem) rem.addEventListener('click', function() { tr.remove(); recalcTotal(); });
+                                                                            tbody.appendChild(tr);
+                                                                            recalcTotal();
+                                                                        }
+
+                                                                        // If the outer scope provided components (from get_product.php),
+                                                                        // prefill them into this clone now that helper functions are wired.
+                                                                        try {
+                                                                            if (cloneRoot && cloneRoot._prefillComponents && Array.isArray(cloneRoot._prefillComponents) && cloneRoot._prefillComponents.length) {
+                                                                                const comps = cloneRoot._prefillComponents;
+                                                                                // Small helper to format currency (same as used above)
+                                                                                function formatCurrency(n) { const num = parseFloat(n) || 0; return '₱' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+                                                                                comps.forEach(function(comp) {
+                                                                                    try {
+                                                                                        // Prefer variant-enriched data when available
+                                                                                        const qty = (comp.component_qty !== null && comp.component_qty !== undefined) ? comp.component_qty : (comp.qty || 1);
+                                                                                        if (comp.variant || comp.component_variant_id) {
+                                                                                            // build product object and variants array
+                                                                                            const prod = (comp.product && comp.product.name) ? { id: comp.product.id, name: comp.product.name, sku: comp.product.sku } : { id: comp.component_product_id || null, name: comp.component_name || '', sku: comp.component_sku || '' };
+                                                                                            const vars = [];
+                                                                                            if (comp.variant) {
+                                                                                                vars.push({ id: comp.variant.id, name: comp.variant.name, sku: comp.variant.sku, cost: comp.variant.cost, price: comp.variant.price });
+                                                                                            } else if (comp.component_variant_id) {
+                                                                                                vars.push({ id: comp.component_variant_id, name: comp.variant_name || '', sku: comp.variant_sku || comp.component_sku || '', cost: comp.component_cost !== null && comp.component_cost !== undefined ? comp.component_cost : (comp.variant_cost || 0), price: comp.variant_price || null });
+                                                                                            }
+                                                                                            // create row using available helper
+                                                                                            try {
+                                                                                                createComponentRowFromProduct(prod, vars);
+                                                                                                // adjust qty and cost if provided
+                                                                                                const rows = cloneRoot.querySelectorAll('tbody tr.component-row');
+                                                                                                const last = rows[rows.length - 1];
+                                                                                                if (last) {
+                                                                                                    const qIn = last.querySelector('.comp-qty'); if (qIn) qIn.value = qty;
+                                                                                                    const costIn = last.querySelector('.comp-cost'); if (costIn && comp.component_cost !== null && comp.component_cost !== undefined) costIn.value = formatCurrency(comp.component_cost);
+                                                                                                }
+                                                                                            } catch (e) {
+                                                                                                // fallback to simple row
+                                                                                                createComponentRow(comp.component_name || (comp.product && comp.product.name) || '', qty, comp.component_cost !== null && comp.component_cost !== undefined ? comp.component_cost : 0, comp.component_sku || (comp.product && comp.product.sku) || '');
+                                                                                            }
+                                                                                        } else if (comp.product || comp.component_product_id) {
+                                                                                            // component references a product (no variant)
+                                                                                            const pname = (comp.product && comp.product.name) ? comp.product.name : (comp.component_name || '');
+                                                                                            const pcost = (comp.component_cost !== null && comp.component_cost !== undefined) ? comp.component_cost : ((comp.product && comp.product.cost) ? comp.product.cost : 0);
+                                                                                            createComponentRow(pname, qty, pcost, comp.component_sku || (comp.product && comp.product.sku) || '');
+                                                                                        } else {
+                                                                                            // fallback minimal
+                                                                                            createComponentRow(comp.component_name || '', qty, comp.component_cost || 0, comp.component_sku || '');
+                                                                                        }
+                                                                                    } catch (e) { /* per-component non-fatal */ }
+                                                                                });
+                                                                                // ensure totals updated
+                                                                                try { recalcTotal(); } catch (e) {}
+                                                                            }
+                                                                        } catch (e) { /* ignore prefill errors */ }
+
+                                                                        // When selecting a product object, possibly fetch variants
+                                                                        function createComponentRowFromProduct(product, variants) {
+                                                                            if (variants && Array.isArray(variants) && variants.length) {
+                                                                                // use first variant
+                                                                                const v = variants[0];
+                                                                                const displayName = (product.name || '') + (v.name ? ' (' + v.name + ')' : '');
+                                                                                const sku = v.sku || product.sku || '';
+                                                                                const cost = (v.cost !== undefined && v.cost !== null) ? v.cost : (product.cost || product.price || 0);
+                                                                                createComponentRow(displayName, 1, cost, sku);
+                                                                            } else {
+                                                                                const cost = (product.cost !== undefined && product.cost !== null) ? product.cost : (product.price !== undefined ? product.price : 0);
+                                                                                createComponentRow(product.name || (product.product_name || ''), 1, cost, product.sku || product.product_sku || '');
+                                                                            }
+                                                                        }
+
+                                                                        function recalcTotal() {
+                                                                            let total = 0;
+                                                                            const rows = tbody.querySelectorAll('tr.component-row');
+                                                                            rows.forEach(r => {
+                                                                                try {
+                                                                                    const q = parseFloat(r.querySelector('.comp-qty').value) || 0;
+                                                                                    const c = parseFloat((r.querySelector('.comp-cost').value || '').replace(/[^0-9.-]/g,'')) || 0;
+                                                                                    total += q * c;
+                                                                                } catch(e) {}
+                                                                            });
+                                                                            // Instead of updating the cloned footer, write the aggregated
+                                                                            // component cost into the main Add/Edit item's Cost input.
+                                                                            try {
+                                                                                const mainCostInput = document.querySelector('#inlineItemCost') || document.getElementById('inlineItemCost');
+                                                                                if (mainCostInput) {
+                                                                                    // Write formatted currency value and emit input event so
+                                                                                    // any listeners can react.
+                                                                                    mainCostInput.value = formatCurrency(total);
+                                                                                    try { mainCostInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
+                                                                                }
+                                                                            } catch(e) { /* non-critical */ }
+                                                                        }
+
+                                                                        // Product fetch & cache (search_api.php)
+                                                                        let productsCache = null;
+                                                                        function fetchProductsOnce() {
+                                                                            if (productsCache !== null) return Promise.resolve(productsCache);
+                                                                            // Try relative path then fallback to PHP-derived path if available
+                                                                            return fetch('search_api.php').then(r => r.json()).then(data => {
+                                                                                if (Array.isArray(data)) productsCache = data;
+                                                                                else if (data && Array.isArray(data.products)) productsCache = data.products;
+                                                                                else productsCache = [];
+                                                                                return productsCache;
+                                                                            }).catch(err => {
+                                                                                console.warn('clone autocomplete fetch failed', err);
+                                                                                productsCache = [];
+                                                                                return productsCache;
+                                                                            });
+                                                                        }
+
+                                                                        let filtered = [];
+                                                                        let highlighted = -1;
+
+                                                                        function showDropdown(items, searchTerm) {
+                                                                            dropdown.innerHTML = '';
+                                                                            filtered = items || [];
+                                                                            highlighted = -1;
+                                                                            const r = input.getBoundingClientRect();
+                                                                            // Position using viewport coordinates (fixed) so the dropdown
+                                                                            // stays attached to the input inside the modal regardless
+                                                                            // of page/body scrolling or modal transforms.
+                                                                            const top = Math.round(r.bottom + 2);
+                                                                            const left = Math.round(r.left);
+                                                                            dropdown.style.top = top + 'px';
+                                                                            dropdown.style.left = left + 'px';
+                                                                            dropdown.style.width = Math.round(r.width) + 'px';
+                                                                            if (!filtered.length) {
+                                                                                const noOpt = document.createElement('div');
+                                                                                noOpt.className = 'create-option';
+                                                                                noOpt.style.opacity = '0.7';
+                                                                                noOpt.style.cursor = 'default';
+                                                                                noOpt.textContent = searchTerm.trim() === '' ? 'Start typing to search items' : 'No item found';
+                                                                                dropdown.appendChild(noOpt);
+                                                                            } else {
+                                                                                filtered.forEach(p => {
+                                                                                    const opt = document.createElement('div');
+                                                                                    opt.className = 'create-option';
+                                                                                    const displayName = (p.name || p.product_name || p.title || '');
+                                                                                    const displaySku = (p.sku || p.product_sku || p.barcode || '');
+                                                                                    const displayCost = (p.cost !== undefined ? p.cost : (p.price !== undefined ? p.price : (p.unit_price !== undefined ? p.unit_price : '')));
+                                                                                    opt.innerHTML = `
+                                                                                        <div style="display:grid; grid-template-columns: 1fr 120px; align-items:center; gap:8px; width:100%;">
+                                                                                            <div style="min-width:0;">
+                                                                                                <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:#e6e6e6;">${escapeHtml(displayName)}</div>
+                                                                                                ${displaySku ? `<div style="color:#9e9e9e; font-size:12px; margin-top:4px;">SKU: ${escapeHtml(displaySku)}</div>` : ''}
+                                                                                            </div>
+                                                                                            <div style="text-align:right; color:#9ca3af; white-space:nowrap;">${displayCost !== '' ? '₱' + Number(displayCost).toFixed(2) : ''}</div>
+                                                                                        </div>
+                                                                                    `;
+                                                                                    opt.addEventListener('mousedown', e => e.preventDefault());
+                                                                                    opt.addEventListener('click', function() {
+                                                                                        selectItem(p);
+                                                                                    });
+                                                                                    dropdown.appendChild(opt);
+                                                                                });
+                                                                            }
+                                                                            dropdown.style.display = 'block';
+                                                                        }
+
+                                                                        function hideDropdown() { dropdown.style.display = 'none'; highlighted = -1; }
+
+                                                                        function selectItem(item) {
+                                                                            input.value = '';
+                                                                            hideDropdown();
+                                                                            // If item includes variants array, use it; else try fetch variants API
+                                                                            if (item && item.variants && Array.isArray(item.variants) && item.variants.length) {
+                                                                                createComponentRowFromProduct(item, item.variants);
+                                                                                return;
+                                                                            }
+                                                                            if (item && (item.id || item.product_id)) {
+                                                                                // try variants endpoint
+                                                                                const pid = item.id || item.product_id;
+                                                                                fetch('variants_api.php?product_id=' + encodeURIComponent(pid)).then(r=>r.json()).then(vars=>{
+                                                                                    if (vars && Array.isArray(vars) && vars.length) createComponentRowFromProduct(item, vars);
+                                                                                    else createComponentRow(item.name || item.product_name || '', 1, item.cost || item.price || 0, item.sku || '');
+                                                                                }).catch(err=>{ createComponentRow(item.name || item.product_name || '', 1, item.cost || item.price || 0, item.sku || ''); });
+                                                                                return;
+                                                                            }
+                                                                            // Fallback
+                                                                            createComponentRow(item.name || item.product_name || '', 1, item.cost || item.price || 0, item.sku || '');
+                                                                        }
+
+                                                                        function filterProducts(term) {
+                                                                            const list = productsCache || [];
+                                                                            if (!term || term.trim() === '') return list;
+                                                                            const q = term.toLowerCase();
+                                                                            return list.filter(p => {
+                                                                                const name = (p.name || p.product_name || p.title || '').toLowerCase();
+                                                                                return name.includes(q);
+                                                                            });
+                                                                        }
+
+                                                                        input.addEventListener('focus', function() {
+                                                                            fetchProductsOnce().then(()=>{
+                                                                                const list = filterProducts(input.value.trim());
+                                                                                showDropdown(list, input.value.trim());
+                                                                            });
+                                                                        });
+                                                                        input.addEventListener('input', function(e){
+                                                                            const term = e.target.value.trim();
+                                                                            fetchProductsOnce().then(()=>{
+                                                                                const list = filterProducts(term);
+                                                                                showDropdown(list, term);
+                                                                            });
+                                                                        });
+                                                                        input.addEventListener('keydown', function(e){
+                                                                            const opts = dropdown.querySelectorAll('.create-option');
+                                                                            switch (e.key) {
+                                                                                case 'ArrowDown': e.preventDefault(); highlighted = Math.min(highlighted+1, opts.length-1); highlight(); break;
+                                                                                case 'ArrowUp': e.preventDefault(); highlighted = Math.max(highlighted-1, 0); highlight(); break;
+                                                                                case 'Enter': e.preventDefault(); if (highlighted>=0 && filtered[highlighted]) selectItem(filtered[highlighted]); else if (filtered.length>0) selectItem(filtered[0]); break;
+                                                                                case 'Escape': e.preventDefault(); hideDropdown(); input.blur(); break;
+                                                                            }
+                                                                        });
+
+                                                                        function highlight() {
+                                                                            const opts = dropdown.querySelectorAll('.create-option');
+                                                                            opts.forEach(o=>o.classList.remove('highlighted'));
+                                                                            if (highlighted>=0 && highlighted<opts.length) opts[highlighted].classList.add('highlighted');
+                                                                        }
+
+                                                                        document.addEventListener('click', function(e){ if (!input.contains(e.target) && !dropdown.contains(e.target)) hideDropdown(); });
+                                                                        input.addEventListener('blur', function(){ setTimeout(()=>{ if (!dropdown.contains(document.activeElement)) hideDropdown(); }, 120); });
+
+                                                                    })(cloned);
+                                                                } catch (e) {}
+                                                            } catch (e) {
+                                                                // fallback to minimal table if cloning fails
+                                                                const tbl = document.createElement('table');
+                                                                tbl.style.width = '100%';
+                                                                tbl.style.borderCollapse = 'collapse';
+                                                                const tb = document.createElement('tbody');
+                                                                const rows = document.querySelectorAll('#createComponentsBody tr.component-row');
+                                                                if (rows && rows.length) {
+                                                                    rows.forEach(function(r) {
+                                                                        try {
+                                                                            const name = (r.querySelector('.comp-name-text') && r.querySelector('.comp-name-text').textContent) ? r.querySelector('.comp-name-text').textContent : '';
+                                                                            const qty = (r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) ? r.querySelector('.comp-qty').value : '';
+                                                                            const cost = (r.querySelector('.comp-cost') && r.querySelector('.comp-cost').value) ? r.querySelector('.comp-cost').value : '';
+                                                                            const trr = document.createElement('tr');
+                                                                            trr.style.borderBottom = '1px solid #2b2b2b';
+                                                                            trr.innerHTML = `<td style="padding:6px; color:#dbdbdb;">${escapeHtml(name)}</td><td style="padding:6px; color:#dbdbdb; text-align:right; width:120px;">${escapeHtml(qty)}</td><td style="padding:6px; color:#dbdbdb; text-align:right; width:120px;">${escapeHtml(cost)}</td>`;
+                                                                            tb.appendChild(trr);
+                                                                        } catch(e) {}
+                                                                    });
+                                                                } else {
+                                                                    const trr = document.createElement('tr');
+                                                                    trr.innerHTML = `<td style="padding:6px; color:#9e9e9e;">No components</td>`;
+                                                                    tb.appendChild(trr);
+                                                                }
+                                                                tbl.appendChild(tb);
+                                                                viewWrap.appendChild(tbl);
+                                                            }
+                                                        } else {
+                                                            // If .create-table-container isn't present, fall back to old manual build
+                                                            const tbl = document.createElement('table');
+                                                            tbl.style.width = '100%';
+                                                            tbl.style.borderCollapse = 'collapse';
+                                                            const tb = document.createElement('tbody');
+                                                            const rows = document.querySelectorAll('#createComponentsBody tr.component-row');
+                                                            if (rows && rows.length) {
+                                                                rows.forEach(function(r) {
+                                                                    try {
+                                                                        const name = (r.querySelector('.comp-name-text') && r.querySelector('.comp-name-text').textContent) ? r.querySelector('.comp-name-text').textContent : '';
+                                                                        const qty = (r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) ? r.querySelector('.comp-qty').value : '';
+                                                                        const cost = (r.querySelector('.comp-cost') && r.querySelector('.comp-cost').value) ? r.querySelector('.comp-cost').value : '';
+                                                                        const trr = document.createElement('tr');
+                                                                        trr.style.borderBottom = '1px solid #2b2b2b';
+                                                                        trr.innerHTML = `<td style="padding:6px; color:#dbdbdb;">${escapeHtml(name)}</td><td style="padding:6px; color:#dbdbdb; text-align:right; width:120px;">${escapeHtml(qty)}</td><td style="padding:6px; color:#dbdbdb; text-align:right; width:120px;">${escapeHtml(cost)}</td>`;
+                                                                        tb.appendChild(trr);
+                                                                    } catch(e) {}
+                                                                });
+                                                            } else {
+                                                                const trr = document.createElement('tr');
+                                                                trr.innerHTML = `<td style="padding:6px; color:#9e9e9e;">No components</td>`;
+                                                                tb.appendChild(trr);
+                                                            }
+                                                            tbl.appendChild(tb);
+                                                            viewWrap.appendChild(tbl);
+                                                        }
+                                                        leftCol.appendChild(viewWrap);
+
+                                                        // Build right column with stacked Price (top) and Cost (bottom)
+                                                        const rightCol = document.createElement('div');
+                                                        rightCol.className = 'form-group composite-price-cost';
+                                                        rightCol.style.flex = '1';
+                                                        rightCol.style.display = 'flex';
+                                                        rightCol.style.flexDirection = 'column';
+                                                        rightCol.style.justifyContent = 'space-between';
+                                                        rightCol.style.gap = '8px';
+
+                                                        // Move the existing price and cost form-groups into the right column to preserve inputs and references
+                                                        try {
+                                                            const priceGroup = panel.querySelector('#inlineItemPrice') ? panel.querySelector('#inlineItemPrice').closest('.form-group') : null;
+                                                            const costGroup = panel.querySelector('#inlineItemCost') ? panel.querySelector('#inlineItemCost').closest('.form-group') : null;
+                                                            if (priceGroup) {
+                                                                // normalize style for stacked layout
+                                                                priceGroup.style.flex = '';
+                                                                rightCol.appendChild(priceGroup);
+                                                            }
+                                                            if (costGroup) {
+                                                                costGroup.style.flex = '';
+                                                                rightCol.appendChild(costGroup);
+                                                            }
+                                                            // Reduce input widths for composite edit so the Price/Cost columns are narrower
+                                                            try {
+                                                                // constrain the right column so it doesn't take too much space
+                                                                rightCol.style.flex = '0 0 195px';
+                                                            } catch(e) {}
+                                                            try {
+                                                                if (priceGroup) {
+                                                                    const pin = priceGroup.querySelector('input');
+                                                                    if (pin) { pin.style.maxWidth = '120px'; pin.style.width = '120px'; pin.style.boxSizing = 'border-box'; }
+                                                                }
+                                                            } catch(e) {}
+                                                            try {
+                                                                if (costGroup) {
+                                                                    const cin = costGroup.querySelector('input');
+                                                                    if (cin) { cin.style.maxWidth = '120px'; cin.style.width = '120px'; cin.style.boxSizing = 'border-box'; }
+                                                                }
+                                                            } catch(e) {}
+                                                        } catch(e) {}
+
+                                                        // Hide track stock toggle completely for composite view
+                                                        try {
+                                                            const inlineTrackGroup = panel.querySelector('#inlineTrackStockToggle') ? (panel.querySelector('#inlineTrackStockToggle').closest('.form-group') || panel.querySelector('#inlineTrackStockToggle').parentElement) : null;
+                                                            if (inlineTrackGroup) inlineTrackGroup.style.display = 'none';
+                                                        } catch(e) {}
+
+                                                        // Replace priceRow content with our two columns
+                                                        try {
+                                                            priceRow.innerHTML = '';
+                                                            priceRow.appendChild(leftCol);
+                                                            priceRow.appendChild(rightCol);
+                                                            // adjust spacing
+                                                            priceRow.style.alignItems = 'flex-start';
+                                                            // When showing composite layout, hide the name autocomplete
+                                                            // and set a flag so other logic knows to suppress it.
+                                                            try {
+                                                                try { window._hideNameAutocompleteForComposite = true; } catch(e) {}
+                                                                const nameDropdown = document.getElementById('nameDropdown');
+                                                                if (nameDropdown) { nameDropdown.classList.remove('show'); nameDropdown.style.display = 'none'; }
+                                                            } catch(e) {}
+                                                        } catch(e) {}
+                                                    }
+                                                } catch(e) { console.warn('composite layout apply failed', e); }
+                                            }
+                                        } catch(e) {}
 
                                         // Variants: clear existing and recreate from API product. Use existing addVariantRow() helper to ensure wiring.
                                         try {
@@ -6261,6 +7508,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             console.debug('Prefill: variants rows now =', variantsBody.querySelectorAll('tr').length);
                                                         }, 0);
                                                     } catch(e){}
+                                                    // Hide name-autocomplete when in variants mode; keep Add Variant button visible
+                                                    try {
+                                                        const createSearchEl = document.getElementById('createItemSearch') || panel.querySelector('#createItemSearch');
+                                                        if (createSearchEl) createSearchEl.style.display = 'none';
+                                                    } catch(e){}
+                                                    try {
+                                                        const addVariantBtnEl = (panel && panel.querySelector) ? panel.querySelector('.variants-add-btn') : document.querySelector('.variants-add-btn');
+                                                        if (addVariantBtnEl) addVariantBtnEl.style.display = '';
+                                                    } catch(e){}
                                                 } else {
                                                     // No variants: ensure variants section hidden and reset price/cost to product-level
                                                     try { hideVariantsSection(); } catch(e) {}
@@ -6286,11 +7542,43 @@ document.addEventListener('DOMContentLoaded', function() {
                             try { const backBtn = addItemsPanel.querySelector('#backInlineAddItems'); if (backBtn) backBtn.style.display = 'none'; } catch (e) {}
                             // update header text
                             try { const header = addItemsPanel.querySelector('.modal-title'); if (header) header.textContent = 'Edit Item'; } catch (e) {}
+
                             // update primary action button(s)
                             try {
                                 // Try several selectors to find the submit button consistently
                                 const actionBtn = addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]');
                                 if (actionBtn) actionBtn.textContent = 'Save';
+                            } catch (e) {}
+
+                            // Make the inline cost input readonly during Edit flow and mark inlineCostFixed
+                            try {
+                                const costElLocal = addItemsPanel.querySelector('#inlineItemCost') || document.getElementById('inlineItemCost');
+                                if (costElLocal) {
+                                    try { costElLocal.readOnly = true; costElLocal.setAttribute('readonly','readonly'); } catch(e) {}
+                                }
+                                try { window._inlineCostFixed = true; } catch(e) {}
+                            } catch(e) {}
+                            // Patch: Cancel button closes modal directly
+                            try {
+                                const cancelBtn = addItemsPanel.querySelector('.cancel-secondary');
+                                if (cancelBtn) {
+                                    cancelBtn.onclick = function(e) {
+                                        e.preventDefault();
+                                        // Restore snapshot if present, then hide the modal (same as clicking outside or close)
+                                        try {
+                                            const panelEl = document.getElementById('addItemsTabPanel');
+                                            if (panelEl && panelEl._snapshot) {
+                                                try { restoreModalState(panelEl, panelEl._snapshot); } catch (er) { console.warn('restore on cancel failed', er); }
+                                                try { delete panelEl._snapshot; } catch (er) {}
+                                            }
+                                        } catch (er) { console.warn('cancel restore failed', er); }
+                                        const modal = document.getElementById('scannerModal') || window.scannerModal;
+                                        if (modal) {
+                                            modal.style.display = 'none';
+                                            modal.classList.remove('show');
+                                        }
+                                    };
+                                }
                             } catch (e) {}
 
                             // Setup a MutationObserver to restore the UI when the modal is closed
@@ -6301,9 +7589,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                         try {
                                             // If modal is hidden or class 'show' removed, restore panel
                                             if (modalEl.style.display === 'none' || !modalEl.classList.contains('show')) {
+                                                // restore snapshot if present
+                                                let hadSnapshot = false;
+                                                try {
+                                                    if (addItemsPanel && addItemsPanel._snapshot) {
+                                                        hadSnapshot = true;
+                                                        try { restoreModalState(addItemsPanel, addItemsPanel._snapshot); } catch (er) { console.warn('observer restore failed', er); }
+                                                        try { delete addItemsPanel._snapshot; } catch (er) {}
+                                                    }
+                                                } catch (e) { console.warn('observer restore err', e); }
                                                 try { const bb = addItemsPanel.querySelector('#backInlineAddItems'); if (bb) bb.style.display = ''; } catch (e) {}
-                                                try { const h = addItemsPanel.querySelector('.modal-title'); if (h) h.textContent = 'Add new item'; } catch (e) {}
-                                                try { const a = addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]'); if (a) a.textContent = 'Add Item'; } catch (e) {}
+                                                // Only set default header/action when we did NOT restore from a snapshot
+                                                if (!hadSnapshot) {
+                                                    try { const h = addItemsPanel.querySelector('.modal-title'); if (h) h.textContent = 'Add new item'; } catch (e) {}
+                                                    try { const a = addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]'); if (a) a.textContent = 'Add Item'; } catch (e) {}
+                                                }
                                                 try { addItemsPanel.removeAttribute('data-row-edit'); } catch (e) {}
                                                 try { mo.disconnect(); } catch (e) {}
                                             }
