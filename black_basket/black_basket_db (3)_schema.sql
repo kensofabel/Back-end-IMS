@@ -106,19 +106,23 @@ CREATE TABLE `products` (
 --
 
 CREATE TABLE `product_components` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `parent_product_id` int(11) NOT NULL,
   `component_variant_id` int(11) DEFAULT NULL,
   `component_product_id` int(11) DEFAULT NULL,
-  `component_name` varchar(150) NOT NULL,
-  `component_sku` varchar(64) DEFAULT NULL,
   `component_qty` decimal(10,2) DEFAULT NULL,
-  `component_cost` decimal(10,2) DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_parent_product` (`parent_product_id`),
+  KEY `idx_component_variant` (`component_variant_id`),
+  KEY `idx_component_product` (`component_product_id`),
+  CONSTRAINT `fk_product_components_parent` FOREIGN KEY (`parent_product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_product_components_component` FOREIGN KEY (`component_product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_product_components_variant` FOREIGN KEY (`component_variant_id`) REFERENCES `product_variants`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
+-- --------------------------------------------------------
 --
 -- Table structure for table `product_variants`
 --
