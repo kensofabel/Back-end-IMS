@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -21,6 +20,33 @@ require_permission(11);
     <link rel="stylesheet" href="employee.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
+    <style>
+        /* Show the select column and checkboxes for the employees table on this page only */
+        #employees-table th.select-col,
+        #employees-table td.select-col {
+            display: table-cell !important;
+            width: 40px;
+            text-align: center;
+        }
+        #employees-table .employee-select,
+        #employees-table #select-all-employees {
+            display: inline-block !important;
+            cursor: pointer;
+        }
+        /* Confirmation modal styles */
+        #confirm-modal {
+            position: fixed; left:0; top:0; right:0; bottom:0; display:none; align-items:center; justify-content:center; z-index:20000; background: rgba(0,0,0,0.6);
+        }
+        #confirm-modal .modal-content { background: #151515; border-radius:8px; color:#eee; }
+        #confirm-modal .modal-header { display:flex; align-items:center; justify-content:space-between; }
+        #confirm-modal .modal-body { color:#ddd; }
+        #confirm-modal .modal-actions .btn { min-width:96px; }
+
+        /* Toast styles */
+        #toast-container .bb-toast { transition: all 0.28s ease; }
+        /* Hide per-row delete buttons for employee rows (use bulk delete instead) */
+        tr.employee-row .btn-delete-role { display: none !important; }
+    </style>
 </head>
 <body>  
     <?php include '../../partials/navigation.php'; ?>
@@ -44,6 +70,7 @@ require_permission(11);
                 <div class="tab-info-text" id="tab-info-text">Add, edit, or remove employees as needed for your system. Click status to toggle Active/Inactive.</div>
                 <div class="tab-info-actions" id="tab-info-actions">
                     <button class="btn-add-role" id="btn-add-employee"><i class="fas fa-user-plus"></i> Add Employee</button>
+                    <button id="btn-bulk-delete" class="btn-select-role delete" style="margin-left:8px; display:none;"><i class="fas fa-trash"></i> Delete selected</button>
                 </div>
             </div>
             <div class="tab-content" id="content-manage-employees">
@@ -59,14 +86,27 @@ $oStmt->fetch();
 $oStmt->close();
 if ($owner_id_val !== null) $owner_for_query = intval($owner_id_val);
 
-$stmt = $conn->prepare(
-    'SELECT u.id, u.full_name, u.email, u.phone, u.pos_pin, u.status, (SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name FROM users u WHERE u.owner_id = ? AND u.id <> ? ORDER BY u.full_name ASC'
-);
+// Detect optional columns (phone, pos_pin) to avoid fatal errors pre-migration
+$hasPhone = false;
+$hasPosPin = false;
+if ($colRes = $conn->query("SHOW COLUMNS FROM users LIKE 'phone'")) { $hasPhone = $colRes->num_rows > 0; $colRes->free(); }
+if ($colRes = $conn->query("SHOW COLUMNS FROM users LIKE 'pos_pin'")) { $hasPosPin = $colRes->num_rows > 0; $colRes->free(); }
+
+// Build SELECT list
+$selectCols = ['u.id','u.full_name','u.email','u.status'];
+if ($hasPhone) $selectCols[] = 'u.phone';
+if ($hasPosPin) $selectCols[] = 'u.pos_pin';
+$selectCols[] = '(SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name';
+$sql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users u WHERE u.owner_id = ? AND u.id <> ? ORDER BY u.full_name ASC';
+
+$stmt = $conn->prepare($sql);
 $stmt->bind_param('ii', $owner_for_query, $currentUser);
 $employees = [];
 if ($stmt->execute()) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        if (!$hasPhone) $row['phone'] = '';
+        if (!$hasPosPin) $row['pos_pin'] = '';
         $employees[] = $row;
     }
     $res->free();
@@ -103,6 +143,8 @@ if (count($employees) > 0) {
 
     echo '<table class="roles-table" id="employees-table">';
     echo '<thead><tr>';
+    // Select column for bulk actions
+    echo '<th class="select-col" style="width:40px;text-align:center;"><input id="select-all-employees" type="checkbox" aria-label="Select all employees" /></th>';
     echo '<th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th class="status-col">Status</th><th class="action-col">Actions</th>';
     echo '</tr></thead><tbody>';
     // Determine if current user can delete employees (owner or has Employee Management permission id=11)
@@ -138,13 +180,15 @@ if (count($employees) > 0) {
         $rname = htmlspecialchars($row['full_name'] ?? '');
         $remail = htmlspecialchars($row['email'] ?? '');
         $rphone = htmlspecialchars($row['phone'] ?? '');
-        $rpos = htmlspecialchars($row['pos_pin'] ?? '');
         $rrole = htmlspecialchars($row['role_name'] ?? '');
-        echo "<tr data-employee-id=\"{$rid}\">\n";
-        echo "    <td class=\"editable-cell\">{$rname}</td>\n";
-        echo "    <td class=\"editable-cell\">{$remail}</td>\n";
-        echo "    <td class=\"editable-cell\">{$rphone}</td>\n";
-        echo "    <td class=\"editable-cell\">{$rrole}</td>\n";
+    echo "<tr data-employee-id=\"{$rid}\" class=\"employee-row\">\n";
+    // Checkbox cell (keeps existing editable-cell column ordering untouched since checkbox is outside editable-cell)
+    $rNameForAria = htmlspecialchars($row['full_name'] ?? '');
+    echo "    <td class=\"select-col\" style=\"text-align:center;\"><input type=\"checkbox\" class=\"employee-select\" name=\"selected_employees[]\" value=\"{$rid}\" aria-label=\"Select {$rNameForAria}\" /></td>\n";
+    echo "    <td class=\"editable-cell employee-name-cell\">{$rname}</td>\n";
+    echo "    <td class=\"editable-cell employee-email-cell\">{$remail}</td>\n";
+    echo "    <td class=\"editable-cell employee-phone-cell\">{$rphone}</td>\n";
+    echo "    <td class=\"editable-cell employee-role-cell\">{$rrole}</td>\n";
     $status = isset($row['status']) ? $row['status'] : 'active';
     $isActive = ($status === 'active');
     $badgeClass = $isActive ? 'status-active' : 'status-inactive';
@@ -288,6 +332,23 @@ if (count($employees) > 0) {
     </div>
 
     <script src="employee.js"></script>
+    <!-- Confirmation modal (used to replace window.confirm) -->
+    <div id="confirm-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:420px;padding:18px;">
+            <div class="modal-header">
+                <h2 id="confirm-modal-title">Confirm</h2>
+                <span class="close" id="confirm-modal-close">&times;</span>
+            </div>
+            <div class="modal-body" id="confirm-modal-body" style="padding:10px 0; color:#ddd;"></div>
+            <div class="modal-actions" style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
+                <button id="confirm-modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-modal-ok" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container for non-blocking messages -->
+    <div id="toast-container" style="position:fixed; right:18px; bottom:18px; z-index:20000; display:flex; flex-direction:column; gap:8px;"></div>
 </body>
 </html>
 
