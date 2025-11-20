@@ -24,6 +24,9 @@ if ($stmt->fetch()) {
     $update = $conn->prepare('UPDATE users SET status = ? WHERE id = ?');
     $update->bind_param('si', $newStatus, $id);
     if ($update->execute()) {
+        require_once __DIR__ . '/../../scripts/log_audit.php';
+        $actor = intval($_SESSION['user_id'] ?? 0);
+        @log_audit($conn, $actor, "Toggle Employee #{$id} -> {$newStatus}");
         echo json_encode(['success' => true, 'new_status' => $newStatus]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to update status']);

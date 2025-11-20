@@ -2,6 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../scripts/log_audit.php';
 
 // Basic auth check
 if (!isset($_SESSION['user_id'])) {
@@ -77,6 +78,10 @@ try {
     $stmt->close();
 
     $conn->commit();
+    // Audit: deleted employee
+    $actor = intval($_SESSION['user_id'] ?? 0);
+    @log_audit($conn, $actor, "Delete Employee #{$employee_id}");
+
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     $conn->rollback();

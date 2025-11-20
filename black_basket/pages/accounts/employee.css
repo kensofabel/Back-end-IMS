@@ -1,4 +1,34 @@
 /* Dark theme pagination bar for employees */
+/* Page layout alignment: center primary content areas and apply consistent gutters */
+:root {
+    --page-max-width: 1100px;
+    --page-gutter: 20px;
+}
+
+/* Center the main sections on the page and keep consistent horizontal padding */
+.tab-info-bar,
+.employee-filters,
+.roles-table,
+.employee-pagination-bar.dark-theme-pagination,
+.roles-header-row {
+    max-width: var(--page-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--page-gutter);
+    padding-right: var(--page-gutter);
+    box-sizing: border-box;
+}
+
+/* Ensure the main content blocks align visually (filters above table, pagination below) */
+.tab-content { display: block; }
+.employee-filters { align-items: center; }
+.employee-filters-left { flex: 1 1 auto; min-width: 0; }
+.employee-filters-right { flex: 0 0 auto; }
+
+/* Right-align actions consistently within the table area */
+.roles-table td.action-col { text-align: right; }
+.roles-table td.action-col > * { justify-content: flex-end; }
+
 .employee-pagination-bar.dark-theme-pagination {
     display: flex;
     align-items: center;
@@ -164,6 +194,33 @@
 .roles-table td.action-col .btn-delete-role {
     padding: 6px 10px;
     font-size: 0.98rem;
+}
+
+/* Compact Edit button specifically for the actions column to align with status badges */
+.roles-table td.action-col .btn-edit-role {
+    padding: 4px 8px;
+    font-size: 0.92rem;
+    min-width: 44px;
+    height: auto;
+    line-height: 1;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.04);
+    color: #ff9800;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.roles-table td.action-col .btn-edit-role i {
+    font-size: 0.92rem;
+}
+
+/* Make delete button visually smaller too when visible */
+.roles-table td.action-col .btn-delete-role {
+    padding: 4px 8px;
+    font-size: 0.92rem;
+    border-radius: 6px;
 }
 .roles-table td.action-col > * {
     vertical-align: middle;

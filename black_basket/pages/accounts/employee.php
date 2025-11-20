@@ -21,31 +21,123 @@ require_permission(11);
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
     <style>
+        /* Page-scoped variables */
+        :root {
+            /* Accent updated to match user's screenshot (muted gray) */
+            --bb-accent: #6e6e6e;
+            --bb-bg-2: #1e1e1e;
+            --bb-bg-3: #151515;
+            --bb-text-muted: #cfcfcf;
+            --bb-table-row-hover: rgba(255,255,255,0.02);
+        }
+
         /* Show the select column and checkboxes for the employees table on this page only */
         #employees-table th.select-col,
         #employees-table td.select-col {
             display: table-cell !important;
-            width: 40px;
+            width: 48px;
             text-align: center;
+            vertical-align: middle;
+            padding: 6px 8px;
         }
-        #employees-table .employee-select,
-        #employees-table #select-all-employees {
-            display: inline-block !important;
+
+        /* Make checkboxes larger and accessible. Use a lightweight custom checkbox
+           so unchecked boxes show the same muted border color as in the screenshot. */
+        #employees-table input[type="checkbox"].employee-select,
+        #employees-table input[type="checkbox"]#select-all-employees {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            margin: 0 auto;
             cursor: pointer;
+            display: inline-block !important;
+            border: 2px solid var(--bb-accent);
+            border-radius: 6px;
+            background: transparent;
+            position: relative;
+            vertical-align: middle;
+            box-sizing: border-box;
         }
+
+        /* Checked state: draw a simple check mark using ::after */
+        #employees-table input[type="checkbox"].employee-select:checked,
+        #employees-table input[type="checkbox"]#select-all-employees:checked {
+            background: var(--bb-accent);
+        }
+        #employees-table input[type="checkbox"].employee-select:checked::after,
+        #employees-table input[type="checkbox"]#select-all-employees:checked::after {
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 6px;
+            height: 11px;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            box-sizing: content-box;
+        }
+
+        /* Focus outlines for keyboard users */
+        #employees-table input[type="checkbox"].employee-select:focus,
+        #employees-table input[type="checkbox"]#select-all-employees:focus {
+            outline: 2px solid rgba(110,110,110,0.18);
+            outline-offset: 3px;
+            border-radius: 6px;
+        }
+
+        /* Table visuals specific to this page */
+        #employees-table { width:100%; border-collapse: collapse; table-layout: auto; }
+        #employees-table thead th { text-align: left; padding: 10px 12px; font-weight:600; color: #e6e6e6; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        #employees-table tbody td { padding: 10px 12px; color: #ddd; }
+
+        /* Row hover and subtle zebra striping for readability */
+        #employees-table tbody tr { transition: background-color 0.12s ease; }
+        #employees-table tbody tr:hover { background: var(--bb-table-row-hover); }
+        #employees-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.008); }
+
+        /* Action column: compact and aligned (centered) */
+        #employees-table td.action-col { white-space: nowrap; width: 140px; display:flex; align-items:center; justify-content:center; gap:8px; vertical-align: middle; }
+        #employees-table .btn-edit-role, #employees-table .btn-delete-role { margin:0; padding:6px 10px; border-radius:6px; background:transparent; color:#ddd; border:1px solid rgba(255,255,255,0.04); cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+        #employees-table .btn-edit-role i { margin-right:6px; }
+
+        /* Status column: center and vertically align */
+        #employees-table th.status-col, #employees-table td.status-col { text-align: center; vertical-align: middle; width: 120px; }
+
+        /* Status badge improvements (reduced size for compact layout) */
+        .status-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 6px; border-radius:10px; font-size:0.84rem; line-height:1; }
+        .status-badge i { font-size:0.92rem; display:inline-block; }
+        .status-active { background: rgba(40,160,80,0.08); color: #bff0c9; }
+        .status-inactive { background: rgba(220,60,60,0.06); color: #ffbfbf; }
+
+        /* Keep per-row delete buttons hidden (bulk delete preferred) */
+        tr.employee-row .btn-delete-role { display: none !important; }
+
+        /* Responsive: hide less-important columns on narrow viewports */
+        @media (max-width: 900px) {
+            #employees-table .employee-phone-cell,
+            #employees-table .employee-role-cell {
+                display: none;
+            }
+            #employees-table thead th.status-col,
+            #employees-table td.status-col {
+                display: none;
+            }
+            #employees-table td.action-col { text-align: left; }
+        }
+
         /* Confirmation modal styles */
         #confirm-modal {
             position: fixed; left:0; top:0; right:0; bottom:0; display:none; align-items:center; justify-content:center; z-index:20000; background: rgba(0,0,0,0.6);
         }
-        #confirm-modal .modal-content { background: #151515; border-radius:8px; color:#eee; }
+        #confirm-modal .modal-content { background: var(--bb-bg-3); border-radius:8px; color:#eee; }
         #confirm-modal .modal-header { display:flex; align-items:center; justify-content:space-between; }
         #confirm-modal .modal-body { color:#ddd; }
         #confirm-modal .modal-actions .btn { min-width:96px; }
 
         /* Toast styles */
         #toast-container .bb-toast { transition: all 0.28s ease; }
-        /* Hide per-row delete buttons for employee rows (use bulk delete instead) */
-        tr.employee-row .btn-delete-role { display: none !important; }
     </style>
 </head>
 <body>  
