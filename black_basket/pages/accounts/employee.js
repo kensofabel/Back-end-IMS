@@ -1,15 +1,28 @@
 // --- Status toggle for employees ---
+console.log('employee.js loaded (v2)');
+// Show the missing-actual-state toast only once per page load
+window._bb_actualStateMissingNotified = window._bb_actualStateMissingNotified || false;
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.addEventListener('click', function(e) {
+            badge.addEventListener('click', async function(e) {
             const empId = this.getAttribute('data-employee-id');
-            const currentStatus = this.getAttribute('data-status');
             if (!empId) return;
             const badgeEl = this;
+            // Ensure actual state is set before toggling lock/unlock. Prompt user if missing.
+            let actualState = (badgeEl.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
+            if (!actualState || actualState === 'offline' || actualState === 'unknown') {
+                const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
+                if (!chosen) {
+                    try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {}
+                    return;
+                }
+                actualState = chosen;
+                badgeEl.setAttribute('data-actual-state', actualState);
+            }
             fetch('toggle_employee_status.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + encodeURIComponent(empId)
+                body: 'id=' + encodeURIComponent(empId) + '&actual_state=' + encodeURIComponent(actualState)
             })
             .then(r => r.json())
             .then(data => {
@@ -18,22 +31,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     badgeEl.setAttribute('data-status', newStatus);
                     const icon = badgeEl.querySelector('i');
                     const text = badgeEl.querySelector('.status-text');
+                    // Map server 'active'/'inactive' to Unlocked/Locked UI labels
                     if (newStatus === 'active') {
                         badgeEl.classList.add('status-active');
                         badgeEl.classList.remove('status-inactive');
                         if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
-                        if (text) text.textContent = 'Active';
+                        if (text) text.textContent = 'Unlocked';
                     } else {
                         badgeEl.classList.remove('status-active');
                         badgeEl.classList.add('status-inactive');
                         if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
-                        if (text) text.textContent = 'Inactive';
+                        if (text) text.textContent = 'Locked';
                     }
                 } else {
-                    showToast('error', data.message || 'Failed to toggle status');
+                    showToast('error', data.message || 'Failed to toggle lock');
                 }
             })
-            .catch(() => showToast('error', 'Failed to toggle status'));
+            .catch(() => showToast('error', 'Failed to toggle lock'));
         });
     });
 });
@@ -101,6 +115,53 @@ function showConfirm(message, title) {
         }
         function onOk() { cleanup(true); }
         function onCancel() { cleanup(false); }
+        ok.addEventListener('click', onOk);
+        cancel.addEventListener('click', onCancel);
+        close.addEventListener('click', onCancel);
+    });
+}
+// showActualStatePicker(message, title) -> Promise<string|null>
+function showActualStatePicker(message, title) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('confirm-modal');
+        // Fallback to prompt if modal not present
+        if (!modal) {
+            const ans = window.prompt((message || 'Set actual state (online/offline):') + '\nEnter online or offline', 'offline');
+            if (!ans) return resolve(null);
+            const val = (ans || '').trim().toLowerCase();
+            if (val !== 'online' && val !== 'offline') return resolve(null);
+            return resolve(val);
+        }
+        const body = document.getElementById('confirm-modal-body');
+        const ok = document.getElementById('confirm-modal-ok');
+        const cancel = document.getElementById('confirm-modal-cancel');
+        const close = document.getElementById('confirm-modal-close');
+        const titleEl = document.getElementById('confirm-modal-title');
+        if (titleEl) titleEl.innerText = title || 'Set actual state';
+        if (body) body.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="font-size:0.95rem;">${(message||'Choose actual state')}</div>
+                <label style="display:flex;align-items:center;gap:8px;"><input type="radio" name="bb_actual_state" value="online"> <span>Online</span></label>
+                <label style="display:flex;align-items:center;gap:8px;"><input type="radio" name="bb_actual_state" value="offline" checked> <span>Offline</span></label>
+            </div>`;
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+        function cleanup() {
+            try { modal.style.display = 'none'; modal.classList.remove('show'); } catch (e) {}
+            ok.removeEventListener('click', onOk);
+            cancel.removeEventListener('click', onCancel);
+            close.removeEventListener('click', onCancel);
+        }
+        function onOk() {
+            const sel = modal.querySelector('input[name="bb_actual_state"]:checked');
+            const v = sel ? sel.value : null;
+            cleanup();
+            resolve(v);
+        }
+        function onCancel() {
+            cleanup();
+            resolve(null);
+        }
         ok.addEventListener('click', onOk);
         cancel.addEventListener('click', onCancel);
         close.addEventListener('click', onCancel);
@@ -404,15 +465,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function attachDynamicRowHandlers() {
         document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
             if (badge._hasHandler) return; badge._hasHandler = true;
-            badge.addEventListener('click', function(e) {
+            badge.addEventListener('click', async function(e) {
                 const empId = this.getAttribute('data-employee-id');
                 if (!empId) return;
-                const badgeEl = this;
-                fetch('toggle_employee_status.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'id=' + encodeURIComponent(empId)
-                })
+                    const badgeEl = this;
+                    // Ensure actual_state exists on dynamically attached badges as well
+                    let actualState = (badgeEl.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
+                    if (!actualState || actualState === 'offline' || actualState === 'unknown') {
+                        const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
+                        if (!chosen) { try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {} ; return; }
+                        actualState = chosen;
+                        badgeEl.setAttribute('data-actual-state', actualState);
+                    }
+                    fetch('toggle_employee_status.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'id=' + encodeURIComponent(empId) + '&actual_state=' + encodeURIComponent(actualState)
+                    })
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
@@ -424,18 +493,18 @@ document.addEventListener('DOMContentLoaded', function() {
                             badgeEl.classList.add('status-active');
                             badgeEl.classList.remove('status-inactive');
                             if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
-                            if (text) text.textContent = 'Active';
+                            if (text) text.textContent = 'Unlocked';
                         } else {
                             badgeEl.classList.remove('status-active');
                             badgeEl.classList.add('status-inactive');
                             if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
-                            if (text) text.textContent = 'Inactive';
+                            if (text) text.textContent = 'Locked';
                         }
                         } else {
-                            showToast('error', data.message || 'Failed to toggle status');
+                            showToast('error', data.message || 'Failed to toggle lock');
                         }
                     })
-                    .catch(() => showToast('error', 'Failed to toggle status'));
+                    .catch(() => showToast('error', 'Failed to toggle lock'));
             });
         });
 
@@ -551,14 +620,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchEl = document.getElementById('employee-search');
     if (searchEl) searchEl.addEventListener('input', function() { if (serverMode) { debouncedApply(); loadEmployeesServer(1); } else debouncedApply(); });
     const roleFilter = document.getElementById('employee-role-filter');
-    if (roleFilter) roleFilter.addEventListener('change', function() { if (serverMode) loadEmployeesServer(1); else applyFilters(); });
+    if (roleFilter) roleFilter.addEventListener('change', function() { 
+        if (serverMode) loadEmployeesServer(1); else applyFilters(); 
+        // Reset header select-all checkbox when role filter changes to avoid stale selection state
+        try {
+            const sa = document.getElementById('select-all-employees');
+            if (sa && sa.checked) { sa.checked = false; updateBulkToolbarState(); }
+        } catch (e) {}
+    });
     const statusFilter = document.getElementById('employee-status-filter');
-    if (statusFilter) statusFilter.addEventListener('change', function() { if (serverMode) loadEmployeesServer(1); else applyFilters(); });
+    if (statusFilter) statusFilter.addEventListener('change', function() {
+        if (serverMode) loadEmployeesServer(1); else applyFilters();
+        // Reset header select-all checkbox when status filter changes to avoid stale selection state
+        try {
+            const sa = document.getElementById('select-all-employees');
+            if (sa && sa.checked) { sa.checked = false; updateBulkToolbarState(); }
+        } catch (e) {}
+    });
     const clearBtn = document.getElementById('employee-clear-filters');
     if (clearBtn) clearBtn.addEventListener('click', function() {
         if (searchEl) searchEl.value = '';
         if (roleFilter) roleFilter.value = '';
         if (statusFilter) statusFilter.value = '';
+        // Reset header select-all checkbox when clearing filters to avoid stale selection state
+        try {
+            const sa = document.getElementById('select-all-employees');
+            if (sa && sa.checked) { sa.checked = false; updateBulkToolbarState(); }
+        } catch (e) {}
         if (serverMode) loadEmployeesServer(1); else {
             getAllRows().forEach(r => r.classList.remove('filtered-out'));
             const noMsg = document.getElementById('no-employees-filter-message'); if (noMsg) noMsg.style.display = 'none';
@@ -1492,22 +1580,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Status badge toggle handler
     document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.onclick = function() {
+        badge.onclick = async function() {
             var icon = badge.querySelector('i');
             var text = badge.querySelector('.status-text');
             if (!icon || !text) return;
+            // Local toggle fallback: ensure actual_state exists and prompt user if missing
+            var actualState = (badge.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
+            if (!actualState || actualState === 'offline' || actualState === 'unknown') {
+                const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
+                if (!chosen) { try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {} ; return; }
+                badge.setAttribute('data-actual-state', chosen);
+            }
             if (icon.classList.contains('fa-check-circle')) {
                 icon.classList.remove('fa-check-circle');
                 icon.classList.add('fa-times-circle');
                 badge.classList.remove('status-active');
                 badge.classList.add('status-inactive');
-                text.innerText = 'Inactive';
+                text.innerText = 'Locked';
             } else {
                 icon.classList.remove('fa-times-circle');
                 icon.classList.add('fa-check-circle');
                 badge.classList.remove('status-inactive');
                 badge.classList.add('status-active');
-                text.innerText = 'Active';
+                text.innerText = 'Unlocked';
             }
         };
     });
@@ -1703,9 +1798,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="editable-cell employee-phone-cell">${escapeHtml(phone)}</td>
                     <td class="editable-cell employee-role-cell">${escapeHtml(role)}</td>
                     <td class="status-col">
-                        <span class="status-badge status-active status-badge-edit" style="cursor:pointer;" title="Toggle Status">
+                        <span class="status-badge status-active status-badge-edit" style="cursor:pointer;" title="Toggle Lock" data-actual-state="offline">
                             <i class="fas fa-check-circle"></i>
-                            <span class="status-text">Active</span>
+                            <span class="status-text">Unlocked</span>
                         </span>
                     </td>
                     <td class="action-col">

@@ -227,7 +227,7 @@ if (count($employees) > 0) {
     }
     echo '    </select>';
     echo '    <select id="employee-status-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
-    echo '      <option value="">All status</option><option value="active">Active</option><option value="inactive">Inactive</option>';
+    echo '      <option value="">All status</option><option value="active">Unlocked</option><option value="inactive">Locked</option>';
     echo '    </select>';
     echo '    <button id="employee-clear-filters" class="btn-add-role" style="padding:8px 14px;margin-left:6px;">Clear</button>';
     echo '  </div>';
@@ -281,13 +281,19 @@ if (count($employees) > 0) {
     echo "    <td class=\"editable-cell employee-email-cell\">{$remail}</td>\n";
     echo "    <td class=\"editable-cell employee-phone-cell\">{$rphone}</td>\n";
     echo "    <td class=\"editable-cell employee-role-cell\">{$rrole}</td>\n";
+    // Presentational: treat stored 'status' as the user's actual availability
+    // and surface a lock/unlock control to administrators. Map active -> unlocked, inactive -> locked.
     $status = isset($row['status']) ? $row['status'] : 'active';
     $isActive = ($status === 'active');
     $badgeClass = $isActive ? 'status-active' : 'status-inactive';
     $iconClass = $isActive ? 'fa-check-circle' : 'fa-times-circle';
-    $statusText = $isActive ? 'Active' : 'Inactive';
+    // Map to Locked/Unlocked labels for the actionable toggle
+    $statusText = $isActive ? 'Unlocked' : 'Locked';
+    // Ensure an "actual state" attribute exists on the badge so client-side code
+    // can rely on it (e.g. online/offline). Default to 'offline' when not available.
+    $actualState = isset($row['actual_state']) ? $row['actual_state'] : 'offline';
     echo "    <td class=\"status-col\">\n";
-    echo "        <span class=\"status-badge {$badgeClass} status-badge-edit\" style=\"cursor:pointer;\" title=\"Toggle Status\" data-employee-id=\"{$rid}\" data-status=\"{$status}\">\n";
+    echo "        <span class=\"status-badge {$badgeClass} status-badge-edit\" style=\"cursor:pointer;\" title=\"Toggle Lock\" data-employee-id=\"{$rid}\" data-status=\"{$status}\" data-actual-state=\"{$actualState}\">\n";
     echo "            <i class=\"fas {$iconClass}\"></i>\n";
     echo "            <span class=\"status-text\">{$statusText}</span>\n";
     echo "        </span>\n";
@@ -423,7 +429,7 @@ if (count($employees) > 0) {
         </div>
     </div>
 
-    <script src="employee.js"></script>
+    <script src="employee.js?v=3"></script>
     <!-- Confirmation modal (used to replace window.confirm) -->
     <div id="confirm-modal" class="modal" style="display:none;">
         <div class="modal-content" style="max-width:420px;padding:18px;">
