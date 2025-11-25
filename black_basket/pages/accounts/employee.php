@@ -6,6 +6,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 require_once __DIR__ . '/../../partials/check_permission.php';
 require_permission(11);
+require_once __DIR__ . '/../../partials/csrf.php';
+$csrf_token = csrf_get_token();
 ?>
 
 <!DOCTYPE html>
@@ -17,7 +19,7 @@ require_permission(11);
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="../../assets/css/content.css">
     <link rel="stylesheet" href="../../assets/css/employee.css">
-    <link rel="stylesheet" href="employee.css">
+    <link rel="stylesheet" href="employee.css?v=2">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
     <style>
@@ -342,6 +344,7 @@ if (count($employees) > 0) {
             </div>
             <div class="modal-body">
                 <form id="employee-form" method="post">
+                            <?php echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf_token) . '">'; ?>
                     <div class="form-group">
                         <label for="employee-name">Name</label>
                         <input type="text" id="employee-name" name="name" required>
@@ -390,6 +393,7 @@ if (count($employees) > 0) {
             </div>
             <div class="modal-body">
                 <form id="employee-edit-form" method="post">
+                        <?php echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf_token) . '">'; ?>
                     <div class="form-group">
                         <label for="edit-employee-name">Name</label>
                         <input type="text" id="edit-employee-name" name="name" required>
