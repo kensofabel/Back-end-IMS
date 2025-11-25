@@ -65,7 +65,14 @@ session_start();
                     </div>
 
                     <div class="pos-section product-selection">
-                        <h3>Available Products</h3>
+                        <div class="section-header-inline">
+                            <h3>Available Products</h3>
+                            <div class="view-toggle" id="view-toggle">
+                                <button id="view-toggle-btn" class="view-toggle-btn" title="Toggle view" aria-pressed="false" aria-label="Toggle grid or list view">
+                                    <i class="fa fa-th" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
                         <div class="product-grid" id="product-grid">
                             <!-- Products will be loaded here -->
                         </div>
@@ -75,7 +82,37 @@ session_start();
                 <!-- Cart and Checkout -->
                 <div class="pos-right">
                     <div class="pos-section">
-                        <h3>Current Sale</h3>
+                        <div class="section-header-inline">
+                            <h3 id="current-sale-title">Current Sale</h3>
+                            <div class="header-actions" style="margin-right: -12px;">
+                                <button id="add-customer-btn" class="view-toggle-btn" title="Add customer" aria-label="Add customer">
+                                    <i class="fa fa-user-plus" aria-hidden="true"></i>
+                                </button>
+                                <div class="more-menu-wrap">
+                                    <button id="sale-more-btn" class="view-toggle-btn" title="More options" aria-label="More options" aria-expanded="false" aria-haspopup="true">
+                                        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                                        </button>
+                                        <ul id="sale-more-list" class="sale-more-list" aria-hidden="true">
+                                        <li data-action="clear"><i class="fa fa-trash" aria-hidden="true"></i><span>Clear order</span></li>
+                                        <li data-action="split"><img src="https://img.icons8.com/android/24/e6e6e6/split.png" alt="Split" width="24" height="24"><span>Split Order</span></li>
+                                        <li data-action="merge"><i class="fas fa-compress-arrows-alt " aria-hidden="true"></i><span>Merge Order</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cart-mode-label">
+                            <div class="total-row">
+                                <button id="cart-mode-btn" class="cart-mode-btn" aria-haspopup="true" aria-expanded="false">
+                                    <span class="cart-mode-label-text">Dine in</span>
+                                </button>
+                                <span id="cart-mode-chevron" class="cart-mode-chevron" tabindex="0" role="button" aria-label="Open cart mode">▾</span>
+                                <ul id="cart-mode-list" class="cart-mode-list" aria-hidden="true">
+                                    <li data-mode="dinein"><i class="fa fa-utensils" aria-hidden="true"></i><span>Dine in</span></li>
+                                    <li data-mode="takeout"><i class="fa fa-shopping-bag" aria-hidden="true"></i><span>Take out</span></li>
+                                    <li data-mode="delivery"><i class="fa fa-truck" aria-hidden="true"></i><span>Delivery</span></li>
+                                </ul>
+                            </div>
+                        </div>
                         <div class="cart-items" id="cart-items">
                             <!-- Cart items will be displayed here -->
                         </div>
@@ -104,14 +141,23 @@ session_start();
                         </div>
                         <div class="payment-input">
                             <label for="amount-received">Amount Received:</label>
-                            <input type="number" id="amount-received" step="0.01" min="0">
+                            <input type="text" id="amount-received" inputmode="decimal" placeholder="" autocomplete="off">
+                            <button type="button" id="amount-clear-btn" class="amount-clear-btn" aria-label="Clear amount">
+                                <i class="fa fa-times" aria-hidden="true"></i>
+                            </button>
+                            <div id="quick-amounts" class="quick-amounts" aria-label="Quick amounts" role="group" style="margin-top:8px;">
+                                <button type="button" class="quick-amount" data-amount="50" aria-label="Add 50">50</button>
+                                <button type="button" class="quick-amount" data-amount="100" aria-label="Add 100">100</button>
+                                <button type="button" class="quick-amount" data-amount="500" aria-label="Add 500">500</button>
+                                <button type="button" class="quick-amount" data-amount="1000" aria-label="Add 1000">1000</button>
+                            </div>
                         </div>
                         <div class="change-amount">
                             <span>Change:</span>
                             <span id="change">₱0.00</span>
                         </div>
-                        <button id="complete-sale-btn" class="complete-sale-btn">Complete Sale</button>
-                        <button id="clear-cart-btn" class="clear-cart-btn">Clear Cart</button>
+                        <button id="complete-sale-btn" class="complete-sale-btn">Complete Order</button>
+                        <button id="open-orders-btn" class="open-orders-btn">Saved Orders</button>
                     </div>
                 </div>
             </div>

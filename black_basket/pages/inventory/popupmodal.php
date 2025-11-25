@@ -929,11 +929,60 @@ document.addEventListener('DOMContentLoaded', function() {
             return '₱' + num.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
         }
 
+        // Evaluate simple arithmetic expressions entered into quantity fields (e.g. "1/4", "2+3/4").
+        function evaluateQuantityExpression(expr) {
+            try {
+                if (expr === null || typeof expr === 'undefined') return 0;
+                var s = String(expr).trim();
+                if (s === '') return 0;
+                s = s.replace(/[,_\s\u20B1\$]/g, '');
+                s = s.replace(/[^0-9+\-*/().\s]/g, '');
+                if (s === '') return 0;
+                if (/[a-zA-Z]|\/\/|\/\*|\*\*/.test(s)) return 0;
+                var val = Function('"use strict"; return (' + s + ')')();
+                var num = Number(val);
+                return (isFinite(num) ? num : 0);
+            } catch (e) { return 0; }
+        }
+
+        // Restrict .comp-qty inputs to only numbers and + - * /, decimal point and spaces.
+        document.addEventListener('keydown', function(e) {
+            try {
+                var t = e.target;
+                if (!t || !t.classList) return;
+                if (!t.classList.contains('comp-qty')) return;
+                var allowedControl = ['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
+                if (allowedControl.indexOf(e.key) !== -1) return;
+                if (e.ctrlKey || e.metaKey) return;
+                var allowedChars = '0123456789+-*/. ';
+                if (e.key.length === 1 && allowedChars.indexOf(e.key) === -1) {
+                    e.preventDefault();
+                }
+            } catch (ex) {}
+        });
+
+        document.addEventListener('input', function(e) {
+            try {
+                var t = e.target;
+                if (!t || !t.classList) return;
+                if (!t.classList.contains('comp-qty')) return;
+                var v = t.value || '';
+                // Allow spaces in the input so users can type expressions like "1 / 4".
+                var cleaned = String(v).replace(/[^0-9+\-*/.\s]/g, '');
+                if (cleaned !== v) {
+                    var pos = t.selectionStart || 0;
+                    t.value = cleaned;
+                    try { t.setSelectionRange(pos - 1, pos - 1); } catch(e) {}
+                }
+            } catch (ex) {}
+        });
+
         function recalcTotal() {
             let total = 0;
             const rows = componentsBody.querySelectorAll('tr.component-row');
             rows.forEach(r => {
-                const q = parseFloat(r.querySelector('.comp-qty').value) || 0;
+                const qRaw = (r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) ? r.querySelector('.comp-qty').value : '';
+                const q = evaluateQuantityExpression(qRaw) || 0;
                 const c = parseFloat(r.querySelector('.comp-cost').value.replace(/[^0-9.-]/g,'')) || 0;
                 total += q * c;
             });
@@ -951,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${sku ? `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">SKU: ${escapeHtml(sku)}</div>` : ''}
                     </div>
                 </td>
-                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="number" min="0" value="${qty}" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
+                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="text" value="${qty}" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
                 <td style="padding:8px; width:120px; text-align:right;"><input class="comp-cost" currency-localization="₱" readonly value="${'₱' + Number(cost).toFixed(2)}" style="width:100%; background:#171717; border: none; color:#fff; cursor:default; pointer-events: none; text-align:right;" /></td>
                 <td style="padding:8px; width:45px; text-align:center;"><button class="comp-remove btn" title="Remove" style="background:transparent; border:none; color:#bbb; font-size:18px; line-height:1; width:30px; height:34px; display:inline-flex; align-items:center; justify-content:center;">🗑</button></td>
             `;
@@ -981,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${product.sku ? `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">SKU: ${escapeHtml(product.sku)}</div>` : `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">&nbsp;</div>`}
                     </div>
                 </td>
-                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="number" min="0" value="1" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
+                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="text" value="1" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
                 <td style="padding:8px; width:120px; text-align:right;"><input class="comp-cost" currency-localization="₱" readonly value="₱0.00" style="width:100%; background:#171717; border: none; color:#fff; cursor:default; pointer-events: none; text-align:right;" /></td>
                 <td style="padding:8px; width:45px; text-align:center;"><button class="comp-remove btn" title="Remove" style="background:transparent; border:none; color:#bbb; font-size:18px; line-height:1; width:30px; height:34px; display:inline-flex; align-items:center; justify-content:center;">🗑</button></td>
             `;
@@ -1464,7 +1513,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const comps = [];
             componentsBody.querySelectorAll('tr.component-row').forEach(r => {
                 const name = r.querySelector('.comp-name').textContent.trim();
-                const qty = parseFloat(r.querySelector('.comp-qty').value) || 0;
+                const qtyRaw = (r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) ? r.querySelector('.comp-qty').value : '';
+                // preserve the original user input string for storage (do not replace with evaluated numeric)
+                const qty = qtyRaw || '';
                 const cost = parseFloat((r.querySelector('.comp-cost').value || '').replace(/[^0-9.-]/g,'')) || 0;
                 if (name) comps.push({ name, qty, cost });
             });
@@ -1717,10 +1768,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             try { csku = skuEl.textContent.replace(/^SKU:\s*/i, '').trim(); } catch(e) { csku = ''; }
                         }
                         if (cname) {
+                            // Prefer sending the original quantity string under `component_qty`
+                            // so server can persist expressions like '1/4' unchanged.
                             composite_components.push({
                                 name: cname,
                                 price: 'variable',
                                 cost: ccost || 0,
+                                component_qty: cqty || '',
+                                qty: cqty || '',
                                 in_stock: cqty || '',
                                 sku: csku || '',
                                 pos_available: 0

@@ -37,17 +37,19 @@ if (!$variantTable) {
 }
 
 // Detect columns on variant table
-$hasName = false; $hasSku = false; $hasCost = false; $hasPrice = false; $hasQty = false; $hasProductId = false;
+$hasName = false; $hasSku = false; $hasCost = false; $hasPrice = false; $hasQty = false; $hasProductId = false; $hasLowStock = false;
+$nameCol = 'name'; $skuCol = 'sku'; $costCol = 'cost'; $priceCol = 'price'; $qtyCol = null; $productIdCol = 'product_id'; $lowStockCol = null;
 $colsRes = $conn->query("SHOW COLUMNS FROM `" . $conn->real_escape_string($variantTable) . "`");
 if ($colsRes) {
     while ($c = $colsRes->fetch_assoc()) {
         $col = $c['Field'];
-        if (in_array($col, ['name','variant_name','title'])) $hasName = true;
-        if (in_array($col, ['sku','variant_sku','code','ref'])) $hasSku = true;
-        if (in_array($col, ['cost','variant_cost'])) $hasCost = true;
-        if (in_array($col, ['price','variant_price','unit_price'])) $hasPrice = true;
-        if (in_array($col, ['quantity','qty','stock','inventory'])) $hasQty = true;
-        if (in_array($col, ['product_id','parent_id'])) $hasProductId = true;
+        if (in_array($col, ['name','variant_name','title'])) { $hasName = true; $nameCol = $col; }
+        if (in_array($col, ['sku','variant_sku','code','ref'])) { $hasSku = true; $skuCol = $col; }
+        if (in_array($col, ['cost','variant_cost'])) { $hasCost = true; $costCol = $col; }
+        if (in_array($col, ['price','variant_price','unit_price'])) { $hasPrice = true; $priceCol = $col; }
+        if (in_array($col, ['quantity','qty','stock','inventory','in_stock'])) { $hasQty = true; $qtyCol = $col; }
+        if (in_array($col, ['product_id','parent_id'])) { $hasProductId = true; $productIdCol = $col; }
+        if ($col === 'low_stock') { $hasLowStock = true; $lowStockCol = $col; }
     }
 }
 
@@ -56,16 +58,18 @@ $productIdCol = $hasProductId ? 'product_id' : 'product_id';
 
 // Build select
 $selectCols = [];
-if ($hasName) $selectCols[] = "COALESCE(`name`, '') AS name";
+if ($hasName) $selectCols[] = "COALESCE(`" . $conn->real_escape_string($nameCol) . "`, '') AS name";
 else $selectCols[] = "'' AS name";
-if ($hasSku) $selectCols[] = "COALESCE(`sku`, '') AS sku";
+if ($hasSku) $selectCols[] = "COALESCE(`" . $conn->real_escape_string($skuCol) . "`, '') AS sku";
 else $selectCols[] = "'' AS sku";
-if ($hasCost) $selectCols[] = "COALESCE(`cost`, NULL) AS cost";
+if ($hasCost) $selectCols[] = "COALESCE(`" . $conn->real_escape_string($costCol) . "`, NULL) AS cost";
 else $selectCols[] = "NULL AS cost";
-if ($hasPrice) $selectCols[] = "COALESCE(`price`, NULL) AS price";
+if ($hasPrice) $selectCols[] = "COALESCE(`" . $conn->real_escape_string($priceCol) . "`, NULL) AS price";
 else $selectCols[] = "NULL AS price";
-if ($hasQty) $selectCols[] = "COALESCE(`quantity`,0) AS quantity";
+if ($hasQty && $qtyCol) $selectCols[] = "COALESCE(`" . $conn->real_escape_string($qtyCol) . "`,0) AS quantity";
 else $selectCols[] = "0 AS quantity";
+if ($hasLowStock && $lowStockCol) $selectCols[] = "COALESCE(`" . $conn->real_escape_string($lowStockCol) . "`, NULL) AS low_stock";
+else $selectCols[] = "NULL AS low_stock";
 $selectCols[] = "COALESCE(`id`,0) AS id";
 
 $sql = "SELECT " . implode(', ', $selectCols) . " FROM `" . $conn->real_escape_string($variantTable) . "` WHERE `product_id` = " . intval($product_id) . " ORDER BY `id` ASC LIMIT 500";
@@ -79,9 +83,26 @@ try {
             $variant['id'] = isset($row['id']) ? (int)$row['id'] : 0;
             $variant['name'] = isset($row['name']) ? $row['name'] : '';
             $variant['sku'] = isset($row['sku']) ? $row['sku'] : '';
-            $variant['cost'] = isset($row['cost']) && $row['cost'] !== null ? (float)$row['cost'] : (isset($row['price']) && $row['price'] !== null ? (float)$row['price'] : 0);
-            $variant['price'] = isset($row['price']) && $row['price'] !== null ? (float)$row['price'] : null;
+            // Normalize cost and price. Preserve non-numeric price values like the literal 'variable'.
+            if (isset($row['cost']) && $row['cost'] !== null && is_numeric($row['cost'])) {
+                $variant['cost'] = (float)$row['cost'];
+            } else {
+                $variant['cost'] = 0;
+            }
+
+            if (isset($row['price']) && $row['price'] !== null) {
+                $rawPrice = $row['price'];
+                // If price is numeric, cast to float. If it's a string like 'variable', preserve as-is.
+                if (is_numeric($rawPrice)) {
+                    $variant['price'] = (float)$rawPrice;
+                } else {
+                    $variant['price'] = trim((string)$rawPrice);
+                }
+            } else {
+                $variant['price'] = null;
+            }
             $variant['quantity'] = isset($row['quantity']) ? (int)$row['quantity'] : 0;
+            $variant['low_stock'] = isset($row['low_stock']) && $row['low_stock'] !== null ? (int)$row['low_stock'] : null;
             $variants[] = $variant;
         }
     }

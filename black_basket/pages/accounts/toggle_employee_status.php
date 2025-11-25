@@ -9,7 +9,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 header('Content-Type: application/json');
 $id = intval($_POST['id'] ?? 0);
-$actual_state = isset($_POST['actual_state']) ? trim($_POST['actual_state']) : null;
 if ($id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Invalid employee ID']);
     exit();
@@ -25,14 +24,7 @@ if ($stmt->fetch()) {
     $update = $conn->prepare('UPDATE users SET status = ? WHERE id = ?');
     $update->bind_param('si', $newStatus, $id);
     if ($update->execute()) {
-        require_once __DIR__ . '/../../scripts/log_audit.php';
-        $actor = intval($_SESSION['user_id'] ?? 0);
-        $msg = "Toggle Employee #{$id} -> {$newStatus}";
-        if ($actual_state !== null && $actual_state !== '') {
-            $msg .= " (actual_state={$actual_state})";
-        }
-        @log_audit($conn, $actor, $msg);
-        echo json_encode(['success' => true, 'new_status' => $newStatus, 'actual_state' => $actual_state]);
+        echo json_encode(['success' => true, 'new_status' => $newStatus]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to update status']);
     }

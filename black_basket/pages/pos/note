@@ -1,0 +1,200 @@
+CREATE TABLE `sale_items` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `sale_id` int(10) UNSIGNED NOT NULL,
+  `product_id` int(11) DEFAULT NULL,
+  `variant_id` int(11) DEFAULT NULL,
+  `name` varchar(255) NOT NULL,
+  `unit_price` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `total_price` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `variant` varchar(100) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `sale_items`
+--
+ALTER TABLE `sale_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_sale_items_sale_id` (`sale_id`),
+  ADD KEY `idx_sale_items_product_id` (`product_id`),
+  ADD KEY `idx_sale_items_variant_id` (`variant_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `sale_items`
+--
+ALTER TABLE `sale_items`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `sale_items`
+--
+ALTER TABLE `sale_items`
+  ADD CONSTRAINT `fk_sale_items_sale` FOREIGN KEY (`sale_id`) REFERENCES `sales` (`id`) ON DELETE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+
+--NOW CHECK THE PRODUCT_ID AND THE VARIANT_ID IF NO VARIANT_ID THEN CHECK FOR THE PRODUCTS TABLE AND CHECK IF IT IS_COMPOSITE
+
+CREATE TABLE `products` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `category_id` int(11) DEFAULT NULL,
+  `price` varchar(20) DEFAULT NULL,
+  `cost` decimal(10,2) DEFAULT NULL,
+  `sku` varchar(50) DEFAULT NULL,
+  `barcode` varchar(50) DEFAULT NULL,
+  `track_stock` tinyint(1) DEFAULT 0,
+  `in_stock` varchar(20) DEFAULT NULL,
+  `low_stock` varchar(20) DEFAULT NULL,
+  `pos_available` tinyint(1) DEFAULT 1,
+  `type` enum('color_shape','image') DEFAULT 'color_shape',
+  `is_composite` tinyint(1) NOT NULL DEFAULT 0,
+  `color` varchar(20) DEFAULT NULL,
+  `shape` varchar(50) DEFAULT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `owner_id` int(11) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `updated_by` int(11) DEFAULT NULL,
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Indexes for table `products`
+--
+ALTER TABLE `products`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `category_id` (`category_id`),
+  ADD KEY `idx_products_owner_id` (`owner_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `products`
+--
+ALTER TABLE `products`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=283;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `products`
+--
+ALTER TABLE `products`
+  ADD CONSTRAINT `fk_products_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `products_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+--IF THERE'S A VARIANT ID IN THE SALE_ITEMS THEN CHECK FOR THE PRODUCT_VARIANTS TABLE AND CHECK IF IT IS_COMPOSITE
+CREATE TABLE `product_variants` (
+  `id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `sku` varchar(50) DEFAULT NULL,
+  `barcode` varchar(50) DEFAULT NULL,
+  `price` varchar(20) DEFAULT NULL,
+  `cost` decimal(10,2) DEFAULT NULL,
+  `is_composite` tinyint(1) NOT NULL DEFAULT 0,
+  `in_stock` varchar(20) DEFAULT NULL,
+  `low_stock` varchar(20) DEFAULT NULL,
+  `pos_available` tinyint(1) DEFAULT 1,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Indexes for table `product_variants`
+--
+ALTER TABLE `product_variants`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `product_id` (`product_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `product_variants`
+--
+ALTER TABLE `product_variants`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=61;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `product_variants`
+--
+ALTER TABLE `product_variants`
+  ADD CONSTRAINT `product_variants_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE;
+COMMIT;
+
+--IF IS_COMPOSITE IS 1 THEN CHECK THE PRODUCT_COMPONENTS TABLE FOR THE COMPONENT_PRODUCT_ID OF THE COMPOSITE PRODUCT OR COMPONENT_VARIANT_ID OF THE COMPOSITE VARIANT
+CREATE TABLE `product_components` (
+  `id` int(11) NOT NULL,
+  `parent_product_id` int(11) NOT NULL,
+  `component_variant_id` int(11) DEFAULT NULL,
+  `component_product_id` int(11) DEFAULT NULL,
+  `component_qty` varchar(64) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+--
+ALTER TABLE `product_components`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_parent_product` (`parent_product_id`),
+  ADD KEY `idx_component_variant` (`component_variant_id`),
+  ADD KEY `idx_component_product` (`component_product_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `product_components`
+--
+ALTER TABLE `product_components`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `product_components`
+--
+ALTER TABLE `product_components`
+  ADD CONSTRAINT `fk_product_components_component` FOREIGN KEY (`component_product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_product_components_parent` FOREIGN KEY (`parent_product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_product_components_variant` FOREIGN KEY (`component_variant_id`) REFERENCES `product_variants` (`id`) ON DELETE SET NULL;
+COMMIT;
+
+
+--ALSO GET THE QUANTITY OF THE COMPONENT FROM THE COMPONENT_QTY FIELD IN THE PRODUCT_COMPONENTS TABLE TO DEDUCT FROM THE STOCK OF THE COMPONENT PRODUCTS OR VARIANTS WHEN A COMPOSITE PRODUCT OR VARIANT IS SOLD.
+--AFTER THAT DEDUCT THE TOTAL QUANTITY SOLD(SALE_ITEMS) MULTIPLIED BY THE COMPONENT_QTY FROM THE IN_STOCK FIELD OF THE PRODUCTS OR PRODUCT_VARIANTS TABLE.

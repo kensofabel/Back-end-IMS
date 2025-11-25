@@ -5,6 +5,28 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../../config/db.php';
 
+// Safe evaluator for quantity expressions (fractions/arithmetic like "1/4" or "3+1/2")
+if (!function_exists('evaluate_quantity_expr')) {
+    function evaluate_quantity_expr($s) {
+        $s = trim((string)$s);
+        if ($s === '') return 0.0;
+        // remove common grouping/currency characters
+        $s = preg_replace('/[,_\s\x{20B1}\$]/u', '', $s);
+        // allow only digits, operators, parentheses, decimal point and whitespace
+        if (!preg_match('/^[0-9+\-\*\/().\s]+$/', $s)) return 0.0;
+        // block suspicious operator combos
+        if (preg_match('/\/\/|\/\*|\*\*/', $s)) return 0.0;
+        // evaluate in a restricted way
+        $__tmp = null;
+        $code = '$__tmp = (' . $s . ');';
+        $ok = @eval($code);
+        if ($ok === false) return 0.0;
+        if (isset($__tmp) && is_numeric($__tmp)) { $v = floatval($__tmp); unset($__tmp); return $v; }
+        unset($__tmp);
+        return 0.0;
+    }
+}
+
 if (!isset($_GET['product_id']) || !is_numeric($_GET['product_id'])) {
     echo json_encode(["success" => false, "error" => "missing_product_id"]);
     exit;
@@ -157,8 +179,11 @@ try {
                     }
                 }
 
-                // Accumulate computed cost where possible
-                $compQty = $comp['component_qty'] !== null ? floatval($comp['component_qty']) : 0.0;
+                // Accumulate computed cost where possible (evaluate stored qty expressions safely)
+                $compQty = 0.0;
+                if ($comp['component_qty'] !== null) {
+                    $compQty = evaluate_quantity_expr($comp['component_qty']);
+                }
                 $compCost = $comp['component_cost'] !== null ? floatval($comp['component_cost']) : 0.0;
                 $computedCost += ($compCost * $compQty);
 

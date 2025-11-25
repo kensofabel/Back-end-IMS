@@ -250,10 +250,11 @@
 
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 15px;
-    padding-top: 10px; /* give top-row cards room to expand on hover so they don't get hidden by fixed header */
-    padding-right: 10px;
+    /* reduce min card width so more columns appear on the same row */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    padding-top: 8px; /* give top-row cards room to expand on hover so they don't get hidden by fixed header */
+    padding-right: 8px;
     max-height: 450px;
     /* Keep scrollbar visible to avoid layout shift when content changes */
     overflow-y: scroll;
@@ -324,7 +325,7 @@
 
 /* New keypad/modal styles */
 .price-modal-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
-.price-modal-header .price-modal-title { font-weight:700; color:#ffd18a; font-size:1rem; text-align:right; flex:1; }
+.price-modal-header .price-modal-title { font-weight:700; color:#ffd18a; font-size:1rem; text-align:left; flex:1; }
 .price-btn { background:#2a2a2a; color:#fff; border:1px solid #333; padding:8px 10px; border-radius:6px; cursor:pointer; }
 .price-btn.icon { font-size:18px; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; }
 .price-modal-body input#price-modal-input { font-size:1.6rem; text-align:right; padding:10px; }
@@ -335,9 +336,53 @@
 .price-modal-actions { margin-top:12px; display:flex; justify-content:center; }
 .price-modal .price-btn.primary { width:100%; padding:12px; font-weight:700; }
 
+/* Variant selection modal (minimal styling so it's visible and usable) */
+.variant-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+.variant-modal-overlay.visible { display: flex; }
+.variant-modal {
+    background: #111;
+    color: #fff;
+    padding: 14px;
+    border-radius: 10px;
+    width: 360px;
+    max-width: calc(100% - 40px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+.variant-modal-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.variant-modal-title { font-weight:700; color:#ffd18a; font-size:1rem; }
+.variant-btn.icon { font-size:18px; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; background:#2a2a2a; color:#fff; border:1px solid #333; padding:0; border-radius:6px; cursor:pointer; }
+.variant-btn.icon:hover { background:#343434; border-color:#444; }
+.variant-btn.icon:focus { outline: 2px solid rgba(255,152,0,0.25); }
+.variant-list { display:flex; flex-direction:column; gap:8px; max-height:320px; overflow:auto; }
+.variant-item { display:flex; align-items:flex-start; justify-content:space-between; background:#161616; border:1px solid #262626; color:#fff; padding:10px; border-radius:8px; cursor:pointer; gap:12px; }
+.variant-item:hover { background:#1f1f1f; border-color:#333; }
+.variant-left { flex:1 1 auto; text-align:left; }
+.variant-name { font-weight:700; color:#fff; }
+.variant-sku { color:#bfbfbf; font-size:0.9rem; margin-top:6px; display:block; }
+.variant-right { flex:0 0 110px; text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
+.variant-price { font-weight:700; color:#ff9800; }
+.variant-stock { font-size:0.85rem; margin-top:6px; color:#bfbfbf; }
+.variant-stock.empty { display: none; }
+.variant-stock.out-of-stock { color:#ff6b6b; font-weight:700; }
+.variant-stock.low-stock { color:#ffb341; font-weight:700; }
+
+/* When a variant row has no stock label, center the price vertically on the right */
+.variant-item.variant-center { align-items: center; }
+.variant-right.centered { justify-content: center; }
+.variant-modal-error { color:#ff6b6b; min-height:18px; margin-top:8px; }
+
 .product-card {
     background: #232323;
-    padding: 15px;
+    /* reduce internal padding to make cards more compact */
+    padding: 10px;
     border-radius: 10px;
     text-align: center;
     transition: box-shadow 0.18s ease, border-color 0.18s ease;
@@ -365,7 +410,7 @@
 }
 .card-middle.column {
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
 }
 
 .card-details {
@@ -377,6 +422,46 @@
     word-break: break-word;
     overflow-wrap: anywhere;
 }
+.variant-stock-indicator {
+    position: absolute;
+    top: -6px;
+    right: -12px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e53e3e; /* red */
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.25);
+    display: inline-block;
+}
+.variant-stock-indicator.low { background: #ffb341; }
+.variant-stock-indicator.out { background: #e53e3e; }
+
+/* Confirm modal styles */
+.confirm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 11000;
+}
+.confirm-modal-overlay.visible { display: flex; }
+.confirm-modal {
+    background: #111;
+    color: #fff;
+    padding: 16px;
+    border-radius: 10px;
+    width: 360px;
+    max-width: calc(100% - 40px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+.confirm-modal-body { padding: 6px 4px 12px 4px; }
+.confirm-message { font-size: 1rem; color: #fff; }
+.confirm-modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+.confirm-btn { background:#2a2a2a; color:#fff; border:1px solid #333; padding:8px 12px; border-radius:6px; cursor:pointer; }
+.confirm-btn.primary { background:#ff9800; color:#111; border-color: #ff9800; }
+.card-details h4, .card-bottom h4 { position: relative; }
 .card-bottom {
     flex: 0 0 auto;
     display: flex;
@@ -388,6 +473,30 @@
     font-weight: 700;
     color: #ff9800;
     margin-top: 6px;
+}
+
+/* Ensure product name and price remain visible on image-type cards only */
+/* Use sibling selector: the bg element precedes the overlay */
+.card-bg.bg-image + .card-overlay .card-details h4,
+.card-bg.bg-image + .card-overlay .card-bottom h4 {
+    display: inline-block;
+    background: rgba(0,0,0,0.48);
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: -5px;
+}
+.card-bg.bg-image + .card-overlay .product-price {
+    display: inline-block;
+    background: rgba(0,0,0,0.38);
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+}
+
+.card-bg.bg-image + .card-overlay .card-middle .stock-status { 
+    margin-bottom: -10px;
 }
 
 /* Background element filling the whole card */
@@ -413,6 +522,63 @@
 .card-bg.bg-shape.circle { border-radius: 50%; }
 .card-bg.bg-image { border-radius: 10px; background-size: cover; background-position: center; }
 
+/* Additional shape variants so non-image products render correctly */
+.card-bg.bg-shape.triangle {
+    border-radius: 0;
+    -webkit-clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+.card-bg.bg-shape.diamond {
+    border-radius: 0;
+    -webkit-clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.card-bg.bg-shape.star {
+    border-radius: 0;
+    -webkit-clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+.card-bg.bg-shape.hexagon {
+    border-radius: 0;
+    -webkit-clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* Triangle-specific layout: push details toward the bottom and place stock badge below them */
+.card-bg.bg-shape.triangle + .card-overlay {
+    display: flex;
+    flex-direction: column;
+}
+.card-bg.bg-shape.triangle + .card-overlay .card-middle {
+    /* push content to the lower area of the triangle */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+}
+.card-bg.bg-shape.triangle + .card-overlay .card-middle .card-details {
+    order: 2; /* ensure details appear above the stock badge */
+    margin-bottom: 0;
+}
+.card-bg.bg-shape.triangle + .card-overlay .card-middle .stock-status {
+    order: 3; /* place stock badge below the details */
+    margin-bottom: 0;
+}
+
+/* If card-bottom exists, allow a bit more spacing so details sit visually lower */
+.card-bg.bg-shape.triangle + .card-overlay .card-bottom {
+    height: 0;
+}
+
+/* When the card background is light (e.g. yellow), prefer dark text for readability. */
+.product-card.bg-light .card-overlay,
+.product-card.bg-light .card-overlay h4,
+.product-card.bg-light .card-overlay .product-price,
+.product-card.bg-light .card-details h4,
+.product-card.bg-light .card-bottom h4 {
+    color: #383838 !important;
+}
+
 /* Put text above gradient */
 .card-overlay .card-middle, .card-overlay .card-bottom { position: relative; z-index: 2; }
 
@@ -425,8 +591,9 @@
     height: 100%;
 }
 .shape {
-    width: 64px;
-    height: 64px;
+    /* slightly smaller shape inside the card so items look denser */
+    width: 52px;
+    height: 52px;
     border-radius: 8px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.4);
 }
@@ -486,8 +653,9 @@
 
 .product-card h4 {
     color: #fff;
-    margin-bottom: 8px;
-    font-size: 1rem;
+    margin-bottom: 6px;
+    /* slightly reduce font so names take less vertical space */
+    font-size: 0.95rem;
     white-space: normal; /* allow wrapping */
     word-break: break-word;
     overflow-wrap: break-word;
@@ -519,7 +687,7 @@
 .cart-items {
     max-height: 300px;
     overflow-y: auto;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 /* Favourite (heart) toggle on product cards
@@ -607,14 +775,292 @@
 }
 .no-products p { max-width: 900px; }
 
+/* Header inline layout for section title + view toggle */
+.section-header-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+/* position wrapper for the small header more-menu */
+.section-header-inline .header-actions { position: relative; display: inline-flex; gap: 6px; align-items: center; }
+
+.sale-more-list {
+    position: absolute;
+    top: calc(100% - 8px);
+    right: 0;
+    background: #121212;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+    min-width: 160px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    z-index: 5000;
+    display: none;
+}
+.sale-more-list[aria-hidden="false"] { display: block; }
+.sale-more-list li {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #e6e6e6;
+    font-size: 0.98rem;
+}
+.sale-more-list li:hover { background:#1f1f1f; color:#fff; }
+/* Left icons for small dropdown lists (sale-more, cart-mode) */
+.sale-more-list li i,
+.cart-mode-list li i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    min-width: 18px;
+    margin-right: 12px; /* slightly larger gap between icon and label */
+    color: #ffffffb8;
+    font-size: 0.85rem; /* a little smaller */
+}
+/* Align images used as icons in small dropdown lists (sale-more, cart-mode) */
+.sale-more-list li img,
+.cart-mode-list li img {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    min-width: 15px;
+    margin-left: 1px;
+    margin-right: 14px;
+    vertical-align: middle;
+}
+.sale-more-list li span,
+.cart-mode-list li span {
+    vertical-align: middle;
+}
+.sale-more-list li { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.cart-mode-list li { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.sale-more-list li:last-child, .cart-mode-list li:last-child { margin-bottom: 0; }
+
+/* Disabled state for sale-more menu items */
+.sale-more-list li.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: default;
+}
+.view-toggle {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    margin-right: 15px;
+}
+.view-toggle-btn {
+    background: #181818;
+    border: 1px solid #333;
+    color: #ddd;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 160ms ease, color 160ms ease, transform 140ms ease;
+}
+.view-toggle-btn:hover {
+    background: #ff9800;
+    color: #111;
+    border-color: #ff9800;
+    transform: translateY(-1px);
+}
+.view-toggle-btn.active {
+    background: #181818;
+    color: #ddd;
+    border-color: #333
+}
+
+/* Ensure hover still turns orange even when the button has .active */
+.view-toggle-btn.active:hover {
+    background: #ff9800;
+    color: #111;
+    border-color: #ff9800;
+    transform: translateY(-1px);
+}
+
+/* Header actions in section headers: minimal, no background/border by default;
+   show only a subtle background on hover to match the user's request. */
+.section-header-inline .header-actions .view-toggle-btn {
+    background: transparent;
+    border: none;
+    color: #dbdbdb;
+    box-shadow: none;
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+}
+.section-header-inline .header-actions .view-toggle-btn:hover {
+    background: rgba(255,255,255,0.02);
+    color: #dbdbdb;
+    transform: none; /* prevent orange transform defined on .view-toggle-btn:hover */
+    border-color: transparent;
+}
+.section-header-inline {
+    margin-right: -10   px;
+}
+
+/* List-mode: render product grid as a vertical list */
+.product-grid.list-mode {
+    display: block; /* full-width stack */
+    grid-template-columns: none;
+    gap: 0;
+}
+.product-grid.list-mode .product-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    aspect-ratio: auto;
+    height: auto; /* allow content to size naturally */
+.cart-mode-list, .cart-mode-list li {
+    /* match the button's font family so the dropdown feels consistent */
+    font-family: inherit;
+}
+    position: relative; /* enable absolutely positioned children like fav and stock */
+}
+/* List-mode visual treatment: subtle border and hover lift to make rows feel interactive */
+.product-grid.list-mode .product-card {
+    border: 1px solid rgba(255,255,255,0.04);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0.04));
+    transition: transform 160ms ease, box-shadow 160ms ease, background 120ms ease;
+}
+.product-grid.list-mode .product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.55);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.08));
+}
+.product-grid.list-mode .card-overlay {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+/* Reserve space on the right so the price and favourite don't overlap */
+.product-grid.list-mode .card-overlay { padding-right: 50px; }
+/* In list mode, show the shape/image (card-bg) as a left-aligned thumbnail */
+.product-grid.list-mode .card-bg {
+    position: relative; /* take it out of absolute flow so it sits inline */
+    inset: auto;
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    border-radius: 8px;
+    margin-right: 12px;
+    z-index: 1;
+    transform: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    pointer-events: none;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+}
+.product-grid.list-mode .card-overlay { align-items: center; }
+.product-grid.list-mode .card-bg.bg-image { background-size: cover; background-position: center; }
+.product-grid.list-mode .card-middle,
+.product-grid.list-mode .card-bottom {
+    flex: 0 0 auto;
+}
+/* Make the details area flexible so the name fills available space */
+.product-grid.list-mode .card-details { text-align: left; padding: 0; flex: 1 1 auto; max-width: none; display: flex; align-items: center; gap: 8px; }
+/* Ensure the product name remains immediately after the thumbnail and the price moves to the right within the row */
+.product-grid.list-mode .card-details h4 { margin: 0; flex: 0 1 auto; }
+.product-grid .card-details .product-price { display: inline-block; margin-left: auto; white-space: nowrap; }
+/* By default (grid) keep price in details visible and hide the card-bottom price.
+    In list-mode we invert that so the right-side price (in .card-bottom) is shown. */
+.product-grid .card-bottom .product-price { display: none; }
+.product-grid.list-mode .card-details .product-price { display: none; }
+.product-grid.list-mode .card-bottom .product-price { display: inline-block; }
+/* Price block should sit to the far right */
+.product-grid.list-mode .card-bottom { margin-left: auto; text-align: right; display: flex; align-items: center; gap: 8px; min-width: 120px; margin-right: 8px; }
+.product-grid.list-mode .card-bottom .product-price { white-space: nowrap; }
+.product-grid.list-mode .card-bottom h4 { margin: 0; font-size: 0.98rem; }
+.product-grid.list-mode .product-price { margin-left: auto; }
+.product-grid.list-mode .shape { width: 56px; height: 56px; }
+
+/* Favourite (heart) vertically centered at far-right */
+.product-grid.list-mode .fav-toggle { top: 50%; right: 10px; transform: translateY(-50%); z-index: 6; }
+
+/* Stock indicator centered horizontally within the row */
+.product-grid.list-mode .stock-status {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Ensure triangle-shaped and image-type cards adopt the same row layout in list-mode
+   so their name and price align like other shapes. This overrides the special
+   triangle stacking rules used for grid display. */
+.product-grid.list-mode .card-bg.bg-shape.triangle + .card-overlay,
+.product-grid.list-mode .card-bg.bg-image + .card-overlay {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px;
+}
+.product-grid.list-mode .card-bg.bg-shape.triangle + .card-overlay .card-middle,
+.product-grid.list-mode .card-bg.bg-image + .card-overlay .card-middle {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-bottom: 0 !important;
+}
+.product-grid.list-mode .card-bg.bg-shape.triangle + .card-overlay .card-middle .card-details,
+.product-grid.list-mode .card-bg.bg-image + .card-overlay .card-middle .card-details {
+    order: 0 !important;
+    margin-bottom: 0 !important;
+}
+.product-grid.list-mode .card-bg.bg-shape.triangle + .card-overlay .card-bottom,
+.product-grid.list-mode .card-bg.bg-image + .card-overlay .card-bottom {
+    height: auto !important;
+}
+
+/* List-mode: for image-type products remove the boxed overlay styles so
+   the thumbnail appears clean on the left and text flows naturally. */
+.product-grid.list-mode .card-bg.bg-image + .card-overlay {
+    background: transparent !important;
+}
+.product-grid.list-mode .card-bg.bg-image + .card-overlay .card-details h4,
+.product-grid.list-mode .card-bg.bg-image + .card-overlay .card-bottom h4,
+.product-grid.list-mode .card-bg.bg-image + .card-overlay .product-price {
+    background: none !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #ddd;
+}
+
+/* Triangle cards: ensure font color matches other cards in list-mode so
+   the name and price use the same contrast rules as standard shapes. */
+.product-grid.list-mode .card-bg.bg-shape.triangle + .card-overlay .card-details h4,
+.product-grid.list-mode .card-bg.bg-shape.triangle + .card-overlay .card-bottom .product-price {
+    color: #ddd !important;
+}
+
 
 .cart-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #333;
+    padding: 8px 0;
+    border-bottom: none; /* removed per-item divider */
 }
+
 
 .cart-item-info h4 {
     color: #fff;
@@ -664,6 +1110,75 @@
     color: #dbdbdb;
 }
 
+/* Compact cart mode selector (Dine in / Take out / Delivery) */
+.cart-mode-btn {
+    background: transparent;
+    border: transparent;
+    color: #dbdbdb;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    /* match global UI font explicitly so the list can be identical */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-weight: 400;
+}
+
+.cart-mode-chevron { font-size: 0.7rem; line-height: 1; opacity: 0.9; }
+/* place chevron at the far right of the total-row */
+.total-row .cart-mode-chevron {
+    margin-left: auto;
+    align-self: center;
+    cursor: pointer;
+    padding-left: 8px;
+    color: #dbdbdb;
+}
+.cart-mode-label {
+    position: relative;
+    /* subtle divider below the cart-mode selector to separate it from cart items */
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+}
+.cart-mode-list {
+    position: absolute;
+    top: calc(100% - 38px); /* directly below the button */
+    left: calc(0% - 13px); /* adjust horizontal position */
+    background: #121212;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    list-style: none;   
+    margin: 0;
+    min-width: 140px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    z-index: 4000;
+    display: none;
+}
+.cart-mode-list[aria-hidden="false"] { display: block; }
+.cart-mode-list li {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #e6e6e6;
+    font-size: 1rem;
+    /* ensure list items use the same font family and weight as the button */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-weight: 400;
+}
+.cart-mode-list li:hover, .cart-mode-list li.active { background:#1f1f1f; color:#fff; }
+
+/* Hoverable row: make the entire cart-mode row highlight and show pointer */
+.cart-mode-label .total-row:hover {
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+}
+.cart-mode-label .total-row { cursor: pointer; padding: 8px; margin: -8px; transition: background 0.2s ease; }
+.cart-mode-label .total-row:hover .cart-mode-label-text,
+.cart-mode-label .total-row:hover .cart-mode-chevron {
+    color: #fff;
+}
+
+
 .total-row.total {
     font-size: 1.2rem;
     font-weight: 700;
@@ -708,12 +1223,34 @@
 .payment-input input {
     width: 100%;
     padding: 10px;
+    padding-right: 44px; /* room for clear button */
     border: 2px solid #333;
     border-radius: 8px;
     background: #181818;
     color: #fff;
     font-size: 16px;
 }
+
+/* Clear button inside payment input */
+.payment-input { position: relative; }
+.amount-clear-btn {
+    position: absolute;
+    top: 25%;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.85);
+    width: 36px;
+    height: 36px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+.amount-clear-btn:hover { background: rgba(255,255,255,0.02); color: #fff; }
+.amount-clear-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(255,152,0,0.12); }
 
 .change-amount {
     display: flex;
@@ -741,10 +1278,10 @@
     transform: translateY(-2px);
 }
 
-.clear-cart-btn {
+.open-orders-btn {
     width: 100%;
     padding: 10px;
-    background: #e53e3e;
+    background: #333;
     color: white;
     border: none;
     border-radius: 8px;
@@ -754,8 +1291,10 @@
     transition: background 0.3s ease;
 }
 
-.clear-cart-btn:hover {
-    background: #c53030;
+.open-orders-btn:hover {
+    background: #f8ad3b;
+    color: #232323;
+    border-color: #f8ad3b;
 }
 
 /* Responsive header for small devices */
@@ -915,3 +1454,149 @@
         margin-top: 5px;
     }
 }
+
+/* Responsive: tablet and phone tweaks for POS product grid */
+@media (max-width: 900px) {
+    .product-grid {
+        /* slightly tighter grid on tablet-ish widths */
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        max-height: 420px;
+    }
+    .product-card {
+        padding: 8px;
+    }
+    .shape {
+        width: 48px;
+        height: 48px;
+    }
+    .product-card h4 { font-size: 0.92rem; margin-bottom: 6px; }
+}
+
+@media (max-width: 480px) {
+    /* Stack left/right panes for narrow phones */
+    .pos-container {
+        flex-direction: column;
+        gap: 12px;
+        height: auto;
+    }
+    .pos-left, .pos-right {
+        flex: unset;
+        width: 100%;
+    }
+
+    /* Force two columns on narrow phones to keep cards tappable */
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        max-height: 360px;
+    }
+
+    .product-card {
+        /* make cards a bit taller than wide for mobile readability */
+        padding: 8px;
+        aspect-ratio: 3 / 4;
+    }
+    .shape {
+        width: 44px;
+        height: 44px;
+    }
+    .product-card h4 { font-size: 0.9rem; margin-bottom: 4px; }
+
+    /* Ensure the expanded search input behaves on very small screens */
+    .search-row.search-open .search-input-wrapper input {
+        width: calc(100% - 60px) !important;
+        padding-left: 12px !important;
+    }
+}
+
+/* Saved Orders modal scroller: make background transparent */
+#open-orders-list {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+#open-orders-list::-webkit-scrollbar-track { background: transparent; }
+#open-orders-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 8px; border: 2px solid transparent; }
+#open-orders-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+/* Group divider for Saved Orders list (Yesterday / Last week / Last month) */
+.open-orders-group-divider {
+    padding: 8px 0;
+    color: #bfbfbf;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-top: 8px;
+    margin-bottom: 6px;
+}
+
+/* Quick amount buttons (under Amount Received) */
+#quick-amounts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+}
+.quick-amount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 12px;
+    background: #333; /* requested background */
+    color: #ffffff;
+    border: 1px solid #2a2a2a;
+    border-radius: 999px; /* oblong / pill shape */
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+.quick-amount:hover {
+    background: #3b3b3b;
+    transform: translateY(-1px);
+}
+.quick-amount:active {
+    transform: translateY(0);
+}
+.quick-amount:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255,152,0,0.12);
+}
+
+/* Make quick-amounts visually consistent with payment methods on small screens */
+@media (max-width: 480px) {
+    #quick-amounts { grid-template-columns: repeat(4, 1fr); gap:6px; }
+    .quick-amount { min-height: 40px; font-size: 0.92rem; }
+}
+
+/* Make each saved-order row show pointer cursor (but not the group divider) */
+#open-orders-list > div:not(.open-orders-group-divider) {
+    cursor: pointer;
+}
+
+/* Ensure checkbox area inside saved orders also uses pointer cursor */
+#open-orders-list .table-checkbox,
+#open-orders-list .table-checkbox input,
+#open-orders-list .table-checkbox .checkmark {
+    cursor: pointer;
+}
+
+/* Make the Saved Orders modal slightly wider for better readability */
+#open-orders-overlay .confirm-modal {
+    width: 450px !important;
+    max-width: calc(100% - 40px) !important;
+}
+
+@media (max-width: 900px) {
+    #open-orders-overlay .confirm-modal {
+        width: calc(100% - 32px) !important;
+        max-width: calc(100% - 32px) !important;
+    }
+}
+

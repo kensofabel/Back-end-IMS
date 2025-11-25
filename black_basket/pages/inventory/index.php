@@ -7,6 +7,44 @@ if (!isset($_SESSION['user_id'])) {
 }
 // Ensure default category exists for this user
 createDefaultCategory($_SESSION['user_id']);
+
+// Safe evaluator for quantity expressions (e.g. "1/4", "2.5", "3+1/2", "1 1/4").
+// Only allows digits, parentheses, decimal point and the + - * / operators.
+function evaluate_quantity_expr($s) {
+    if (!isset($s)) return 0.0;
+    $s = trim((string)$s);
+    if ($s === '') return 0.0;
+
+    // Normalize common grouping/currency characters (remove them)
+    $s = str_replace([',', '₱', '$', "\u{00A0}"], '', $s);
+
+    // Interpret a space between numeric tokens as addition (handle mixed fractions like "1 1/4" -> "1+1/4").
+    // Only replace whitespace that is directly between digits (or a closing paren) and a digit (or opening paren).
+    // Example: "1 1/4" => "1+1/4". Do not convert spaces around operators like "1 / 4".
+    $s = preg_replace('/(?<=[0-9)\]])\s+(?=[0-9(\[])/u', '+', $s);
+
+    // Remove any remaining whitespace (spaces around operators, etc.)
+    $s = preg_replace('/\s+/u', '', $s);
+
+    // Reject any disallowed characters (only digits, operators, parentheses and dot allowed)
+    if (preg_match('/[^0-9+\-\/*().]/', $s)) return 0.0;
+
+    // Disallow suspicious operator sequences that could be used for injection
+    if (strpos($s, '//') !== false || strpos($s, '/*') !== false || strpos($s, '*/') !== false || strpos($s, '**') !== false) return 0.0;
+
+    // Evaluate expression in a minimal, controlled manner
+    try {
+        // Suppress parse warnings; eval will return the computed value on success
+        $val = @eval('return (' . $s . ');');
+        if ($val === null || $val === false) return 0.0;
+        if (!is_numeric($val)) return 0.0;
+        $num = floatval($val);
+        if (!is_finite($num)) return 0.0;
+        return $num;
+    } catch (\Throwable $e) {
+        return 0.0;
+    }
+}
 ?>
 
 <html lang="en">
@@ -230,8 +268,8 @@ createDefaultCategory($_SESSION['user_id']);
                                 <option value="in">In Stock</option>
                                 <option value="low">Low Stock</option>
                                 <option value="out">Out of Stock</option>
-                                <option value="estimated">Estimated</option>
-                            </select>
+                                <option value="estimated">   </option>
+                             </select>
                         </div>
                 </div>
                 <div class="inventory-table-container">
@@ -255,7 +293,7 @@ createDefaultCategory($_SESSION['user_id']);
                         <tbody id="inventory-table-body">
                             <?php
                             // Query products and their variants. We'll display variants as separate rows and products without variants as single rows.
-                            // Include is_composite so we can calculate estimated stock for composite products
+                            // Include is_composite so we can calculate                                     stock for composite products
                             $prodSql = "SELECT p.id AS product_id, p.name AS product_name, p.sku AS product_sku, p.barcode AS product_barcode, p.price AS product_price, p.cost AS product_cost, p.in_stock AS product_stock, p.low_stock AS low_stock, p.pos_available, p.track_stock AS track_stock, p.category_id, p.type, p.color, p.shape, p.image_url, p.is_composite AS is_composite
                                         FROM products p ORDER BY p.name ASC";
 
@@ -311,16 +349,30 @@ createDefaultCategory($_SESSION['user_id']);
                                             $compRes = $conn->query($compSql);
                                             if ($compRes && $compRes->num_rows > 0) {
                                                 while ($comp = $compRes->fetch_assoc()) {
-                                                    $needed = floatval($comp['component_qty']) ?: 0;
-                                                    if ($needed <= 0) { $estimates[] = 0; continue; }
+                                                    $needed = evaluate_quantity_expr($comp['component_qty']) ?: 0;
+                                                    // skip invalid/zero needed quantities
+                                                    if ($needed <= 0) { continue; }
                                                     $availableRaw = null;
+                                                    $componentTracks = 1; // default: tracked
                                                     if (!empty($comp['component_variant_id'])) {
-                                                        $cq = $conn->query("SELECT in_stock FROM product_variants WHERE id = " . intval($comp['component_variant_id']) . " LIMIT 1");
-                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                        // Fetch variant in_stock and parent product track_stock
+                                                        $cq = $conn->query("SELECT pv.in_stock, p.track_stock FROM product_variants pv LEFT JOIN products p ON pv.product_id = p.id WHERE pv.id = " . intval($comp['component_variant_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) {
+                                                            $rowC = $cq->fetch_assoc();
+                                                            $availableRaw = $rowC['in_stock'];
+                                                            $componentTracks = isset($rowC['track_stock']) ? intval($rowC['track_stock']) : 1;
+                                                        }
                                                     } else if (!empty($comp['component_product_id'])) {
-                                                        $cq = $conn->query("SELECT in_stock FROM products WHERE id = " . intval($comp['component_product_id']) . " LIMIT 1");
-                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                        $cq = $conn->query("SELECT in_stock, track_stock FROM products WHERE id = " . intval($comp['component_product_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) {
+                                                            $rowC = $cq->fetch_assoc();
+                                                            $availableRaw = $rowC['in_stock'];
+                                                            $componentTracks = isset($rowC['track_stock']) ? intval($rowC['track_stock']) : 1;
+                                                        }
                                                     }
+                                                    // If a component does not track stock, ignore it (it doesn't limit assemblies)
+                                                    if ($componentTracks === 0) { continue; }
+
                                                     $availableNum = 0.0;
                                                     if ($availableRaw !== null && $availableRaw !== '') {
                                                         if (preg_match('/^([0-9]+(?:\.[0-9]+)?)/', trim((string)$availableRaw), $m)) {
@@ -331,7 +383,11 @@ createDefaultCategory($_SESSION['user_id']);
                                                     $estimates[] = (int)$possible;
                                                 }
                                             }
-                                            if (!empty($estimates)) {
+                                            if (empty($estimates)) {
+                                                // If no tracked components contributed to estimates, treat as infinite
+                                                $displayStock = '∞';
+                                                $isEstimated = true;
+                                            } else {
                                                 $displayStock = min($estimates);
                                                 $isEstimated = true;
                                             }
@@ -482,16 +538,29 @@ createDefaultCategory($_SESSION['user_id']);
                                             $compRes = $conn->query($compSql);
                                             if ($compRes && $compRes->num_rows > 0) {
                                                 while ($comp = $compRes->fetch_assoc()) {
-                                                    $needed = floatval($comp['component_qty']) ?: 0;
-                                                    if ($needed <= 0) { $estimates[] = 0; continue; }
+                                                    $needed = evaluate_quantity_expr($comp['component_qty']) ?: 0;
+                                                    // skip invalid needed
+                                                    if ($needed <= 0) { continue; }
                                                     $availableRaw = null;
+                                                    $componentTracks = 1;
                                                     if (!empty($comp['component_variant_id'])) {
-                                                        $cq = $conn->query("SELECT in_stock FROM product_variants WHERE id = " . intval($comp['component_variant_id']) . " LIMIT 1");
-                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                        $cq = $conn->query("SELECT pv.in_stock, p.track_stock FROM product_variants pv LEFT JOIN products p ON pv.product_id = p.id WHERE pv.id = " . intval($comp['component_variant_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) {
+                                                            $rowC = $cq->fetch_assoc();
+                                                            $availableRaw = $rowC['in_stock'];
+                                                            $componentTracks = isset($rowC['track_stock']) ? intval($rowC['track_stock']) : 1;
+                                                        }
                                                     } else if (!empty($comp['component_product_id'])) {
-                                                        $cq = $conn->query("SELECT in_stock FROM products WHERE id = " . intval($comp['component_product_id']) . " LIMIT 1");
-                                                        if ($cq && $cq->num_rows > 0) $availableRaw = $cq->fetch_assoc()['in_stock'];
+                                                        $cq = $conn->query("SELECT in_stock, track_stock FROM products WHERE id = " . intval($comp['component_product_id']) . " LIMIT 1");
+                                                        if ($cq && $cq->num_rows > 0) {
+                                                            $rowC = $cq->fetch_assoc();
+                                                            $availableRaw = $rowC['in_stock'];
+                                                            $componentTracks = isset($rowC['track_stock']) ? intval($rowC['track_stock']) : 1;
+                                                        }
                                                     }
+                                                    // Ignore untracked components — they don't limit assemblies
+                                                    if ($componentTracks === 0) { continue; }
+
                                                     $availableNum = 0.0;
                                                     if ($availableRaw !== null && $availableRaw !== '') {
                                                         if (preg_match('/^([0-9]+(?:\.[0-9]+)?)/', trim((string)$availableRaw), $m)) {
@@ -502,7 +571,10 @@ createDefaultCategory($_SESSION['user_id']);
                                                     $estimates[] = (int)$possible;
                                                 }
                                             }
-                                            if (!empty($estimates)) {
+                                            if (empty($estimates)) {
+                                                $displayStock = '∞';
+                                                $isEstimated = true;
+                                            } else {
                                                 $displayStock = min($estimates);
                                                 $isEstimated = true;
                                             }
@@ -708,13 +780,30 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // formatting helper
                                 function _formatCurrency(n) { return '₱' + Number(n||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); }
 
+                                // Local fallback evaluator for simple arithmetic expressions
+                                function _evalQuantity(expr) {
+                                    try {
+                                        if (expr === null || typeof expr === 'undefined') return 0;
+                                        var s = String(expr).trim();
+                                        if (s === '') return 0;
+                                        s = s.replace(/[,_\s\u20B1\$]/g, '');
+                                        s = s.replace(/[^0-9+\-*/().\s]/g, '');
+                                        if (s === '') return 0;
+                                        if (/[a-zA-Z]|\/\/|\/\*|\*\*/.test(s)) return 0;
+                                        var val = Function('"use strict"; return (' + s + ')')();
+                                        var num = Number(val);
+                                        return (isFinite(num) ? num : 0);
+                                    } catch (e) { return 0; }
+                                }
+
                                 // Local fallback recalc function (mirrors modal recalcTotal)
                                 function _fallbackRecalcTotal() {
                                     try {
                                         var total = 0;
                                         var rows = cb.querySelectorAll('tr.component-row');
                                         rows.forEach(function(r) {
-                                            var q = parseFloat((r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) || 0) || 0;
+                                            var qRaw = (r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) ? r.querySelector('.comp-qty').value : '';
+                                            var q = _evalQuantity(qRaw) || 0;
                                             var c = parseFloat((r.querySelector('.comp-cost') && r.querySelector('.comp-cost').value || '').replace(/[^0-9.-]/g, '')) || 0;
                                             total += q * c;
                                         });
@@ -864,7 +953,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             nameWrapper.appendChild(nameText); nameWrapper.appendChild(skuDiv); tdName.appendChild(nameWrapper);
 
                                                             var tdQty = document.createElement('td'); tdQty.style.padding = '8px'; tdQty.style.width = '120px'; tdQty.style.textAlign = 'right';
-                                                            var qtyInput = document.createElement('input'); qtyInput.className = 'comp-qty'; qtyInput.type = 'number'; qtyInput.min = '0'; qtyInput.value = (it.qty !== undefined && it.qty !== null) ? it.qty : 1; qtyInput.style.width = '100%'; qtyInput.style.padding = '6px'; qtyInput.style.background = '#171717'; qtyInput.style.border = '1px solid #333'; qtyInput.style.color = '#fff'; qtyInput.style.borderRadius = '4px'; qtyInput.style.textAlign = 'right'; tdQty.appendChild(qtyInput);
+                                                            var qtyInput = document.createElement('input'); qtyInput.className = 'comp-qty'; qtyInput.type = 'text'; qtyInput.value = (it.qty !== undefined && it.qty !== null) ? it.qty : 1; qtyInput.style.width = '100%'; qtyInput.style.padding = '6px'; qtyInput.style.background = '#171717'; qtyInput.style.border = '1px solid #333'; qtyInput.style.color = '#fff'; qtyInput.style.borderRadius = '4px'; qtyInput.style.textAlign = 'right'; tdQty.appendChild(qtyInput);
 
                                                             var tdCost = document.createElement('td'); tdCost.style.padding = '8px'; tdCost.style.width = '120px'; tdCost.style.textAlign = 'right';
                                                             var costVal = (product.cost !== undefined && product.cost !== null) ? product.cost : (product.price !== undefined && product.price !== null ? product.price : (it.cost || 0));
@@ -920,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         nameWrapper.appendChild(nameText); nameWrapper.appendChild(skuDiv); tdName.appendChild(nameWrapper);
 
                                         var tdQty = document.createElement('td'); tdQty.style.padding = '8px'; tdQty.style.width = '120px'; tdQty.style.textAlign = 'right';
-                                        var qtyInput = document.createElement('input'); qtyInput.className = 'comp-qty'; qtyInput.type = 'number'; qtyInput.min = '0'; qtyInput.value = (it.qty !== undefined && it.qty !== null) ? it.qty : 1; qtyInput.style.width = '100%'; qtyInput.style.padding = '6px'; qtyInput.style.background = '#171717'; qtyInput.style.border = '1px solid #333'; qtyInput.style.color = '#fff'; qtyInput.style.borderRadius = '4px'; qtyInput.style.textAlign = 'right'; tdQty.appendChild(qtyInput);
+                                        var qtyInput = document.createElement('input'); qtyInput.className = 'comp-qty'; qtyInput.type = 'text'; qtyInput.value = (it.qty !== undefined && it.qty !== null) ? it.qty : 1; qtyInput.style.width = '100%'; qtyInput.style.padding = '6px'; qtyInput.style.background = '#171717'; qtyInput.style.border = '1px solid #333'; qtyInput.style.color = '#fff'; qtyInput.style.borderRadius = '4px'; qtyInput.style.textAlign = 'right'; tdQty.appendChild(qtyInput);
 
                                         var tdCost = document.createElement('td'); tdCost.style.padding = '8px'; tdCost.style.width = '120px'; tdCost.style.textAlign = 'right';
                                         var costInput = document.createElement('input'); costInput.className = 'comp-cost'; costInput.setAttribute('currency-localization','₱'); costInput.readOnly = true; costInput.value = _formatCurrency(Number(it.cost || 0)); costInput.style.width = '100%'; costInput.style.background = '#171717'; costInput.style.border = 'none'; costInput.style.color = '#fff'; costInput.style.cursor = 'default'; costInput.style.pointerEvents = 'none'; costInput.style.textAlign = 'right'; tdCost.appendChild(costInput);

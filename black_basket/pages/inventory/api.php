@@ -10,20 +10,44 @@ require_once '../../config/db.php';
 function recompute_parent_cost($conn, $parent_id) {
     $pid = intval($parent_id);
     if ($pid <= 0) return 0.0;
-    // New schema: product_components no longer stores component_cost/name/sku.
-    // Compute parent cost from referenced variant.cost or product.cost multiplied by component_qty.
-    $sql = "SELECT IFNULL(SUM(COALESCE(pv.cost, p2.cost,0) * COALESCE(pc.component_qty,0)),0) AS total"
-        . " FROM product_components pc LEFT JOIN products p2 ON pc.component_product_id = p2.id LEFT JOIN product_variants pv ON pc.component_variant_id = pv.id"
-        . " WHERE pc.parent_product_id = " . $pid;
+    // New schema: product_components stores component_qty as VARCHAR (may contain expressions like '1/4').
+    // Fetch referenced component cost and the stored qty string, evaluate qty on server, then compute total in PHP.
+    $sql = "SELECT COALESCE(pv.cost, p2.cost,0) AS comp_cost, COALESCE(pc.component_qty,'') AS comp_qty FROM product_components pc LEFT JOIN products p2 ON pc.component_product_id = p2.id LEFT JOIN product_variants pv ON pc.component_variant_id = pv.id WHERE pc.parent_product_id = " . $pid;
     $res = $conn->query($sql);
     $total = 0.0;
-    if ($res && $res->num_rows > 0) {
-        $row = $res->fetch_assoc();
-        $total = floatval($row['total']);
+    if ($res) {
+        // ensure we have an evaluator available
+        if (!function_exists('evaluate_quantity_expr')) {
+            function evaluate_quantity_expr($s) {
+                $s = trim((string)$s);
+                if ($s === '') return 0.0;
+                // remove common grouping/currency characters
+                $s = preg_replace('/[,_\s\x{20B1}\$]/u', '', $s);
+                // allow only digits, operators, parentheses, decimal point and whitespace
+                if (!preg_match('/^[0-9+\-\*\/().\s]+$/', $s)) return 0.0;
+                // block suspicious operator combos
+                if (preg_match('/\/\/|\/\*|\*\*/', $s)) return 0.0;
+                // evaluate in a restricted way: assign to temporary variable
+                $__tmp = null;
+                $code = '$__tmp = (' . $s . ');';
+                $ok = @eval($code);
+                if ($ok === false) return 0.0;
+                if (isset($__tmp) && is_numeric($__tmp)) { $v = floatval($__tmp); unset($__tmp); return $v; }
+                unset($__tmp);
+                return 0.0;
+            }
+        }
+
+        while ($row = $res->fetch_assoc()) {
+            $cost = floatval($row['comp_cost']);
+            $qtyStr = isset($row['comp_qty']) ? $row['comp_qty'] : '';
+            $qtyNum = evaluate_quantity_expr($qtyStr);
+            $total += $cost * $qtyNum;
+        }
     }
     // Persist only if parent is marked composite (safety)
     $upd = "UPDATE products SET cost = " . $conn->real_escape_string((string)$total) . " WHERE id = " . $pid . " AND is_composite = 1";
-    @$conn->query($upd);
+    @ $conn->query($upd);
     return $total;
 }
 
@@ -987,6 +1011,123 @@ switch ($method) {
                     }
                 }
 
+                // Handle composite components update (if provided)
+                if (isset($data['composite_components'])) {
+                    $comps = [];
+                    if (is_string($data['composite_components'])) {
+                        $decoded = json_decode($data['composite_components'], true);
+                        $comps = is_array($decoded) ? $decoded : [];
+                    } else if (is_array($data['composite_components'])) {
+                        $comps = $data['composite_components'];
+                    }
+
+                    if (is_array($comps)) {
+                        // Load existing components for this parent
+                        $existing = [];
+                        $res = $conn->query("SELECT id, component_variant_id, component_product_id FROM product_components WHERE parent_product_id=" . intval($product_id));
+                        $existingByVariant = [];
+                        $existingByProduct = [];
+                        $existingIds = [];
+                        if ($res) {
+                            while ($row = $res->fetch_assoc()) {
+                                $existing[intval($row['id'])] = $row;
+                                $existingIds[] = intval($row['id']);
+                                if (!empty($row['component_variant_id'])) $existingByVariant[intval($row['component_variant_id'])] = intval($row['id']);
+                                if (!empty($row['component_product_id'])) $existingByProduct[intval($row['component_product_id'])] = intval($row['id']);
+                            }
+                        }
+
+                        $keptIds = [];
+
+                        foreach ($comps as $comp) {
+                            // Normalize incoming component
+                            $pc_id = isset($comp['id']) ? intval($comp['id']) : (isset($comp['pc_id']) ? intval($comp['pc_id']) : 0);
+                            $csku = isset($comp['sku']) ? trim((string)$comp['sku']) : '';
+                            $component_variant_id = null;
+                            $component_product_id = null;
+                            // If explicit ids provided in payload, prefer them
+                            if (isset($comp['component_variant_id']) && intval($comp['component_variant_id'])>0) $component_variant_id = intval($comp['component_variant_id']);
+                            if (isset($comp['component_product_id']) && intval($comp['component_product_id'])>0) $component_product_id = intval($comp['component_product_id']);
+
+                            // Resolve by SKU when explicit refs not provided
+                            if (!$component_variant_id && !$component_product_id && $csku !== '') {
+                                $vsel = $conn->query("SELECT id FROM product_variants WHERE sku='" . $conn->real_escape_string($csku) . "' LIMIT 1");
+                                if ($vsel && $vsel->num_rows > 0) {
+                                    $component_variant_id = intval($vsel->fetch_assoc()['id']);
+                                } else {
+                                    $psel = $conn->query("SELECT id FROM products WHERE sku='" . $conn->real_escape_string($csku) . "' LIMIT 1");
+                                    if ($psel && $psel->num_rows > 0) {
+                                        $component_product_id = intval($psel->fetch_assoc()['id']);
+                                    }
+                                }
+                            }
+
+                            // Determine quantity (preserve original string for storage)
+                            $component_qty = null;
+                            if (isset($comp['component_qty'])) {
+                                $component_qty = trim((string)$comp['component_qty']);
+                            } else if (isset($comp['qty'])) {
+                                $component_qty = trim((string)$comp['qty']);
+                            } else if (isset($comp['in_stock']) && trim((string)$comp['in_stock']) !== '') {
+                                $txt = trim((string)$comp['in_stock']);
+                                if (preg_match('/^([0-9]+(?:\.[0-9]+)?)/', $txt, $m)) {
+                                    $component_qty = $m[1];
+                                } else {
+                                    $component_qty = $txt;
+                                }
+                            }
+
+                            // If payload referenced an existing product_components row id, try to update that row
+                            if ($pc_id && isset($existing[$pc_id])) {
+                                $upd = "UPDATE product_components SET component_variant_id=" . ($component_variant_id ? intval($component_variant_id) : 'NULL') . ", component_product_id=" . ($component_product_id ? intval($component_product_id) : 'NULL') . ", component_qty=" . ($component_qty !== null ? "'" . $conn->real_escape_string((string)$component_qty) . "'" : 'NULL') . " WHERE id=" . intval($pc_id) . " AND parent_product_id=" . intval($product_id);
+                                if (!$conn->query($upd)) throw new Exception($conn->error);
+                                $keptIds[] = intval($pc_id);
+                                continue;
+                            }
+
+                            // Try matching existing by variant/product reference
+                            $matchedExistingId = null;
+                            if ($component_variant_id && isset($existingByVariant[$component_variant_id])) {
+                                $matchedExistingId = $existingByVariant[$component_variant_id];
+                            } else if ($component_product_id && isset($existingByProduct[$component_product_id])) {
+                                $matchedExistingId = $existingByProduct[$component_product_id];
+                            }
+
+                            if ($matchedExistingId) {
+                                $upd = "UPDATE product_components SET component_variant_id=" . ($component_variant_id ? intval($component_variant_id) : 'NULL') . ", component_product_id=" . ($component_product_id ? intval($component_product_id) : 'NULL') . ", component_qty=" . ($component_qty !== null ? "'" . $conn->real_escape_string((string)$component_qty) . "'" : 'NULL') . " WHERE id=" . intval($matchedExistingId) . " AND parent_product_id=" . intval($product_id);
+                                if (!$conn->query($upd)) throw new Exception($conn->error);
+                                $keptIds[] = intval($matchedExistingId);
+                                continue;
+                            }
+
+                            // No match — insert new component row
+                            $ins = "INSERT INTO product_components (parent_product_id, component_variant_id, component_product_id, component_qty) VALUES (" . intval($product_id) . ", " . ($component_variant_id ? intval($component_variant_id) : 'NULL') . ", " . ($component_product_id ? intval($component_product_id) : 'NULL') . ", " . ($component_qty !== null ? "'" . $conn->real_escape_string((string)$component_qty) . "'" : 'NULL') . ")";
+                            if (!$conn->query($ins)) throw new Exception($conn->error);
+                            $newId = $conn->insert_id;
+                            if ($newId) $keptIds[] = intval($newId);
+                        }
+
+                        // Delete any existing rows that were not included in the incoming payload
+                        $toDelete = array_diff($existingIds, $keptIds ?: []);
+                        if (!empty($toDelete)) {
+                            foreach ($toDelete as $delId) {
+                                $dsql = "DELETE FROM product_components WHERE id=" . intval($delId) . " AND parent_product_id=" . intval($product_id);
+                                if (!$conn->query($dsql)) throw new Exception($conn->error);
+                            }
+                        }
+
+                        // Update is_composite flag based on whether any components remain
+                        $remaining = $conn->query("SELECT COUNT(*) AS c FROM product_components WHERE parent_product_id=" . intval($product_id));
+                        $countRem = 0;
+                        if ($remaining && $remaining->num_rows > 0) $countRem = intval($remaining->fetch_assoc()['c']);
+                        $updIsComp = "UPDATE products SET is_composite = " . ($countRem > 0 ? '1' : '0') . " WHERE id=" . intval($product_id);
+                        if (!$conn->query($updIsComp)) throw new Exception($conn->error);
+
+                        // Recompute parent cost when composite
+                        if ($countRem > 0) recompute_parent_cost($conn, $product_id);
+                    }
+                }
+
                 // Commit transaction
                 $conn->commit();
 
@@ -1230,12 +1371,20 @@ switch ($method) {
                     $cname = isset($comp['name']) ? $conn->real_escape_string($comp['name']) : '';
                     $ccost = isset($comp['cost']) ? floatval($comp['cost']) : null;
                     $csku = isset($comp['sku']) ? $conn->real_escape_string($comp['sku']) : '';
-                    // component_qty: prefer numeric extraction from supplied in_stock-like value
+                    // component_qty: preserve original string (may be an expression like '1/4')
+                    // Prefer explicit keys sent by the client: component_qty or qty, then fallback to in_stock
                     $component_qty = null;
-                    if (isset($comp['in_stock']) && trim($comp['in_stock']) !== '') {
+                    if (isset($comp['component_qty'])) {
+                        $component_qty = trim((string)$comp['component_qty']);
+                    } else if (isset($comp['qty'])) {
+                        $component_qty = trim((string)$comp['qty']);
+                    } else if (isset($comp['in_stock']) && trim((string)$comp['in_stock']) !== '') {
                         $txt = trim((string)$comp['in_stock']);
+                        // If in_stock starts with a simple numeric (e.g. '2 pcs'), extract numeric part
                         if (preg_match('/^([0-9]+(?:\.[0-9]+)?)/', $txt, $m)) {
-                            $component_qty = floatval($m[1]);
+                            $component_qty = $m[1];
+                        } else {
+                            $component_qty = $txt;
                         }
                     }
 
@@ -1262,7 +1411,7 @@ switch ($method) {
                         . intval($product_id) . ", "
                         . ($component_variant_id ? intval($component_variant_id) : 'NULL') . ", "
                         . ($component_product_id ? intval($component_product_id) : 'NULL') . ", "
-                        . ($component_qty !== null ? $conn->real_escape_string((string)$component_qty) : 'NULL') . ")";
+                        . ($component_qty !== null ? "'" . $conn->real_escape_string((string)$component_qty) . "'" : 'NULL') . ")";
                     if (!$conn->query($ins)) throw new Exception($conn->error);
                 }
 

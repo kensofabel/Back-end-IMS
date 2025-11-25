@@ -37,6 +37,65 @@ window.resetScannerVars = function() {
     }
 };
 
+// Evaluate simple arithmetic expressions entered into quantity fields (e.g. "1/4", "2+3/4").
+// Returns a Number (0 on invalid input).
+window.evaluateQuantityExpression = function(expr) {
+    try {
+        if (expr === null || typeof expr === 'undefined') return 0;
+        var s = String(expr).trim();
+        if (s === '') return 0;
+        // Remove common currency symbols and commas
+        s = s.replace(/[,_\s\u20B1\$]/g, '');
+        // Allow only digits, operators, parentheses, decimal point and whitespace
+        s = s.replace(/[^0-9+\-*/().\s]/g, '');
+        if (s === '') return 0;
+        // Reject obviously dangerous tokens
+        if (/[a-zA-Z]|\/\/|\/\*|\*\*/.test(s)) return 0;
+        // Evaluate expression in a safe function scope
+        var val = Function('"use strict"; return (' + s + ')')();
+        var num = Number(val);
+        return (isFinite(num) ? num : 0);
+    } catch (e) {
+        return 0;
+    }
+};
+
+// Restrict .comp-qty inputs to only numbers and + - * / and decimal point.
+// Use delegated listeners so dynamically created inputs are covered.
+document.addEventListener('keydown', function(e) {
+    try {
+        var t = e.target;
+        if (!t || !t.classList) return;
+        if (!t.classList.contains('comp-qty')) return;
+        // Allow navigation and control keys
+        var allowedControl = ['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
+        if (allowedControl.indexOf(e.key) !== -1) return;
+        // Allow Ctrl/Meta combos (copy/paste/select)
+        if (e.ctrlKey || e.metaKey) return;
+        // Allowed characters (include SPACE so users can type expressions like "1 / 4")
+        var allowedChars = '0123456789+-*/. ';
+        if (e.key.length === 1 && allowedChars.indexOf(e.key) === -1) {
+            e.preventDefault();
+        }
+    } catch (ex) {}
+});
+
+document.addEventListener('input', function(e) {
+    try {
+        var t = e.target;
+        if (!t || !t.classList) return;
+        if (!t.classList.contains('comp-qty')) return;
+        var v = t.value || '';
+        // Remove any disallowed characters (keep digits, +-*/., and whitespace)
+        var cleaned = String(v).replace(/[^0-9+\-*/.\s]/g, '');
+        if (cleaned !== v) {
+            var pos = t.selectionStart || 0;
+            t.value = cleaned;
+            try { t.setSelectionRange(pos - 1, pos - 1); } catch(e) {}
+        }
+    } catch (ex) {}
+});
+
 // Reusable confirmation popup for not found
 function showNotFoundConfirmation(message, onConfirm, onCancel) {
     // Add skip logic
@@ -5505,7 +5564,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         if (nameEl) fd.append('name', nameEl.value);
                         if (categoryEl) fd.append('category', categoryEl.value);
-                        if (priceEl) fd.append('price', (priceEl.value || '').toString().replace(/[^0-9.\-]/g, '') );
+                        if (priceEl) {
+                            var rawPriceVal = (priceEl.value || '').toString().trim();
+                            if (rawPriceVal === '') {
+                                // Empty input when editing should be treated as 'variable'
+                                fd.append('price', 'variable');
+                            } else {
+                                fd.append('price', rawPriceVal.replace(/[^0-9.\-]/g, ''));
+                            }
+                        }
                         if (costEl) fd.append('cost', (costEl.value || '').toString().replace(/[^0-9.\-]/g, '') );
                         fd.append('track_stock', trackEl && trackEl.checked ? '1' : '0');
                         fd.append('variantsTrackStock', variantsTrackEl && variantsTrackEl.checked ? '1' : '0');
@@ -5651,6 +5718,43 @@ document.addEventListener('DOMContentLoaded', function () {
                             deletedInputs.forEach(function(di) { fd.append('deleted_variants[]', di.value); });
                         }
                     } catch (errVar) { console.warn('Variant serialization failed', errVar); }
+
+                    // Collect composite components (if present in the edit UI) and append to FormData
+                    try {
+                        var compositeComponents = [];
+                        // Prefer the cloned composite view inside the Add Items panel when present
+                        var createClone = (addItemsPanel && addItemsPanel.querySelector) ? (addItemsPanel.querySelector('.composite-create-clone') || addItemsPanel.querySelector('.create-table-container')) : document.querySelector('.create-table-container');
+                        if (createClone) {
+                            var body = createClone.querySelector('tbody');
+                            if (body) {
+                                var crow = body.querySelectorAll('tr.component-row');
+                                crow.forEach(function(r) {
+                                    try {
+                                        var qtyEl = r.querySelector('.comp-qty') || r.querySelector('input[type="number"]');
+                                        var qtyVal = qtyEl ? qtyEl.value : null;
+                                        // attempt to read any embedded SKU text
+                                        var skuEl = r.querySelector('.comp-sku');
+                                        var skuText = '';
+                                        if (skuEl) skuText = (skuEl.textContent || '').replace(/^[sS][kK][uU]\s*:\s*/,'').trim();
+                                        // read any data attributes if present (pc id, variant/product ids)
+                                        var pcId = r.dataset && r.dataset.pcId ? parseInt(r.dataset.pcId,10) : 0;
+                                        var compVarId = r.dataset && r.dataset.componentVariantId ? parseInt(r.dataset.componentVariantId,10) : 0;
+                                        var compProdId = r.dataset && r.dataset.componentProductId ? parseInt(r.dataset.componentProductId,10) : 0;
+                                        var obj = {};
+                                        if (pcId && pcId > 0) obj.id = pcId;
+                                        if (compVarId && compVarId > 0) obj.component_variant_id = compVarId;
+                                        if (compProdId && compProdId > 0) obj.component_product_id = compProdId;
+                                        if (!obj.component_variant_id && !obj.component_product_id && skuText) obj.sku = skuText;
+                                        // include qty under component_qty (send the original user input string so it is stored as-is)
+                                        if (qtyVal !== null && qtyVal !== undefined) obj.component_qty = String(qtyVal);
+                                        // Only push if we have either a sku or an id/refs or a qty
+                                        if (Object.keys(obj).length) compositeComponents.push(obj);
+                                    } catch (e) { /* best-effort per-row */ }
+                                });
+                            }
+                        }
+                        if (compositeComponents.length) fd.append('composite_components', JSON.stringify(compositeComponents));
+                    } catch (e) { console.warn('composite components serialization failed', e); }
 
                     // POST to API endpoint
                     fetch('./api.php', {
@@ -7213,7 +7317,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                                         ${sku ? `<div class="comp-sku" style="color:#9e9e9e; font-size:12px; margin-top:0;">SKU: ${escapeHtml(sku)}</div>` : ''}
                                                                                     </div>
                                                                                 </td>
-                                                                                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="number" min="0" value="${qty}" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
+                                                                                <td style="padding:8px; width:120px; text-align:right;"><input class="comp-qty" type="text" value="${qty}" style="width:100%; padding:6px; background:#171717; border:1px solid #333; color:#fff; border-radius:4px; text-align:right;" /></td>
                                                                                 <td style="padding:8px; width:120px; text-align:right;"><input class="comp-cost" currency-localization="₱" readonly value="${'₱' + Number(cost).toFixed(2)}" style="width:100%; background:#171717; border: none; color:#fff; cursor:default; pointer-events: none; text-align:right;" /></td>
                                                                                 <td style="padding:8px; width:45px; text-align:center;"><button class="comp-remove btn" title="Remove" style="background:transparent; border:none; color:#bbb; font-size:18px; line-height:1; width:30px; height:34px; display:inline-flex; align-items:center; justify-content:center;">🗑</button></td>
                                                                             `;
@@ -7295,7 +7399,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                             const rows = tbody.querySelectorAll('tr.component-row');
                                                                             rows.forEach(r => {
                                                                                 try {
-                                                                                    const q = parseFloat(r.querySelector('.comp-qty').value) || 0;
+                                                                                    const qRaw = (r.querySelector('.comp-qty') && r.querySelector('.comp-qty').value) ? r.querySelector('.comp-qty').value : '';
+                                                                                    const q = window.evaluateQuantityExpression(qRaw) || 0;
                                                                                     const c = parseFloat((r.querySelector('.comp-cost').value || '').replace(/[^0-9.-]/g,'')) || 0;
                                                                                     total += q * c;
                                                                                 } catch(e) {}
@@ -7563,6 +7668,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                 const nameDropdown = document.getElementById('nameDropdown');
                                                                 if (nameDropdown) { nameDropdown.classList.remove('show'); nameDropdown.style.display = 'none'; }
                                                             } catch(e) {}
+                                                                    // Mark panel as composite and make the main Cost input non-editable
+                                                                    try {
+                                                                        try { if (panel && panel.setAttribute) panel.setAttribute('data-is-composite', '1'); } catch(e) {}
+                                                                        try {
+                                                                            const mainCost = (panel && panel.querySelector) ? panel.querySelector('#inlineItemCost') : document.getElementById('inlineItemCost');
+                                                                            if (mainCost) {
+                                                                                mainCost.readOnly = true;
+                                                                                mainCost.setAttribute('readonly','readonly');
+                                                                                mainCost.disabled = true;
+                                                                                mainCost.setAttribute('disabled','disabled');
+                                                                                try { mainCost.classList.add('composite-cost-disabled'); } catch(e) {}
+                                                                                try { mainCost.style.cursor = 'text'; mainCost.style.background = '#151515'; } catch(e) {}
+                                                                            }
+                                                                        } catch(e) {}
+                                                                    } catch(e) {}
                                                         } catch(e) {}
                                                     }
                                                 } catch(e) { console.warn('composite layout apply failed', e); }
@@ -7901,6 +8021,19 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     try { const a = addItemsPanel.querySelector('button[type="submit"].btn.btn-primary, button[type="submit"].btn-primary, button.btn-primary[type="submit"], #inlineAddItemsForm button[type="submit"]'); if (a) a.textContent = 'Add Item'; } catch (e) {}
                                                 }
                                                 try { addItemsPanel.removeAttribute('data-row-edit'); } catch (e) {}
+                                                // If this panel had been marked composite, clear that marker and re-enable Cost input
+                                                try {
+                                                    try { addItemsPanel.removeAttribute('data-is-composite'); } catch(e) {}
+                                                    try {
+                                                        const mainCost = (addItemsPanel && addItemsPanel.querySelector) ? addItemsPanel.querySelector('#inlineItemCost') : document.getElementById('inlineItemCost');
+                                                        if (mainCost) {
+                                                            try { mainCost.readOnly = false; mainCost.removeAttribute('readonly'); } catch(e) {}
+                                                            try { mainCost.disabled = false; mainCost.removeAttribute('disabled'); } catch(e) {}
+                                                            try { mainCost.classList.remove('composite-cost-disabled'); } catch(e) {}
+                                                            try { mainCost.style.cursor = ''; mainCost.style.background = ''; } catch(e) {}
+                                                        }
+                                                    } catch(e) {}
+                                                } catch(e) {}
                                                 try { mo.disconnect(); } catch (e) {}
                                             }
                                         } catch (e) { /* ignore */ }
