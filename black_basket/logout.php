@@ -18,11 +18,17 @@ if(isset($_SESSION['user'])) {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
     $actionText = 'Logout (' . ($userEmail ?: $uid) . ')';
-    $log_stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
-    if ($log_stmt) {
-        $log_stmt->bind_param("isss", $uid, $actionText, $ip, $user_agent);
-        $log_stmt->execute();
-        $log_stmt->close();
+    $helper = __DIR__ . '/scripts/log_audit.php';
+    if (file_exists($helper)) require_once $helper;
+    if (function_exists('log_audit')) {
+        @log_audit($conn, $uid, $actionText);
+    } else {
+        $log_stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+        if ($log_stmt) {
+            $log_stmt->bind_param("isss", $uid, $actionText, $ip, $user_agent);
+            $log_stmt->execute();
+            $log_stmt->close();
+        }
     }
 }
 

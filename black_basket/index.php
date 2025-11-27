@@ -38,14 +38,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             // For backward compatibility
             $_SESSION['user'] = $user['id'];
 
-            // --- INSERT THIS BLOCK FOR AUDIT LOGGING (include email in action text) ---
+            // --- AUDIT LOGGING (use central helper) ---
+            $helper = __DIR__ . '/scripts/log_audit.php';
+            if (file_exists($helper)) require_once $helper;
             $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
             $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-            $actionText = 'Login (' . ($user['email'] ?? $user['username'] ?? $username) . ')';
-            $stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("isss", $user['id'], $actionText, $ip, $user_agent);
-            $stmt->execute();
-            $stmt->close();
+            $emailOrUsername = $user['email'] ?? $user['username'] ?? $username;
+            $actionText = 'Login (' . $emailOrUsername . ')';
+            if (function_exists('log_audit')) {
+                @log_audit($conn, intval($user['id']), $actionText);
+            } else {
+                $stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+                if ($stmt) {
+                    $stmt->bind_param("isss", $user['id'], $actionText, $ip, $user_agent);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
             // --- END AUDIT LOGGING ---
 
             echo json_encode(['success' => true]);
@@ -54,11 +63,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             // --- OPTIONAL: LOG FAILED LOGIN ATTEMPT ---
             $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
             $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-            $null = null;
-            $stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, 'failed_login', ?, ?)");
-            $stmt->bind_param("iss", $null, $ip, $user_agent);
-            $stmt->execute();
-            $stmt->close();
+            if (function_exists('log_audit')) {
+                @log_audit($conn, 0, 'failed_login');
+            } else {
+                $nullId = 0;
+                $stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, 'failed_login', ?, ?)");
+                if ($stmt) {
+                    $stmt->bind_param("iss", $nullId, $ip, $user_agent);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
             // --- END FAILED LOGIN LOGGING ---
 
             echo json_encode(['success' => false, 'reason' => 'Invalid credentials']);
