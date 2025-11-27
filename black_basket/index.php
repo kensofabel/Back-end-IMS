@@ -38,11 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             // For backward compatibility
             $_SESSION['user'] = $user['id'];
 
-            // --- INSERT THIS BLOCK FOR AUDIT LOGGING ---
+            // --- INSERT THIS BLOCK FOR AUDIT LOGGING (include email in action text) ---
             $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
             $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-            $stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, 'login', ?, ?)");
-            $stmt->bind_param("iss", $user['id'], $ip, $user_agent);
+            $actionText = 'Login (' . ($user['email'] ?? $user['username'] ?? $username) . ')';
+            $stmt = $conn->prepare("INSERT INTO audit_logs (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $user['id'], $actionText, $ip, $user_agent);
             $stmt->execute();
             $stmt->close();
             // --- END AUDIT LOGGING ---
