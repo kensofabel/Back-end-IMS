@@ -23,7 +23,7 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo '<tr><td colspan="5">Error: Unable to connect to database</td></tr>';
+    echo '<tr><td colspan="4">Error: Unable to connect to database</td></tr>';
     exit;
 }
 
@@ -188,13 +188,12 @@ if ($export) {
     header('Content-Type: application/vnd.ms-excel');
     header('Content-Disposition: attachment; filename="audit_logs.xls"');
     $sep = "\t";
-    echo "Timestamp{$sep}User{$sep}Action{$sep}Details{$sep}IP Address\n";
+    echo "Timestamp{$sep}User{$sep}Action{$sep}IP Address\n";
     if ($result && $result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             echo $row['created_at'] . $sep;
             echo ($row['username'] ?? 'Unknown') . $sep;
             echo $row['action'] . $sep;
-            echo '' . $sep; // No details column
             echo $row['ip_address'] . "\n";
         }
     }
@@ -239,13 +238,12 @@ if ($export) {
     header('Content-Type: application/vnd.ms-excel');
     header('Content-Disposition: attachment; filename="audit_logs.xls"');
     $sep = "\t";
-    echo "Timestamp{$sep}User{$sep}Action{$sep}Details{$sep}IP Address\n";
+    echo "Timestamp{$sep}User{$sep}Action{$sep}IP Address\n";
     if ($result && $result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             echo $row['created_at'] . $sep;
             echo ($row['username'] ?? 'Unknown') . $sep;
             echo $row['action'] . $sep;
-            echo '' . $sep; // No details column
             echo $row['ip_address'] . "\n";
         }
     }
@@ -254,7 +252,7 @@ if ($export) {
     exit;
 }
 
-if ($result && $result->num_rows > 0) {
+    if ($result && $result->num_rows > 0) {
     // Output pagination metadata as an HTML comment for the client-side JS to parse
     $paginationMeta = json_encode([
         'page' => $page,
@@ -263,30 +261,27 @@ if ($result && $result->num_rows > 0) {
         'pages' => $total_pages
     ]);
     echo '<!-- PAGINATION: ' . $paginationMeta . ' -->';
-    while($row = $result->fetch_assoc()) {
+        while($row = $result->fetch_assoc()) {
         // Use raw timestamp for client-side processing
         $rawTimestamp = $row['created_at'];
-        
+
         // Add data attributes for real-time sorting and processing
         echo '<tr data-timestamp="' . htmlspecialchars($rawTimestamp) . '" data-log-id="' . htmlspecialchars($row['id'] ?? '') . '">';
-        
+
         // Let JavaScript handle the timestamp formatting for real-time updates
         echo '<td class="timestamp-cell" title="' . htmlspecialchars($rawTimestamp) . '">Loading...</td>';
-        
+
         echo '<td>' . htmlspecialchars($row['username'] ?? 'System') . '</td>';
-        // Add details if available (from the database schema, there might be details)
-        $details = $row['details'] ?? $row['description'] ?? '';
-        // Beautify action for a clearer, human-friendly message, keep raw action/details on hover
+        // Beautify action for a clearer, human-friendly message
         $rawAction = $row['action'] ?? '';
-        $formattedAction = beautify_action($rawAction, $details);
-        $titleAttr = htmlspecialchars($rawAction . ($details ? ' — ' . $details : ''));
+        $formattedAction = beautify_action($rawAction);
+        $titleAttr = htmlspecialchars($rawAction);
         echo '<td><span class="action-badge" title="' . $titleAttr . '">' . htmlspecialchars($formattedAction) . '</span></td>';
-        echo '<td>' . htmlspecialchars($details) . '</td>';
         echo '<td>' . htmlspecialchars($row['ip_address'] ?? 'N/A') . '</td>';
         echo '</tr>';
     }
 } else {
-    echo '<tr><td colspan="5" class="no-data">No audit logs found. Waiting for activity...</td></tr>';
+    echo '<tr><td colspan="4" class="no-data">No audit logs found. Waiting for activity...</td></tr>';
 }
 $stmt->close();
 $conn->close();

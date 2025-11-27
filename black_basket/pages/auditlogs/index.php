@@ -76,7 +76,6 @@ $result = $conn->query($sql);
                                         <th>Timestamp</th>
                                         <th>User</th>
                                         <th>Action</th>
-                                        <th>Details</th>
                                         <th>IP Address</th>
                                     </tr>
                                 </thead>
