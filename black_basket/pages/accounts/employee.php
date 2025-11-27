@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -7,6 +6,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 require_once __DIR__ . '/../../partials/check_permission.php';
 require_permission(11);
+require_once __DIR__ . '/../../partials/csrf.php';
+$csrf_token = csrf_get_token();
 ?>
 
 <!DOCTYPE html>
@@ -18,9 +19,128 @@ require_permission(11);
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="../../assets/css/content.css">
     <link rel="stylesheet" href="../../assets/css/employee.css">
-    <link rel="stylesheet" href="employee.css">
+    <link rel="stylesheet" href="employee.css?v=2">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="../../assets/images/icon.webp">
+    <style>
+        /* Page-scoped variables */
+        :root {
+            /* Accent updated to match user's screenshot (muted gray) */
+            --bb-accent: #6e6e6e;
+            --bb-bg-2: #1e1e1e;
+            --bb-bg-3: #151515;
+            --bb-text-muted: #cfcfcf;
+            --bb-table-row-hover: rgba(255,255,255,0.02);
+        }
+
+        /* Show the select column and checkboxes for the employees table on this page only */
+        #employees-table th.select-col,
+        #employees-table td.select-col {
+            display: table-cell !important;
+            width: 48px;
+            text-align: center;
+            vertical-align: middle;
+            padding: 6px 8px;
+        }
+
+        /* Make checkboxes larger and accessible. Use a lightweight custom checkbox
+           so unchecked boxes show the same muted border color as in the screenshot. */
+        #employees-table input[type="checkbox"].employee-select,
+        #employees-table input[type="checkbox"]#select-all-employees {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            margin: 0 auto;
+            cursor: pointer;
+            display: inline-block !important;
+            border: 2px solid var(--bb-accent);
+            border-radius: 6px;
+            background: transparent;
+            position: relative;
+            vertical-align: middle;
+            box-sizing: border-box;
+        }
+
+        /* Checked state: draw a simple check mark using ::after */
+        #employees-table input[type="checkbox"].employee-select:checked,
+        #employees-table input[type="checkbox"]#select-all-employees:checked {
+            background: var(--bb-accent);
+        }
+        #employees-table input[type="checkbox"].employee-select:checked::after,
+        #employees-table input[type="checkbox"]#select-all-employees:checked::after {
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 6px;
+            height: 11px;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            box-sizing: content-box;
+        }
+
+        /* Focus outlines for keyboard users */
+        #employees-table input[type="checkbox"].employee-select:focus,
+        #employees-table input[type="checkbox"]#select-all-employees:focus {
+            outline: 2px solid rgba(110,110,110,0.18);
+            outline-offset: 3px;
+            border-radius: 6px;
+        }
+
+        /* Table visuals specific to this page */
+        #employees-table { width:100%; border-collapse: collapse; table-layout: auto; }
+        #employees-table thead th { text-align: left; padding: 10px 12px; font-weight:600; color: #e6e6e6; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        #employees-table tbody td { padding: 10px 12px; color: #ddd; }
+
+        /* Row hover and subtle zebra striping for readability */
+        #employees-table tbody tr { transition: background-color 0.12s ease; }
+        #employees-table tbody tr:hover { background: var(--bb-table-row-hover); }
+        #employees-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.008); }
+
+        /* Action column: compact and aligned (centered) */
+        #employees-table td.action-col { white-space: nowrap; width: 140px; display:flex; align-items:center; justify-content:center; gap:8px; vertical-align: middle; }
+        #employees-table .btn-edit-role, #employees-table .btn-delete-role { margin:0; padding:6px 10px; border-radius:6px; background:transparent; color:#ddd; border:1px solid rgba(255,255,255,0.04); cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+        #employees-table .btn-edit-role i { margin-right:6px; }
+
+        /* Status column: center and vertically align */
+        #employees-table th.status-col, #employees-table td.status-col { text-align: center; vertical-align: middle; width: 120px; }
+
+        /* Status badge improvements (reduced size for compact layout) */
+        .status-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 6px; border-radius:10px; font-size:0.84rem; line-height:1; }
+        .status-badge i { font-size:0.92rem; display:inline-block; }
+        .status-active { background: rgba(40,160,80,0.08); color: #bff0c9; }
+        .status-inactive { background: rgba(220,60,60,0.06); color: #ffbfbf; }
+
+        /* Keep per-row delete buttons hidden (bulk delete preferred) */
+        tr.employee-row .btn-delete-role { display: none !important; }
+
+        /* Responsive: hide less-important columns on narrow viewports */
+        @media (max-width: 900px) {
+            #employees-table .employee-phone-cell,
+            #employees-table .employee-role-cell {
+                display: none;
+            }
+            #employees-table thead th.status-col,
+            #employees-table td.status-col {
+                display: none;
+            }
+            #employees-table td.action-col { text-align: left; }
+        }
+
+        /* Confirmation modal styles */
+        #confirm-modal {
+            position: fixed; left:0; top:0; right:0; bottom:0; display:none; align-items:center; justify-content:center; z-index:20000; background: rgba(0,0,0,0.6);
+        }
+        #confirm-modal .modal-content { background: var(--bb-bg-3); border-radius:8px; color:#eee; }
+        #confirm-modal .modal-header { display:flex; align-items:center; justify-content:space-between; }
+        #confirm-modal .modal-body { color:#ddd; }
+        #confirm-modal .modal-actions .btn { min-width:96px; }
+
+        /* Toast styles */
+        #toast-container .bb-toast { transition: all 0.28s ease; }
+    </style>
 </head>
 <body>  
     <?php include '../../partials/navigation.php'; ?>
@@ -44,6 +164,7 @@ require_permission(11);
                 <div class="tab-info-text" id="tab-info-text">Add, edit, or remove employees as needed for your system. Click status to toggle Active/Inactive.</div>
                 <div class="tab-info-actions" id="tab-info-actions">
                     <button class="btn-add-role" id="btn-add-employee"><i class="fas fa-user-plus"></i> Add Employee</button>
+                    <button id="btn-bulk-delete" class="btn-select-role delete" style="margin-left:8px; display:none;"><i class="fas fa-trash"></i> Delete selected</button>
                 </div>
             </div>
             <div class="tab-content" id="content-manage-employees">
@@ -59,14 +180,27 @@ $oStmt->fetch();
 $oStmt->close();
 if ($owner_id_val !== null) $owner_for_query = intval($owner_id_val);
 
-$stmt = $conn->prepare(
-    'SELECT u.id, u.full_name, u.email, u.phone, u.pos_pin, u.status, (SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name FROM users u WHERE u.owner_id = ? AND u.id <> ? ORDER BY u.full_name ASC'
-);
+// Detect optional columns (phone, pos_pin) to avoid fatal errors pre-migration
+$hasPhone = false;
+$hasPosPin = false;
+if ($colRes = $conn->query("SHOW COLUMNS FROM users LIKE 'phone'")) { $hasPhone = $colRes->num_rows > 0; $colRes->free(); }
+if ($colRes = $conn->query("SHOW COLUMNS FROM users LIKE 'pos_pin'")) { $hasPosPin = $colRes->num_rows > 0; $colRes->free(); }
+
+// Build SELECT list
+$selectCols = ['u.id','u.full_name','u.email','u.status'];
+if ($hasPhone) $selectCols[] = 'u.phone';
+if ($hasPosPin) $selectCols[] = 'u.pos_pin';
+$selectCols[] = '(SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as role_name';
+$sql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users u WHERE u.owner_id = ? AND u.id <> ? ORDER BY u.full_name ASC';
+
+$stmt = $conn->prepare($sql);
 $stmt->bind_param('ii', $owner_for_query, $currentUser);
 $employees = [];
 if ($stmt->execute()) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        if (!$hasPhone) $row['phone'] = '';
+        if (!$hasPosPin) $row['pos_pin'] = '';
         $employees[] = $row;
     }
     $res->free();
@@ -95,7 +229,7 @@ if (count($employees) > 0) {
     }
     echo '    </select>';
     echo '    <select id="employee-status-filter" style="padding:8px 10px;border-radius:6px;border:1px solid #444;background:#1e1e1e;color:#fff;">';
-    echo '      <option value="">All status</option><option value="active">Active</option><option value="inactive">Inactive</option>';
+    echo '      <option value="">All status</option><option value="active">Unlocked</option><option value="inactive">Locked</option>';
     echo '    </select>';
     echo '    <button id="employee-clear-filters" class="btn-add-role" style="padding:8px 14px;margin-left:6px;">Clear</button>';
     echo '  </div>';
@@ -103,6 +237,8 @@ if (count($employees) > 0) {
 
     echo '<table class="roles-table" id="employees-table">';
     echo '<thead><tr>';
+    // Select column for bulk actions
+    echo '<th class="select-col" style="width:40px;text-align:center;"><input id="select-all-employees" type="checkbox" aria-label="Select all employees" /></th>';
     echo '<th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th class="status-col">Status</th><th class="action-col">Actions</th>';
     echo '</tr></thead><tbody>';
     // Determine if current user can delete employees (owner or has Employee Management permission id=11)
@@ -138,20 +274,28 @@ if (count($employees) > 0) {
         $rname = htmlspecialchars($row['full_name'] ?? '');
         $remail = htmlspecialchars($row['email'] ?? '');
         $rphone = htmlspecialchars($row['phone'] ?? '');
-        $rpos = htmlspecialchars($row['pos_pin'] ?? '');
         $rrole = htmlspecialchars($row['role_name'] ?? '');
-        echo "<tr data-employee-id=\"{$rid}\">\n";
-        echo "    <td class=\"editable-cell\">{$rname}</td>\n";
-        echo "    <td class=\"editable-cell\">{$remail}</td>\n";
-        echo "    <td class=\"editable-cell\">{$rphone}</td>\n";
-        echo "    <td class=\"editable-cell\">{$rrole}</td>\n";
+    echo "<tr data-employee-id=\"{$rid}\" class=\"employee-row\">\n";
+    // Checkbox cell (keeps existing editable-cell column ordering untouched since checkbox is outside editable-cell)
+    $rNameForAria = htmlspecialchars($row['full_name'] ?? '');
+    echo "    <td class=\"select-col\" style=\"text-align:center;\"><input type=\"checkbox\" class=\"employee-select\" name=\"selected_employees[]\" value=\"{$rid}\" aria-label=\"Select {$rNameForAria}\" /></td>\n";
+    echo "    <td class=\"editable-cell employee-name-cell\">{$rname}</td>\n";
+    echo "    <td class=\"editable-cell employee-email-cell\">{$remail}</td>\n";
+    echo "    <td class=\"editable-cell employee-phone-cell\">{$rphone}</td>\n";
+    echo "    <td class=\"editable-cell employee-role-cell\">{$rrole}</td>\n";
+    // Presentational: treat stored 'status' as the user's actual availability
+    // and surface a lock/unlock control to administrators. Map active -> unlocked, inactive -> locked.
     $status = isset($row['status']) ? $row['status'] : 'active';
     $isActive = ($status === 'active');
     $badgeClass = $isActive ? 'status-active' : 'status-inactive';
     $iconClass = $isActive ? 'fa-check-circle' : 'fa-times-circle';
-    $statusText = $isActive ? 'Active' : 'Inactive';
+    // Map to Locked/Unlocked labels for the actionable toggle
+    $statusText = $isActive ? 'Unlocked' : 'Locked';
+    // Ensure an "actual state" attribute exists on the badge so client-side code
+    // can rely on it (e.g. online/offline). Default to 'offline' when not available.
+    $actualState = isset($row['actual_state']) ? $row['actual_state'] : 'offline';
     echo "    <td class=\"status-col\">\n";
-    echo "        <span class=\"status-badge {$badgeClass} status-badge-edit\" style=\"cursor:pointer;\" title=\"Toggle Status\" data-employee-id=\"{$rid}\" data-status=\"{$status}\">\n";
+    echo "        <span class=\"status-badge {$badgeClass} status-badge-edit\" style=\"cursor:pointer;\" title=\"Toggle Lock\" data-employee-id=\"{$rid}\" data-status=\"{$status}\" data-actual-state=\"{$actualState}\">\n";
     echo "            <i class=\"fas {$iconClass}\"></i>\n";
     echo "            <span class=\"status-text\">{$statusText}</span>\n";
     echo "        </span>\n";
@@ -200,6 +344,7 @@ if (count($employees) > 0) {
             </div>
             <div class="modal-body">
                 <form id="employee-form" method="post">
+                            <?php echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf_token) . '">'; ?>
                     <div class="form-group">
                         <label for="employee-name">Name</label>
                         <input type="text" id="employee-name" name="name" required>
@@ -248,6 +393,7 @@ if (count($employees) > 0) {
             </div>
             <div class="modal-body">
                 <form id="employee-edit-form" method="post">
+                        <?php echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf_token) . '">'; ?>
                     <div class="form-group">
                         <label for="edit-employee-name">Name</label>
                         <input type="text" id="edit-employee-name" name="name" required>
@@ -287,7 +433,24 @@ if (count($employees) > 0) {
         </div>
     </div>
 
-    <script src="employee.js"></script>
+    <script src="employee.js?v=3"></script>
+    <!-- Confirmation modal (used to replace window.confirm) -->
+    <div id="confirm-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:420px;padding:18px;">
+            <div class="modal-header">
+                <h2 id="confirm-modal-title">Confirm</h2>
+                <span class="close" id="confirm-modal-close">&times;</span>
+            </div>
+            <div class="modal-body" id="confirm-modal-body" style="padding:10px 0; color:#ddd;"></div>
+            <div class="modal-actions" style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
+                <button id="confirm-modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-modal-ok" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container for non-blocking messages -->
+    <div id="toast-container" style="position:fixed; right:18px; bottom:18px; z-index:20000; display:flex; flex-direction:column; gap:8px;"></div>
 </body>
 </html>
 

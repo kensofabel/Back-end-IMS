@@ -1,42 +1,96 @@
 /* Dark theme pagination bar for employees */
+/* Page layout alignment: center primary content areas and apply consistent gutters */
+:root {
+    --page-max-width: 1100px;
+    --page-gutter: 20px;
+}
+
+/* Center the main sections on the page and keep consistent horizontal padding */
+.tab-info-bar,
+.employee-filters,
+.roles-table,
+.employee-pagination-bar.dark-theme-pagination,
+.roles-header-row {
+    max-width: var(--page-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--page-gutter);
+    padding-right: var(--page-gutter);
+    box-sizing: border-box;
+}
+
+/* Ensure the main content blocks align visually (filters above table, pagination below) */
+.tab-content { display: block; }
+.employee-filters { align-items: center; }
+.employee-filters-left { flex: 1 1 auto; min-width: 0; }
+.employee-filters-right { flex: 0 0 auto; }
+
+/* Right-align actions consistently within the table area */
+.roles-table td.action-col { text-align: right; }
+.roles-table td.action-col > * { justify-content: flex-end; }
+
 .employee-pagination-bar.dark-theme-pagination {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding: 18px 12px 8px 12px;
-    background: #232323;
-    border-radius: 0 0 14px 14px;
-    border-top: 1.5px solid #333;
-    gap: 18px;
-    margin-top: -2px;
+    padding: 6px 10px; /* more compact */
+    background: #0f1112; /* deeper dark */
+    border-radius: 8px;
+    border-top: 1px solid rgba(255,255,255,0.02);
+    gap: 8px;
+    margin-top: 6px;
 }
 .employee-pagination-bar .pagination-btn {
     border: none;
-    background: #181818;
-    color: #888;
-    padding: 7px 16px;
+    background: #0e1011; /* inset dark button */
+    color: #cfcfcf;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 1.1rem;
-    transition: background 0.15s, color 0.15s;
+    font-size: 0.9rem;
+    transition: background 0.12s, color 0.12s, transform 0.06s;
 }
 .employee-pagination-bar .pagination-btn:enabled {
     color: #fff;
-    background: #333;
-    cursor: pointer;
+    background: #1b1f20;
 }
-.employee-pagination-bar .pagination-btn:enabled:hover, .employee-pagination-bar .pagination-btn:enabled:focus {
-    background: #444;
+.employee-pagination-bar .pagination-btn:enabled:hover,
+.employee-pagination-bar .pagination-btn:enabled:focus {
+    background: #26292a;
     color: #ffb300;
+    transform: translateY(-0.5px);
 }
 /* Make the page number input and rows-per-page select match the dark system background */
-.employee-pagination-bar .pagination-page-input,
-.employee-pagination-bar .pagination-rows-select {
-    background: transparent; /* let the bar background show through */
+.employee-pagination-bar .pagination-page-input {
+    /* Smaller dark page input: compact and low-profile */
+    background: #0f1112;
     color: #ffffff;
-    border: 1px solid #333;
+    border: 1px solid rgba(255,255,255,0.03);
+    padding: 4px 6px;
+    border-radius: 6px;
+    width: 34px;
+    min-width: 34px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+.employee-pagination-bar .pagination-rows-select {
+    /* More compact rows-per-page select */
+    background: #161718;
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.02);
     padding: 4px 8px;
     border-radius: 6px;
+    font-size: 0.95rem;
 }
 .employee-pagination-bar .pagination-page-input::-webkit-outer-spin-button,
 .employee-pagination-bar .pagination-page-input::-webkit-inner-spin-button {
@@ -46,28 +100,36 @@
 .employee-pagination-bar .pagination-page-input:focus,
 .employee-pagination-bar .pagination-rows-select:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(255,185,0,0.08);
+    box-shadow: 0 0 0 4px rgba(255,185,0,0.06);
 }
-.employee-pagination-bar .pagination-current-page {
-    color: #ffb300;
-    font-weight: 600;
-    font-size: 1.08rem;
-    margin: 0 2px;
+.employee-pagination-bar .pagination-label {
+    color: #d3d3d3;
+    font-size: 0.98rem;
+    margin-right: 6px;
+}
+.employee-pagination-bar .pagination-of {
+    color: #9a9a9a;
+    margin: 0 8px;
 }
 .employee-pagination-bar .pagination-total-pages {
-    color: #fff;
-    font-size: 1.04rem;
-    margin: 0 2px;
+    color: #ffffff;
+    font-weight: 600;
 }
 @media (max-width: 700px) {
     .employee-pagination-bar.dark-theme-pagination {
-        padding: 10px 2px 6px 2px;
-        gap: 8px;
-        font-size: 0.97rem;
+        padding: 6px 6px;
+        gap: 6px;
+        font-size: 0.92rem;
     }
     .employee-pagination-bar .pagination-btn {
-        padding: 5px 8px;
-        font-size: 0.98rem;
+        width: 28px;
+        height: 28px;
+        font-size: 0.88rem;
+    }
+    .employee-pagination-bar .pagination-page-input {
+        width: 30px;
+        height: 26px;
+        font-size: 0.92rem;
     }
 }
 /* Employee page specific styles extracted from content.css (non-destructive copy)
@@ -164,6 +226,33 @@
 .roles-table td.action-col .btn-delete-role {
     padding: 6px 10px;
     font-size: 0.98rem;
+}
+
+/* Compact Edit button specifically for the actions column to align with status badges */
+.roles-table td.action-col .btn-edit-role {
+    padding: 4px 8px;
+    font-size: 0.92rem;
+    min-width: 44px;
+    height: auto;
+    line-height: 1;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.04);
+    color: #ff9800;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.roles-table td.action-col .btn-edit-role i {
+    font-size: 0.92rem;
+}
+
+/* Make delete button visually smaller too when visible */
+.roles-table td.action-col .btn-delete-role {
+    padding: 4px 8px;
+    font-size: 0.92rem;
+    border-radius: 6px;
 }
 .roles-table td.action-col > * {
     vertical-align: middle;

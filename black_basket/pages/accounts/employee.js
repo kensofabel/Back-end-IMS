@@ -1,15 +1,28 @@
 // --- Status toggle for employees ---
+console.log('employee.js loaded (v2)');
+// Show the missing-actual-state toast only once per page load
+window._bb_actualStateMissingNotified = window._bb_actualStateMissingNotified || false;
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.addEventListener('click', function(e) {
+            badge.addEventListener('click', async function(e) {
             const empId = this.getAttribute('data-employee-id');
-            const currentStatus = this.getAttribute('data-status');
             if (!empId) return;
             const badgeEl = this;
+            // Ensure actual state is set before toggling lock/unlock. Prompt user if missing.
+            let actualState = (badgeEl.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
+            if (!actualState || actualState === 'offline' || actualState === 'unknown') {
+                const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
+                if (!chosen) {
+                    try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {}
+                    return;
+                }
+                actualState = chosen;
+                badgeEl.setAttribute('data-actual-state', actualState);
+            }
             fetch('toggle_employee_status.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + encodeURIComponent(empId)
+                body: 'id=' + encodeURIComponent(empId) + '&actual_state=' + encodeURIComponent(actualState)
             })
             .then(r => r.json())
             .then(data => {
@@ -18,23 +31,217 @@ document.addEventListener('DOMContentLoaded', function() {
                     badgeEl.setAttribute('data-status', newStatus);
                     const icon = badgeEl.querySelector('i');
                     const text = badgeEl.querySelector('.status-text');
+                    // Map server 'active'/'inactive' to Unlocked/Locked UI labels
                     if (newStatus === 'active') {
                         badgeEl.classList.add('status-active');
                         badgeEl.classList.remove('status-inactive');
                         if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
-                        if (text) text.textContent = 'Active';
+                        if (text) text.textContent = 'Unlocked';
                     } else {
                         badgeEl.classList.remove('status-active');
                         badgeEl.classList.add('status-inactive');
                         if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
-                        if (text) text.textContent = 'Inactive';
+                        if (text) text.textContent = 'Locked';
                     }
                 } else {
-                    alert(data.message || 'Failed to toggle status');
+                    showToast('error', data.message || 'Failed to toggle lock');
                 }
             })
-            .catch(() => alert('Failed to toggle status'));
+            .catch(() => showToast('error', 'Failed to toggle lock'));
         });
+    });
+});
+// Helper for employee row cells — use .editable-cell to avoid relying on child index (checkbox column may be present)
+function getEditableCellText(row, idx) {
+    if (!row) return '';
+    const cells = row.querySelectorAll('.editable-cell');
+    return (cells && cells[idx] && cells[idx].innerText) ? cells[idx].innerText : '';
+}
+function setEditableCellText(row, idx, text) {
+    if (!row) return;
+    const cells = row.querySelectorAll('.editable-cell');
+    if (cells && cells[idx]) cells[idx].innerText = text;
+}
+// ---------- In-page toast & confirm helpers ----------
+// showToast(type, message, timeoutMs)
+function showToast(type, message, timeout) {
+    timeout = typeof timeout === 'number' ? timeout : 4000;
+    const container = document.getElementById('toast-container');
+    if (!container) {
+        // fallback to alert if toast container missing
+        alert(message);
+        return;
+    }
+    const toast = document.createElement('div');
+    toast.className = 'bb-toast bb-toast-' + (type || 'info');
+    toast.style.background = type === 'error' ? '#d9534f' : (type === 'success' ? '#4caf50' : (type === 'warning' ? '#f0ad4e' : '#333'));
+    toast.style.color = '#fff';
+    toast.style.padding = '10px 14px';
+    toast.style.borderRadius = '6px';
+    toast.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
+    toast.style.maxWidth = '320px';
+    toast.style.wordBreak = 'break-word';
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(6px)'; }, timeout - 300);
+    setTimeout(() => { try { toast.remove(); } catch (e) {} }, timeout);
+}
+
+// showConfirm(message, title) -> Promise<boolean>
+function showConfirm(message, title) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('confirm-modal');
+        if (!modal) {
+            // fallback
+            resolve(window.confirm(message));
+            return;
+        }
+        const body = document.getElementById('confirm-modal-body');
+        const ok = document.getElementById('confirm-modal-ok');
+        const cancel = document.getElementById('confirm-modal-cancel');
+        const close = document.getElementById('confirm-modal-close');
+        const titleEl = document.getElementById('confirm-modal-title');
+        if (titleEl) titleEl.innerText = title || 'Confirm';
+        if (body) body.innerText = message || '';
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+        // ensure buttons exist
+        function cleanup(result) {
+            try { modal.style.display = 'none'; modal.classList.remove('show'); } catch (e) {}
+            ok.removeEventListener('click', onOk);
+            cancel.removeEventListener('click', onCancel);
+            close.removeEventListener('click', onCancel);
+            resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        ok.addEventListener('click', onOk);
+        cancel.addEventListener('click', onCancel);
+        close.addEventListener('click', onCancel);
+    });
+}
+// showActualStatePicker(message, title) -> Promise<string|null>
+function showActualStatePicker(message, title) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('confirm-modal');
+        // Fallback to prompt if modal not present
+        if (!modal) {
+            const ans = window.prompt((message || 'Set actual state (online/offline):') + '\nEnter online or offline', 'offline');
+            if (!ans) return resolve(null);
+            const val = (ans || '').trim().toLowerCase();
+            if (val !== 'online' && val !== 'offline') return resolve(null);
+            return resolve(val);
+        }
+        const body = document.getElementById('confirm-modal-body');
+        const ok = document.getElementById('confirm-modal-ok');
+        const cancel = document.getElementById('confirm-modal-cancel');
+        const close = document.getElementById('confirm-modal-close');
+        const titleEl = document.getElementById('confirm-modal-title');
+        if (titleEl) titleEl.innerText = title || 'Set actual state';
+        if (body) body.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="font-size:0.95rem;">${(message||'Choose actual state')}</div>
+                <label style="display:flex;align-items:center;gap:8px;"><input type="radio" name="bb_actual_state" value="online"> <span>Online</span></label>
+                <label style="display:flex;align-items:center;gap:8px;"><input type="radio" name="bb_actual_state" value="offline" checked> <span>Offline</span></label>
+            </div>`;
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+        function cleanup() {
+            try { modal.style.display = 'none'; modal.classList.remove('show'); } catch (e) {}
+            ok.removeEventListener('click', onOk);
+            cancel.removeEventListener('click', onCancel);
+            close.removeEventListener('click', onCancel);
+        }
+        function onOk() {
+            const sel = modal.querySelector('input[name="bb_actual_state"]:checked');
+            const v = sel ? sel.value : null;
+            cleanup();
+            resolve(v);
+        }
+        function onCancel() {
+            cleanup();
+            resolve(null);
+        }
+        ok.addEventListener('click', onOk);
+        cancel.addEventListener('click', onCancel);
+        close.addEventListener('click', onCancel);
+    });
+}
+// Return array of selected employee IDs (strings)
+function getSelectedEmployeeIds() {
+    return Array.from(document.querySelectorAll('.employee-select:checked')).map(cb => cb.value);
+}
+
+// Attach change handlers to employee-select checkboxes and keep select-all in sync
+function attachEmployeeSelectHandlers() {
+    const selectAll = document.getElementById('select-all-employees');
+    // header checkbox handler (only attach once)
+    if (selectAll && !selectAll._hasSelectionHandler) {
+        selectAll._hasSelectionHandler = true;
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.employee-select').forEach(cb => cb.checked = selectAll.checked);
+            // Ensure toolbar updates when select-all toggled
+            updateBulkToolbarState();
+        });
+    }
+    // per-row checkboxes
+    document.querySelectorAll('.employee-select').forEach(cb => {
+        if (cb._hasSelectionHandler) return; cb._hasSelectionHandler = true;
+        cb.addEventListener('change', function() {
+            const all = Array.from(document.querySelectorAll('.employee-select'));
+            if (selectAll) selectAll.checked = all.length > 0 && all.every(c => c.checked);
+            // Update bulk toolbar visibility
+            updateBulkToolbarState();
+        });
+    });
+    // Ensure toolbar state is correct after handlers attached
+    updateBulkToolbarState();
+}
+
+function updateBulkToolbarState() {
+    const btn = document.getElementById('btn-bulk-delete');
+    if (!btn) return;
+    const selected = getSelectedEmployeeIds();
+    const has = selected && selected.length > 0;
+    // Show/hide the bulk-delete button depending on selection
+    btn.style.display = has ? '' : 'none';
+}
+
+// Bulk delete handler
+document.addEventListener('DOMContentLoaded', function() {
+    const bulkBtn = document.getElementById('btn-bulk-delete');
+    if (!bulkBtn) return;
+    bulkBtn.addEventListener('click', async function() {
+        const ids = getSelectedEmployeeIds();
+        if (!ids || ids.length === 0) return;
+        const ok = await showConfirm('Are you sure you want to permanently delete the selected employees? This cannot be undone.', 'Delete employees');
+        if (!ok) return;
+        try {
+            const resp = await fetch('employees_bulk.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employee_ids: ids })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (data && data.success) {
+                (data.deleted || []).forEach(id => {
+                    const row = document.querySelector('#employees-table tbody tr[data-employee-id="' + id + '"]');
+                    if (row && row.parentNode) row.parentNode.removeChild(row);
+                });
+                updateBulkToolbarState();
+                if ((data.failed || []).length > 0) {
+                    showToast('warning', 'Some items could not be deleted. See console for details.');
+                    console.warn('Failed deletions', data.failed);
+                } else {
+                    showToast('success', 'Selected employees deleted.');
+                }
+            } else {
+                showToast('error', data && data.message ? data.message : 'Failed to delete selected employees');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('error', 'Network or server error while deleting');
+        }
     });
 });
 // --- Employee Table Pagination Logic ---
@@ -152,10 +359,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const status = (document.getElementById('employee-status-filter') || {}).value || '';
         const lq = q.trim().toLowerCase();
         getAllRows().forEach(row => {
-            const name = (row.children[0] && row.children[0].innerText || '').toLowerCase();
-            const email = (row.children[1] && row.children[1].innerText || '').toLowerCase();
-            const phone = (row.children[2] && row.children[2].innerText || '').toLowerCase();
-            const roleCell = (row.children[3] && row.children[3].innerText || '').toLowerCase();
+            const name = (getEditableCellText(row, 0) || '').toLowerCase();
+            const email = (getEditableCellText(row, 1) || '').toLowerCase();
+            const phone = (getEditableCellText(row, 2) || '').toLowerCase();
+            const roleCell = (getEditableCellText(row, 3) || '').toLowerCase();
             const badge = row.querySelector('.status-badge') || row.querySelector('.status-badge-edit');
             let rowStatus = '';
             if (badge) {
@@ -201,6 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
             table.innerHTML = `
                 <thead>
                     <tr>
+                        <th class="select-col" style="width:40px;text-align:center;"><input id="select-all-employees" type="checkbox" aria-label="Select all employees" /></th>
                         <th>Name</th>
                         <th>Email</th>
                         <th>Phone</th>
@@ -228,11 +436,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusText = isActive ? 'Active' : 'Inactive';
             const tr = document.createElement('tr');
             tr.setAttribute('data-employee-id', id);
+            tr.className = 'employee-row';
             tr.innerHTML = `
-                <td class="editable-cell">${name}</td>
-                <td class="editable-cell">${email}</td>
-                <td class="editable-cell">${phone}</td>
-                <td class="editable-cell">${role}</td>
+                <td class="select-col" style="text-align:center;"><input type="checkbox" class="employee-select" name="selected_employees[]" value="${id}" aria-label="Select ${name}" /></td>
+                <td class="editable-cell employee-name-cell">${name}</td>
+                <td class="editable-cell employee-email-cell">${email}</td>
+                <td class="editable-cell employee-phone-cell">${phone}</td>
+                <td class="editable-cell employee-role-cell">${role}</td>
                 <td class="status-col">
                     <span class="status-badge ${badgeClass} status-badge-edit" style="cursor:pointer;" title="Toggle Status" data-employee-id="${id}" data-status="${status}">
                         <i class="fas ${iconClass}"></i>
@@ -245,23 +455,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td>`;
             tbody.appendChild(tr);
         });
-        attachDynamicRowHandlers();
-        // set tooltips for truncated content
-        setCellTooltips();
+    attachDynamicRowHandlers();
+    // Attach employee-select handlers for newly rendered rows
+    attachEmployeeSelectHandlers();
+    // set tooltips for truncated content
+    setCellTooltips();
     }
 
     function attachDynamicRowHandlers() {
         document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
             if (badge._hasHandler) return; badge._hasHandler = true;
-            badge.addEventListener('click', function(e) {
+            badge.addEventListener('click', async function(e) {
                 const empId = this.getAttribute('data-employee-id');
                 if (!empId) return;
-                const badgeEl = this;
-                fetch('toggle_employee_status.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'id=' + encodeURIComponent(empId)
-                })
+                    const badgeEl = this;
+                    // Ensure actual_state exists on dynamically attached badges as well
+                    let actualState = (badgeEl.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
+                    if (!actualState || actualState === 'offline' || actualState === 'unknown') {
+                        const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
+                        if (!chosen) { try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {} ; return; }
+                        actualState = chosen;
+                        badgeEl.setAttribute('data-actual-state', actualState);
+                    }
+                    fetch('toggle_employee_status.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'id=' + encodeURIComponent(empId) + '&actual_state=' + encodeURIComponent(actualState)
+                    })
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
@@ -273,44 +493,50 @@ document.addEventListener('DOMContentLoaded', function() {
                             badgeEl.classList.add('status-active');
                             badgeEl.classList.remove('status-inactive');
                             if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
-                            if (text) text.textContent = 'Active';
+                            if (text) text.textContent = 'Unlocked';
                         } else {
                             badgeEl.classList.remove('status-active');
                             badgeEl.classList.add('status-inactive');
                             if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
-                            if (text) text.textContent = 'Inactive';
+                            if (text) text.textContent = 'Locked';
                         }
-                    } else {
-                        alert(data.message || 'Failed to toggle status');
-                    }
-                })
-                .catch(() => alert('Failed to toggle status'));
+                        } else {
+                            showToast('error', data.message || 'Failed to toggle lock');
+                        }
+                    })
+                    .catch(() => showToast('error', 'Failed to toggle lock'));
             });
         });
 
         document.querySelectorAll('.btn-delete-role').forEach(function(btn) {
             if (btn._hasHandler) return; btn._hasHandler = true;
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', async function(e) {
                 e.stopPropagation();
-                if (!confirm('Are you sure you want to delete this employee?')) return;
+                const ok = await showConfirm('Are you sure you want to delete this employee?', 'Delete employee');
+                if (!ok) return;
                 const row = this.closest('tr');
                 const empId = row && (row.getAttribute('data-employee-id') || '');
                 if (empId && /^\d+$/.test(empId)) {
-                    fetch('delete_employee.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: `employee_id=${encodeURIComponent(empId)}`
-                    }).then(r => r.json()).then(data => {
+                    try {
+                        const resp = await fetch('delete_employee.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: `employee_id=${encodeURIComponent(empId)}`
+                        });
+                        const data = await resp.json().catch(() => ({}));
                         if (data && data.success) {
                             if (row && row.parentNode) row.parentNode.removeChild(row);
+                            showToast('success', 'Employee deleted.');
                         } else {
-                            alert(data.message || 'Failed to delete employee');
+                            showToast('error', data.message || 'Failed to delete employee');
                         }
-                    }).catch(() => {
-                        if (confirm('Could not contact server to delete account. Remove locally from the table instead?')) {
+                    } catch (err) {
+                        console.error(err);
+                        const removeLocal = await showConfirm('Could not contact server to delete account. Remove locally from the table instead?', 'Remove locally?');
+                        if (removeLocal) {
                             if (row && row.parentNode) row.parentNode.removeChild(row);
                         }
-                    });
+                    }
                 } else {
                     if (row && row.parentNode) row.parentNode.removeChild(row);
                 }
@@ -328,10 +554,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 var emailEl = document.getElementById('edit-employee-email');
                 var phoneEl = document.getElementById('edit-employee-phone');
                 var roleEl = document.getElementById('edit-employee-role');
-                if (nameEl) nameEl.value = row.children[0].innerText;
-                if (emailEl) emailEl.value = row.children[1].innerText;
-                if (phoneEl) phoneEl.value = row.children[2].innerText;
-                if (roleEl) roleEl.value = row.children[3].innerText;
+                if (nameEl) nameEl.value = getEditableCellText(row, 0);
+                if (emailEl) emailEl.value = getEditableCellText(row, 1);
+                if (phoneEl) phoneEl.value = getEditableCellText(row, 2);
+                if (roleEl) roleEl.value = getEditableCellText(row, 3);
                 try { if (typeof updateFormGroupState === 'function') { if (nameEl) updateFormGroupState(nameEl); if (emailEl) updateFormGroupState(emailEl); if (phoneEl) updateFormGroupState(phoneEl); if (roleEl) updateFormGroupState(roleEl); } } catch (err) {}
             });
         });
@@ -339,8 +565,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add tooltips for truncated table cells (only if text is overflowing)
     function setCellTooltips() {
-        const selector = '#employees-table tbody tr td:nth-child(1), #employees-table tbody tr td:nth-child(2), #employees-table tbody tr td:nth-child(3), #employees-table tbody tr td:nth-child(4)';
-        document.querySelectorAll(selector).forEach(td => {
+        const selector = '#employees-table tbody tr td.employee-name-cell, #employees-table tbody tr td.employee-email-cell, #employees-table tbody tr td.employee-phone-cell, #employees-table tbody tr td.employee-role-cell';
+            document.querySelectorAll(selector).forEach(td => {
             // clear previous title
             td.removeAttribute('title');
             // use timeout to ensure rendered widths are calculated after DOM changes
@@ -394,14 +620,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchEl = document.getElementById('employee-search');
     if (searchEl) searchEl.addEventListener('input', function() { if (serverMode) { debouncedApply(); loadEmployeesServer(1); } else debouncedApply(); });
     const roleFilter = document.getElementById('employee-role-filter');
-    if (roleFilter) roleFilter.addEventListener('change', function() { if (serverMode) loadEmployeesServer(1); else applyFilters(); });
+    if (roleFilter) roleFilter.addEventListener('change', function() { 
+        if (serverMode) loadEmployeesServer(1); else applyFilters(); 
+        // Reset header select-all checkbox when role filter changes to avoid stale selection state
+        try {
+            const sa = document.getElementById('select-all-employees');
+            if (sa && sa.checked) { sa.checked = false; updateBulkToolbarState(); }
+        } catch (e) {}
+    });
     const statusFilter = document.getElementById('employee-status-filter');
-    if (statusFilter) statusFilter.addEventListener('change', function() { if (serverMode) loadEmployeesServer(1); else applyFilters(); });
+    if (statusFilter) statusFilter.addEventListener('change', function() {
+        if (serverMode) loadEmployeesServer(1); else applyFilters();
+        // Reset header select-all checkbox when status filter changes to avoid stale selection state
+        try {
+            const sa = document.getElementById('select-all-employees');
+            if (sa && sa.checked) { sa.checked = false; updateBulkToolbarState(); }
+        } catch (e) {}
+    });
     const clearBtn = document.getElementById('employee-clear-filters');
     if (clearBtn) clearBtn.addEventListener('click', function() {
         if (searchEl) searchEl.value = '';
         if (roleFilter) roleFilter.value = '';
         if (statusFilter) statusFilter.value = '';
+        // Reset header select-all checkbox when clearing filters to avoid stale selection state
+        try {
+            const sa = document.getElementById('select-all-employees');
+            if (sa && sa.checked) { sa.checked = false; updateBulkToolbarState(); }
+        } catch (e) {}
         if (serverMode) loadEmployeesServer(1); else {
             getAllRows().forEach(r => r.classList.remove('filtered-out'));
             const noMsg = document.getElementById('no-employees-filter-message'); if (noMsg) noMsg.style.display = 'none';
@@ -414,6 +659,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Ensure tooltips are set for the initial client-side table too
     setTimeout(setCellTooltips, 200);
+    // Ensure employee checkbox handlers are attached (handles existing rows)
+    attachEmployeeSelectHandlers();
 });
 // Consolidated accounts JS (moved from assets/js/content.js + page inline handlers)
 // This file is loaded by pages in pages/accounts/*.php
@@ -554,7 +801,7 @@ document.querySelectorAll('.btn-edit-role').forEach(function(editBtn) {
 });
 
 document.querySelectorAll('.btn-save-role').forEach(function(saveBtn) {
-    saveBtn.addEventListener('click', function() {
+    saveBtn.addEventListener('click', async function() {
         // Re-enable Add Role and Select buttons after save
         const addRoleBtn = document.getElementById('btn-add-role');
         const selectBtn = document.getElementById('btn-select-role');
@@ -585,7 +832,7 @@ document.querySelectorAll('.btn-save-role').forEach(function(saveBtn) {
             statusValue // status
         ];
         const changed = original.some((val, idx) => val !== current[idx]);
-        if (!changed || confirm("Are you sure you want to save changes?")) {
+    if (!changed || await showConfirm("Are you sure you want to save changes?", 'Save changes')) {
             // AJAX to update_role.php
             const roleId = row.dataset.roleId;
             const name = current[0].trim();
@@ -610,55 +857,58 @@ document.querySelectorAll('.btn-save-role').forEach(function(saveBtn) {
                     const deleteBtn = row.querySelector('.btn-delete-role');
                     if (deleteBtn) deleteBtn.style.display = "none";
                 } else {
-                    alert(data.message || 'Failed to update role.');
+                    showToast('error', data.message || 'Failed to update role.');
                 }
             })
-            .catch(() => alert('Failed to update role.'));
+            .catch(() => showToast('error', 'Failed to update role.'));
         }
     });
 });
 
 // Attach delete logic for role delete buttons (after DOM is ready)
 document.addEventListener('DOMContentLoaded', function() {
+    // Replace role delete handlers to use in-page confirm/toast when not in select mode
     document.querySelectorAll('.btn-delete-role').forEach(function(deleteBtn) {
         // Remove any previous click handlers to prevent stacking
-        deleteBtn.replaceWith(deleteBtn.cloneNode(true));
+        const newBtn = deleteBtn.cloneNode(true);
+        deleteBtn.parentNode.replaceChild(newBtn, deleteBtn);
     });
     document.querySelectorAll('.btn-delete-role').forEach(function(deleteBtn) {
-        deleteBtn.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent bubbling and duplicate triggers
+        deleteBtn.addEventListener('click', async function(e) {
+            e.stopPropagation();
             const row = this.closest('tr');
-            const roleId = row.dataset.roleId;
-            // Only confirm here if not in select mode
-            if (typeof selectMode !== 'undefined' && selectMode) {
-                // In select mode, confirmation is already handled
-                return;
-            }
-            // Proceed with delete request for roleId
-            fetch('delete_role.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `role_id=${encodeURIComponent(roleId)}`
-            })
-            .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        row.parentNode.removeChild(row);
+            const roleId = row && row.dataset.roleId;
+            if (typeof selectMode !== 'undefined' && selectMode) return;
+            const ok = await showConfirm('Are you sure you want to delete this role?', 'Delete role');
+            if (!ok) return;
+            try {
+                const res = await fetch('delete_role.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `role_id=${encodeURIComponent(roleId)}`
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.success) {
+                    if (row && row.parentNode) row.parentNode.removeChild(row);
+                    showToast('success', 'Role deleted.');
+                } else {
+                    if (data.message && data.message.trim()) {
+                        showToast('error', data.message);
                     } else {
-                        if (data.message && data.message.trim()) {
-                            alert(data.message);
-                        } else {
-                            console.warn('Failed to delete role (no error message from server).');
-                        }
+                        console.warn('Failed to delete role (no error message from server).');
+                        showToast('error', 'Failed to delete role.');
                     }
-                })
-            .catch(() => { console.warn('Failed to delete role (network or server error).'); });
+                }
+            } catch (err) {
+                console.warn('Failed to delete role (network or server error).', err);
+                showToast('error', 'Network or server error while deleting role.');
+            }
         });
     });
 });
 
 document.querySelectorAll('.btn-cancel-role').forEach(function(cancelBtn) {
-    cancelBtn.addEventListener('click', function() {
+    cancelBtn.addEventListener('click', async function() {
         // Re-enable Add Role and Select buttons after cancel
         const addRoleBtn = document.getElementById('btn-add-role');
         const selectBtn = document.getElementById('btn-select-role');
@@ -689,7 +939,7 @@ document.querySelectorAll('.btn-cancel-role').forEach(function(cancelBtn) {
             statusValue // status
         ];
         const changed = original.some((val, idx) => val !== current[idx]);
-        if (!changed || confirm("Are you sure you want to cancel editing?")) {
+    if (!changed || await showConfirm("Are you sure you want to cancel editing?", 'Cancel editing')) {
             // Restore original values if needed
             if (changed) {
                 editableCells[0].innerText = original[0] || editableCells[0].innerText;
@@ -787,7 +1037,7 @@ function attachRoleTabHandlers() {
 
     // Select button logic
     if (selectBtn) {
-        selectBtn.addEventListener('click', function() {
+        selectBtn.addEventListener('click', async function() {
             if (!selectMode) {
                 setSelectMode(true);
             } else {
@@ -795,9 +1045,9 @@ function attachRoleTabHandlers() {
                 const checkedRows = Array.from(document.querySelectorAll('.row-select-checkbox')).filter(cb => cb.checked);
                 if (checkedRows.length === 0) return;
                 if (checkedRows.length === document.querySelectorAll('.row-select-checkbox').length) {
-                    if (!confirm('Are you sure you want to delete ALL selected roles?')) return;
+                    if (!await showConfirm('Are you sure you want to delete ALL selected roles?', 'Delete roles')) return;
                 } else {
-                    if (!confirm('Are you sure you want to delete the selected roles?')) return;
+                    if (!await showConfirm('Are you sure you want to delete the selected roles?', 'Delete roles')) return;
                 }
                 // Collect role IDs from data-role-id
                 const roleIds = checkedRows.map(cb => cb.closest('tr').dataset.roleId).filter(Boolean);
@@ -824,10 +1074,10 @@ function attachRoleTabHandlers() {
                         });
                         setSelectMode(false);
                     } else {
-                        alert(data.message || 'Failed to delete roles.');
+                        showToast('error', data.message || 'Failed to delete roles.');
                     }
                 })
-                .catch(() => alert('Failed to delete roles.'));
+                .catch(() => showToast('error', 'Failed to delete roles.'));
             }
         });
     }
@@ -894,7 +1144,7 @@ function attachRoleTabHandlers() {
                     const name = cells[0].innerText.trim();
                     const desc = cells[1].innerText.trim();
                     if (!name) {
-                        alert('Role name is required.');
+                        showToast('error', 'Role name is required.');
                         return;
                     }
                     // AJAX to add_role.php
@@ -924,17 +1174,17 @@ function attachRoleTabHandlers() {
                                     // Reload the page after successful add and permission assignment
                                     window.location.reload();
                                 } else {
-                                    alert('Role added but failed to assign permissions: ' + (permData.message || 'Unknown error'));
+                                    showToast('error', 'Role added but failed to assign permissions: ' + (permData.message || 'Unknown error'));
                                 }
                             })
                             .catch(error => {
-                                alert('Role added but failed to assign permissions: ' + error.message);
+                                showToast('error', 'Role added but failed to assign permissions: ' + error.message);
                             });
                         } else {
-                            alert(data.message || 'Failed to add role.');
+                            showToast('error', data.message || 'Failed to add role.');
                         }
                     })
-                    .catch(() => alert('Failed to add role.'));
+                    .catch(() => showToast('error', 'Failed to add role.'));
                 });
                 // Cancel button logic
                 tr.querySelector('.btn-cancel-role').addEventListener('click', function() {
@@ -998,7 +1248,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Edit/Save button logic for permissions
-document.addEventListener('click', function(e) {
+document.addEventListener('click', async function(e) {
     if (e.target && e.target.id === 'btn-edit-permissions') {
         // Add edit mode class for permission hover
         document.body.classList.add('edit-permissions-mode');
@@ -1062,9 +1312,9 @@ document.addEventListener('click', function(e) {
                 saveBtn.textContent = 'Save';
                 saveBtn.style.display = 'none';
                 saveBtn.style.marginLeft = 'auto';
-                saveBtn.addEventListener('click', function(ev) {
+                saveBtn.addEventListener('click', async function(ev) {
                     ev.stopPropagation();
-                    if (!confirm('Saving these changes will affect how users access your system. Are you sure you want to continue?')) return;
+                    if (!await showConfirm('Saving these changes will affect how users access your system. Are you sure you want to continue?', 'Save permissions')) return;
                     // Gather checked permissions for this role
                     const roleId = roleBlock.dataset.roleId;
                     const checkedPerms = Array.from(roleBlock.querySelectorAll('input[type="checkbox"]:checked')).map(cb => parseInt(cb.closest('.permission-card').dataset.permissionId));
@@ -1084,12 +1334,12 @@ document.addEventListener('click', function(e) {
                             }));
                             roleBlock.dataset.unsaved = 'false';
                             saveBtn.style.display = 'none';
-                            alert('Permissions updated successfully.');
+                            showToast('success', 'Permissions updated successfully.');
                         } else {
-                            alert(data.message || 'Failed to update permissions.');
+                            showToast('error', data.message || 'Failed to update permissions.');
                         }
                     })
-                    .catch(() => alert('Failed to update permissions.'))
+                    .catch(() => showToast('error', 'Failed to update permissions.'))
                     .finally(() => { saveBtn.disabled = false; });
                 });
                 header.appendChild(saveBtn);
@@ -1176,7 +1426,7 @@ document.addEventListener('click', function(e) {
         });
         if (unsavedRoles.length > 0) {
             const msg = 'The following roles have unsaved changes:\n' + unsavedRoles.join('\n') + '\nAre you sure you want to cancel editing?';
-            if (!confirm(msg)) return;
+            if (!await showConfirm(msg, 'Unsaved changes')) return;
         }
         // Exit edit mode: restore view mode (only show checked permissions, hide checkboxes)
         document.querySelectorAll('.role-permissions').forEach(roleBlock => {
@@ -1309,10 +1559,10 @@ document.addEventListener('DOMContentLoaded', function() {
             var emailEl = document.getElementById('edit-employee-email');
             var phoneEl = document.getElementById('edit-employee-phone');
             var roleEl = document.getElementById('edit-employee-role');
-            if (nameEl) nameEl.value = row.children[0].innerText;
-            if (emailEl) emailEl.value = row.children[1].innerText;
-            if (phoneEl) phoneEl.value = row.children[2].innerText;
-            if (roleEl) roleEl.value = row.children[3].innerText;
+            if (nameEl) nameEl.value = getEditableCellText(row, 0);
+            if (emailEl) emailEl.value = getEditableCellText(row, 1);
+            if (phoneEl) phoneEl.value = getEditableCellText(row, 2);
+            if (roleEl) roleEl.value = getEditableCellText(row, 3);
             // For demo, pos pin and hire date left blank
             // Ensure labels hide/show correctly for populated fields
             try {
@@ -1330,22 +1580,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Status badge toggle handler
     document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.onclick = function() {
+        badge.onclick = async function() {
             var icon = badge.querySelector('i');
             var text = badge.querySelector('.status-text');
             if (!icon || !text) return;
+            // Local toggle fallback: ensure actual_state exists and prompt user if missing
+            var actualState = (badge.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
+            if (!actualState || actualState === 'offline' || actualState === 'unknown') {
+                const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
+                if (!chosen) { try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {} ; return; }
+                badge.setAttribute('data-actual-state', chosen);
+            }
             if (icon.classList.contains('fa-check-circle')) {
                 icon.classList.remove('fa-check-circle');
                 icon.classList.add('fa-times-circle');
                 badge.classList.remove('status-active');
                 badge.classList.add('status-inactive');
-                text.innerText = 'Inactive';
+                text.innerText = 'Locked';
             } else {
                 icon.classList.remove('fa-times-circle');
                 icon.classList.add('fa-check-circle');
                 badge.classList.remove('status-inactive');
                 badge.classList.add('status-active');
-                text.innerText = 'Active';
+                text.innerText = 'Unlocked';
             }
         };
     });
@@ -1366,26 +1623,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.querySelectorAll('.btn-delete-role').forEach(function(btn) {
-        btn.onclick = function() {
-            if (!confirm('Are you sure you want to delete this employee?')) return;
+        btn.onclick = async function() {
+            const ok = await showConfirm('Are you sure you want to delete this employee?', 'Delete employee');
+            if (!ok) return;
             var row = btn.closest('tr');
             if (!row) return;
             var empId = row.dataset.employeeId || row.getAttribute('data-employee-id') || '';
             // If empId looks like a server id (numeric), try server delete; otherwise remove locally
             if (empId && /^\d+$/.test(empId)) {
-                attemptDeleteEmployee(empId, row).then(data => {
+                try {
+                    const data = await attemptDeleteEmployee(empId, row);
                     if (data && data.success) {
                         if (row && row.parentNode) row.parentNode.removeChild(row);
-                        alert('Employee deleted.');
+                        showToast('success', 'Employee deleted.');
                     } else {
-                        alert(data.message || 'Failed to delete employee on server');
+                        showToast('error', data.message || 'Failed to delete employee on server');
                     }
-                }).catch(err => {
-                    // If server refused or network failed, ask to remove locally
-                    if (confirm('Server did not delete the account (or endpoint returned an error). Remove locally from the table instead?')) {
+                } catch (err) {
+                    const removeLocal = await showConfirm('Server did not delete the account (or endpoint returned an error). Remove locally from the table instead?', 'Remove locally?');
+                    if (removeLocal) {
                         if (row && row.parentNode) row.parentNode.removeChild(row);
                     }
-                });
+                }
             } else {
                 // local-only row (no numeric id)
                 if (row && row.parentNode) row.parentNode.removeChild(row);
@@ -1396,39 +1655,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // Delete Account button in Edit modal
     const deleteEmployeeBtn = document.getElementById('btn-delete-employee');
     if (deleteEmployeeBtn) {
-        deleteEmployeeBtn.addEventListener('click', function() {
+        deleteEmployeeBtn.addEventListener('click', async function() {
             const row = window.currentEditingEmployeeRow;
-            if (!row) { alert('No employee selected.'); return; }
-            if (!confirm('Are you sure you want to permanently delete this employee account? This action cannot be undone.')) return;
+            if (!row) { showToast('error', 'No employee selected.'); return; }
+            const ok = await showConfirm('Are you sure you want to permanently delete this employee account? This action cannot be undone.', 'Delete employee');
+            if (!ok) return;
             const empId = row.dataset.employeeId;
-            // Try server-side delete, otherwise fallback to client removal
-            fetch('pages/accounts/delete_employee.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `employee_id=${encodeURIComponent(empId)}`
-            }).then(resp => {
+            try {
+                const resp = await fetch('pages/accounts/delete_employee.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `employee_id=${encodeURIComponent(empId)}`
+                });
                 if (!resp.ok) throw new Error('Network response not ok');
-                return resp.json().catch(()=>({ success: false }));
-            }).then(data => {
+                const data = await resp.json().catch(()=>({ success: false }));
                 if (data && data.success) {
                     if (row && row.parentNode) row.parentNode.removeChild(row);
                     closeEmployeeEditModal();
                     window.currentEditingEmployeeRow = null;
-                    alert('Employee deleted.');
+                    showToast('success', 'Employee deleted.');
                 } else {
-                    if (confirm('Server did not delete the account (or endpoint missing). Remove locally from the table instead?')) {
+                    const removeLocal = await showConfirm('Server did not delete the account (or endpoint missing). Remove locally from the table instead?', 'Remove locally?');
+                    if (removeLocal) {
                         if (row && row.parentNode) row.parentNode.removeChild(row);
                         closeEmployeeEditModal();
                         window.currentEditingEmployeeRow = null;
                     }
                 }
-            }).catch(err => {
-                if (confirm('Could not contact server to delete account. Remove locally from the table instead?')) {
+            } catch (err) {
+                const removeLocal = await showConfirm('Could not contact server to delete account. Remove locally from the table instead?', 'Remove locally?');
+                if (removeLocal) {
                     if (row && row.parentNode) row.parentNode.removeChild(row);
                     closeEmployeeEditModal();
                     window.currentEditingEmployeeRow = null;
                 }
-            });
+            }
         });
     }
 
@@ -1464,7 +1725,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const email = (document.getElementById('employee-email') || {}).value || '';
                 // Basic validation: require name and email
                 if (!name.trim() || !email.trim()) {
-                    alert('Please enter name and email before saving.');
+                    showToast('error', 'Please enter name and email before saving.');
                     return;
                 }
                 // Prevent double-submit
@@ -1486,6 +1747,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     table.innerHTML = `
                         <thead>
                             <tr>
+                                <th class="select-col" style="width:40px;text-align:center;"><input id="select-all-employees" type="checkbox" aria-label="Select all employees" /></th>
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Phone</th>
@@ -1509,14 +1771,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newId = 'emp-' + Date.now();
                 // If a row with same email exists, update it instead of appending duplicate
                 const existing = Array.from(tbody.querySelectorAll('tr')).find(r => {
-                    const emailCell = r.children[1];
-                    return emailCell && emailCell.innerText.trim().toLowerCase() === email.trim().toLowerCase();
+                    const emailCellText = getEditableCellText(r, 1) || '';
+                    return emailCellText.trim().toLowerCase() === email.trim().toLowerCase();
                 });
                 if (existing) {
-                    existing.children[0].innerText = name;
-                    existing.children[1].innerText = email;
-                    existing.children[2].innerText = phone;
-                    existing.children[3].innerText = role;
+                    setEditableCellText(existing, 0, name);
+                    setEditableCellText(existing, 1, email);
+                    setEditableCellText(existing, 2, phone);
+                    setEditableCellText(existing, 3, role);
                     // ensure delete/edit buttons shown
                     const delBtn = existing.querySelector('.btn-delete-role'); if (delBtn) delBtn.style.display = '';
                     const editBtn = existing.querySelector('.btn-edit-role'); if (editBtn) editBtn.style.display = '';
@@ -1528,15 +1790,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-employee-id', newId);
+                tr.className = 'employee-row';
                 tr.innerHTML = `
-                    <td class="editable-cell">${escapeHtml(name)}</td>
-                    <td class="editable-cell">${escapeHtml(email)}</td>
-                    <td class="editable-cell">${escapeHtml(phone)}</td>
-                    <td class="editable-cell">${escapeHtml(role)}</td>
+                    <td class="select-col" style="text-align:center;"><input type="checkbox" class="employee-select" name="selected_employees[]" value="${newId}" aria-label="Select ${escapeHtml(name)}" /></td>
+                    <td class="editable-cell employee-name-cell">${escapeHtml(name)}</td>
+                    <td class="editable-cell employee-email-cell">${escapeHtml(email)}</td>
+                    <td class="editable-cell employee-phone-cell">${escapeHtml(phone)}</td>
+                    <td class="editable-cell employee-role-cell">${escapeHtml(role)}</td>
                     <td class="status-col">
-                        <span class="status-badge status-active status-badge-edit" style="cursor:pointer;" title="Toggle Status">
+                        <span class="status-badge status-active status-badge-edit" style="cursor:pointer;" title="Toggle Lock" data-actual-state="offline">
                             <i class="fas fa-check-circle"></i>
-                            <span class="status-text">Active</span>
+                            <span class="status-text">Unlocked</span>
                         </span>
                     </td>
                     <td class="action-col">
@@ -1545,6 +1809,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     </td>
                 `;
                 tbody.appendChild(tr);
+                // Ensure selection handlers are wired for this dynamically added row
+                attachEmployeeSelectHandlers();
 
                 // wire handlers for new row
                 const statusBadge = tr.querySelector('.status-badge-edit');
@@ -1570,8 +1836,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 const delBtn = tr.querySelector('.btn-delete-role');
                 if (delBtn) {
-                    delBtn.onclick = function() {
-                        if (confirm('Are you sure you want to delete this employee?')) {
+                    delBtn.onclick = async function() {
+                        const ok = await showConfirm('Are you sure you want to delete this employee?', 'Delete employee');
+                        if (ok) {
                             const r = this.closest('tr');
                             if (r) r.remove();
                         }
@@ -1587,10 +1854,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         const emailEl = document.getElementById('edit-employee-email');
                         const phoneEl = document.getElementById('edit-employee-phone');
                         const roleEl = document.getElementById('edit-employee-role');
-                        if (nameEl) nameEl.value = row.children[0].innerText;
-                        if (emailEl) emailEl.value = row.children[1].innerText;
-                        if (phoneEl) phoneEl.value = row.children[2].innerText;
-                        if (roleEl) roleEl.value = row.children[3].innerText;
+                        if (nameEl) nameEl.value = getEditableCellText(row, 0);
+                        if (emailEl) emailEl.value = getEditableCellText(row, 1);
+                        if (phoneEl) phoneEl.value = getEditableCellText(row, 2);
+                        if (roleEl) roleEl.value = getEditableCellText(row, 3);
                         try {
                             if (typeof updateFormGroupState === 'function') {
                                 if (nameEl) updateFormGroupState(nameEl);
@@ -1626,7 +1893,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeEmployeeFormModal();
             } catch (err) {
                 console.error('Error in employee add handler', err);
-                alert('An error occurred while saving the employee. See console for details.');
+                showToast('error', 'An error occurred while saving the employee. See console for details.');
             } finally {
                 // Always restore the submit button state
                 restoreSubmit();
@@ -1679,7 +1946,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const role = (document.getElementById('edit-employee-role') || {}).value || '';
             const phone = (document.getElementById('edit-employee-phone') || {}).value || '';
             const posPin = (document.getElementById('edit-employee-pos-pin') || {}).value || '';
-            if (!id) { alert('No employee selected'); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = submitBtn.dataset.originalText || 'Save Changes'; } return; }
+            if (!id) { showToast('error', 'No employee selected'); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = submitBtn.dataset.originalText || 'Save Changes'; } return; }
             fetch('update_employee.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1690,18 +1957,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     // update DOM
                     const row = window.currentEditingEmployeeRow;
                     if (row) {
-                        row.children[0].innerText = name;
-                        row.children[1].innerText = email;
-                        row.children[2].innerText = phone;
-                        row.children[3].innerText = role;
+                        setEditableCellText(row, 0, name);
+                        setEditableCellText(row, 1, email);
+                        setEditableCellText(row, 2, phone);
+                        setEditableCellText(row, 3, role);
                         // If pos pin cell exists elsewhere, we currently don't have a column for it; consider adding
                     }
                     closeEmployeeEditModal();
                     try { window.location.reload(); } catch(e) {}
                 } else {
-                    alert((data && data.message) || 'Failed to update employee');
+                    showToast('error', (data && data.message) || 'Failed to update employee');
                 }
-            }).catch(err => { console.error('update_employee error', err); alert('Network error when updating employee'); })
+            }).catch(err => { console.error('update_employee error', err); showToast('error', 'Network error when updating employee'); })
             .finally(() => {
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = submitBtn.dataset.originalText || 'Save Changes'; }
             });

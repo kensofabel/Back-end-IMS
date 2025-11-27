@@ -2,6 +2,8 @@
 session_start();
 header('Content-Type: application/json');
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../scripts/log_audit.php';
+require_once __DIR__ . '/../../partials/csrf.php';
 
 // Basic auth check
 if (!isset($_SESSION['user_id'])) {
@@ -11,6 +13,13 @@ if (!isset($_SESSION['user_id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request']);
+    exit;
+}
+
+// CSRF check
+$csrf = $_POST['csrf_token'] ?? '';
+if (!csrf_validate($csrf)) {
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
     exit;
 }
 
@@ -77,6 +86,10 @@ try {
     $stmt->close();
 
     $conn->commit();
+    // Audit: deleted employee
+    $actor = intval($_SESSION['user_id'] ?? 0);
+    @log_audit($conn, $actor, "Delete Employee #{$employee_id}");
+
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     $conn->rollback();

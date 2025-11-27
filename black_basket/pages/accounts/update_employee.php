@@ -2,6 +2,8 @@
 session_start();
 header('Content-Type: application/json');
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../scripts/log_audit.php';
+require_once __DIR__ . '/../../partials/csrf.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Not authenticated']);
@@ -9,6 +11,13 @@ if (!isset($_SESSION['user_id'])) {
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request']);
+    exit;
+}
+
+// CSRF check
+$csrf = $_POST['csrf_token'] ?? '';
+if (!csrf_validate($csrf)) {
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
     exit;
 }
 
@@ -126,6 +135,9 @@ if ($userRow) {
         'role' => $roleName
     ];
 }
+// Audit: update employee
+$actor = intval($_SESSION['user_id'] ?? 0);
+@log_audit($conn, $actor, "Update Employee #{$id}");
 
 echo json_encode(['success' => true, 'user' => $respUser]);
 exit;
