@@ -17,12 +17,12 @@ try {
 	$types = '';
 
 	if ($start) {
-		$where[] = 'sale_date >= ?';
+		$where[] = 's.created_at >= ?';
 		$params[] = $start . ' 00:00:00';
 		$types .= 's';
 	}
 	if ($end) {
-		$where[] = 'sale_date <= ?';
+		$where[] = 's.created_at <= ?';
 		$params[] = $end . ' 23:59:59';
 		$types .= 's';
 	}
@@ -30,50 +30,38 @@ try {
 	$whereSql = count($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 	// Get total count for pagination
-	$countSql = "SELECT COUNT(*) AS c FROM sales $whereSql";
+	$countSql = "SELECT COUNT(*) AS c FROM sales s $whereSql";
 	$countStmt = $conn->prepare($countSql);
 	if ($countStmt === false) throw new Exception('Prepare failed');
 	if (count($params)) $countStmt->bind_param($types, ...$params);
 	$countStmt->execute();
 	$countRes = $countStmt->get_result();
-	$totalCount = ($countRes && ($r = $countRes->fetch_assoc())) ? (int)$r['c'] : 0;
+	$totalRows = ($countRes && ($r = $countRes->fetch_assoc())) ? (int)$r['c'] : 0;
 
-	// Fetch sales header rows (paged)
-	$sql = "SELECT id, customer_name, sale_date, total_amount, payment_method FROM sales $whereSql ORDER BY sale_date DESC LIMIT ? OFFSET ?";
+	// Fetch sales header rows (paged) — use created_at as date
+	$sql = "SELECT s.id, s.customer_name, s.created_at AS sale_date, s.total_amount, s.payment_method FROM sales s $whereSql ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
 	$stmt = $conn->prepare($sql);
 	if ($stmt === false) throw new Exception('Prepare failed');
 	// bind dynamic params plus pagination params
-	if (count($params)) {
-		// add two ints to types
-		$bindTypes = $types . 'ii';
-		$allParams = array_merge($params, [$per_page, $offset]);
-		// mysqli bind_param requires references
-		$refs = [];
-		foreach ($allParams as $k => $v) {
-			$refs[$k] = &$allParams[$k];
-		}
-		array_unshift($refs, $bindTypes);
-		call_user_func_array([$stmt, 'bind_param'], $refs);
-	} else {
-		$stmt->bind_param('ii', $per_page, $offset);
-	}
-	if ($stmt === false) throw new Exception('Prepare failed');
-	if (count($params)) {
-		$stmt->bind_param($types, ...$params);
-	}
+	$bindTypes = $types . 'ii';
+	$allParams = array_merge($params, [$per_page, $offset]);
+	$refs = [];
+	foreach ($allParams as $k => $v) { $refs[$k] = &$allParams[$k]; }
+	array_unshift($refs, $bindTypes);
+	call_user_func_array([$stmt, 'bind_param'], $refs);
 	$stmt->execute();
 	$res = $stmt->get_result();
 
 	$transactions = [];
 	$totalRevenue = 0;
-	$totalCount = 0;
+	$retrievedCount = 0;
 	$productCounts = [];
 
 	while ($row = $res->fetch_assoc()) {
 		$saleId = (int)$row['id'];
 
 		// Get items for this sale
-		$itStmt = $conn->prepare('SELECT si.quantity_sold, si.total_price, p.name FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = ?');
+		$itStmt = $conn->prepare('SELECT si.quantity, si.total_price, p.name FROM sale_items si LEFT JOIN products p ON p.id = si.product_id WHERE si.sale_id = ?');
 		$itStmt->bind_param('i', $saleId);
 		$itStmt->execute();
 		$itRes = $itStmt->get_result();
@@ -82,8 +70,9 @@ try {
 		$qtySum = 0;
 		while ($it = $itRes->fetch_assoc()) {
 			$products[] = $it['name'];
-			$qtySum += (int)$it['quantity_sold'];
-			$productCounts[$it['name']] = ($productCounts[$it['name']] ?? 0) + (int)$it['quantity_sold'];
+			$qty = (int)$it['quantity'];
+			$qtySum += $qty;
+			$productCounts[$it['name']] = ($productCounts[$it['name']] ?? 0) + $qty;
 		}
 
 		$transactions[] = [
@@ -96,11 +85,11 @@ try {
 		];
 
 		$totalRevenue += (float)$row['total_amount'];
-		$totalCount++;
+		$retrievedCount++;
 	}
 
 	// Summary
-	$average = $totalCount ? ($totalRevenue / $totalCount) : 0;
+	$average = $retrievedCount ? ($totalRevenue / $retrievedCount) : 0;
 	arsort($productCounts);
 	$topProduct = count($productCounts) ? array_key_first($productCounts) : null;
 
@@ -108,7 +97,7 @@ try {
 		'success' => true,
 		'transactions' => $transactions,
 		'summary' => [
-			'count' => $totalCount,
+			'count' => $totalRows,
 			'revenue' => number_format($totalRevenue, 2, '.', ''),
 			'average' => number_format($average, 2, '.', ''),
 			'topProduct' => $topProduct
@@ -116,7 +105,7 @@ try {
 		'pagination' => [
 			'page' => $page,
 			'per_page' => $per_page,
-			'total_count' => $totalCount
+			'total_count' => $totalRows
 		],
 		'currencySymbol' => '₱'
 	]);

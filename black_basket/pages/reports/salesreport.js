@@ -85,6 +85,13 @@ function renderSalesPager(pagination) {
   document.getElementById('sales-next').onclick = () => { salesPageState.page = Math.min(totalPages, page + 1); generateSalesReport(); };
 }
 
+// Auto-load rows on page load so the sales table is visible immediately
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(() => { salesPageState.page = 1; generateSalesReport(); }, 50);
+} else {
+  document.addEventListener('DOMContentLoaded', () => { salesPageState.page = 1; generateSalesReport(); });
+}
+
 function generateSalesReport() {
   const startDate = document.getElementById('report-start-date').value;
   const endDate = document.getElementById('report-end-date').value;
@@ -108,7 +115,8 @@ function generateSalesReport() {
   params.append('page', salesPageState.page);
   params.append('per_page', salesPageState.per_page);
 
-  fetch('salesreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
+  // Use absolute path so this fetch works from any page in the app
+  fetch('/black_basket/pages/reports/salesreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
     .then(async r => {
       if (!r.ok) throw new Error('Network error: ' + r.status + ' ' + r.statusText);
       const ct = r.headers.get('Content-Type') || '';
@@ -145,10 +153,20 @@ function generateSalesReport() {
       }
 
       // Summary
-      document.getElementById('total-sales-count').textContent = summary.count;
-      document.getElementById('total-sales-revenue').textContent = currencySymbol + Number(summary.revenue).toFixed(2);
-      document.getElementById('average-sale').textContent = currencySymbol + Number(summary.average).toFixed(2);
-      document.getElementById('top-product').textContent = summary.topProduct || 'N/A';
+      if (document.getElementById('total-sales-count')) document.getElementById('total-sales-count').textContent = summary.count;
+      if (document.getElementById('total-sales-revenue')) document.getElementById('total-sales-revenue').textContent = currencySymbol + Number(summary.revenue).toFixed(2);
+      if (document.getElementById('average-sale')) document.getElementById('average-sale').textContent = currencySymbol + Number(summary.average).toFixed(2);
+      if (document.getElementById('top-product')) document.getElementById('top-product').textContent = summary.topProduct || 'N/A';
+
+      // Optional period comparison display
+      if (summary.period && summary.previous_period) {
+        if (document.getElementById('period-start')) document.getElementById('period-start').textContent = summary.period.start;
+        if (document.getElementById('period-end')) document.getElementById('period-end').textContent = summary.period.end;
+        if (document.getElementById('prev-period-start')) document.getElementById('prev-period-start').textContent = summary.previous_period.start;
+        if (document.getElementById('prev-period-end')) document.getElementById('prev-period-end').textContent = summary.previous_period.end;
+        if (document.getElementById('sales-count-change')) document.getElementById('sales-count-change').textContent = (summary.count_change_percent !== null) ? Number(summary.count_change_percent).toFixed(2) + '%' : 'N/A';
+        if (document.getElementById('sales-revenue-change')) document.getElementById('sales-revenue-change').textContent = (summary.revenue_change_percent !== null) ? Number(summary.revenue_change_percent).toFixed(2) + '%' : 'N/A';
+      }
 
       // Pager
       if (json.pagination) renderSalesPager(json.pagination);

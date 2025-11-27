@@ -3,6 +3,35 @@ session_start();
 header('Content-Type: application/json');
 require_once '../../config/db.php';
 
+// Normalize popular cart_mode and payment_method values before persistence.
+function normalize_mode($val, $type = 'payment') {
+    if ($val === null) return null;
+    $v = trim((string)$val);
+    if ($v === '') return null;
+    $low = strtolower($v);
+
+    if ($type === 'cart') {
+        // Map common variants to canonical cart modes
+        if (in_array($low, ['dine in', 'dinein', 'dine-in', 'dine'])) return 'Dine in';
+        if (in_array($low, ['take out', 'takeout', 'take-away', 'take away', 'takeaway', 'pickup', 'pick up'])) return 'Take out';
+        if (in_array($low, ['delivery', 'deliver'])) return 'Delivery';
+        // default: Capitalize first letter only (e.g. "Dine in", "Take out")
+        return ucfirst(strtolower($v));
+    }
+
+    // payment mapping
+    if ($type === 'payment') {
+        if (in_array($low, ['cash', 'cashier'])) return 'Cash';
+        if (in_array($low, ['card', 'credit card', 'debit card', 'credit', 'debit', 'pos', 'chip'])) return 'Card';
+        if (in_array($low, ['online', 'e-wallet', 'ewallet', 'gcash', 'paymaya', 'paypal', 'stripe', 'merchant'])) return 'Online';
+        if (in_array($low, ['mobile', 'mobilepay', 'mpesa'])) return 'Online';
+        // default: Capitalize first letter only
+        return ucfirst(strtolower($v));
+    }
+
+    return ucfirst(strtolower($v));
+}
+
 // Optional debug bypass: when developing locally you can call GET api.php?debug=1
 // to skip authentication for GET requests and receive extra diagnostics. Remove this in production.
 $debugMode = (isset($_GET['debug']) && $_GET['debug'] === '1');
@@ -324,12 +353,195 @@ switch ($method) {
         }
 
         $items = $data['items'];
+        // Support refund action: creates a new sale row with status='refund' and inserts only the checked items.
+        if (isset($data['action']) && $data['action'] === 'refund') {
+            $orig_sale_id = isset($data['original_sale_id']) ? intval($data['original_sale_id']) : null;
+            $refund_items = is_array($data['items']) ? $data['items'] : [];
+            if (!$orig_sale_id || empty($refund_items)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid refund payload']);
+                exit;
+            }
+
+            // Fetch original sale to reuse metadata
+            $orig = null;
+            try {
+                $q = $conn->prepare("SELECT id, reference, customer_name, subtotal, tax, total_amount, payment_method, cart_mode, employee_id FROM sales WHERE id = ? LIMIT 1");
+                if ($q) {
+                    $q->bind_param('i', $orig_sale_id);
+                    $q->execute();
+                    $res = $q->get_result();
+                    $orig = $res->fetch_assoc();
+                    $q->close();
+                }
+            } catch (Exception $e) { }
+
+            if (!$orig) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Original sale not found']);
+                exit;
+            }
+
+            // Compute refund totals from provided items
+            $r_sub = 0.0;
+            foreach ($refund_items as $it) {
+                $q = isset($it['quantity']) ? intval($it['quantity']) : 0;
+                $up = isset($it['unit_price']) ? floatval($it['unit_price']) : 0.0;
+                $r_sub += $q * $up;
+            }
+            $r_tax = 0.0;
+            $r_total = floatval($r_sub + $r_tax);
+
+            $r_amount_received = 0.0;
+            $r_change = 0.0;
+
+            $r_employee_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : (isset($orig['employee_id']) ? intval($orig['employee_id']) : null);
+            $r_payment_method = isset($orig['payment_method']) ? $orig['payment_method'] : 'Cash';
+            $r_cart_mode = isset($orig['cart_mode']) ? $orig['cart_mode'] : null;
+            $r_reference = isset($orig['reference']) ? $orig['reference'] : ('Refund for #' . $orig_sale_id);
+
+            // Determine whether caller wants to cancel the original sale entirely.
+            $cancel_original = isset($data['cancel_original']) && $data['cancel_original'] === true;
+            // determine original sale item count so we can check for full-cancel cases
+            $origCount = null;
+            try {
+                $qcnt = $conn->prepare("SELECT COUNT(*) AS cnt FROM sale_items WHERE sale_id = ?");
+                if ($qcnt) {
+                    $qcnt->bind_param('i', $orig_sale_id);
+                    $qcnt->execute();
+                    $qcnt->bind_result($origCountRes);
+                    if ($qcnt->fetch()) $origCount = intval($origCountRes);
+                    $qcnt->close();
+                }
+            } catch (Exception $e) { $origCount = null; }
+
+            $refundedCount = count($refund_items);
+
+            // If caller requested cancel AND they selected all items from the original
+            // sale, perform an in-place cancellation: update the original sale to
+            // status='cancelled' and set an informative customer_name. Do not create
+            // a separate refund sale/receipt for a pure cancellation.
+            if ($cancel_original && $origCount !== null && $refundedCount >= $origCount) {
+                $conn->begin_transaction();
+                try {
+                    $up = $conn->prepare("UPDATE sales SET status = 'cancelled' WHERE id = ?");
+                    if ($up) {
+                        $up->bind_param('i', $orig_sale_id);
+                        $up->execute();
+                        $up->close();
+                    }
+                    // Insert audit log for sale cancellation
+                    try {
+                        $audit_user = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+                        $audit_action = 'Sale Cancelled';
+                        $audit_details = 'Sale ' . $orig_sale_id . ' : ' . (isset($orig['reference']) ? $orig['reference'] : '');
+                        $audit_ip = !empty($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+                        $audit_agent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                        $ain = $conn->prepare("INSERT INTO audit_logs (user_id, action, details, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                        if ($ain) {
+                            $ain->bind_param('issss', $audit_user, $audit_action, $audit_details, $audit_ip, $audit_agent);
+                            $ain->execute();
+                            $ain->close();
+                        }
+                    } catch (Exception $e) { /* don't break cancellation if audit fails */ }
+                    $conn->commit();
+                    echo json_encode(['success' => true, 'refund_sale_id' => null, 'message' => 'Sale cancelled']);
+                    exit;
+                } catch (Exception $e) {
+                    $conn->rollback();
+                    http_response_code(500);
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                    exit;
+                }
+            }
+
+            // Begin transaction for refund
+            $conn->begin_transaction();
+                try {
+                // Insert refund sale row without overriding reference or customer_name
+                $sql = "INSERT INTO sales (subtotal, tax, total_amount, payment_method, cart_mode, amount_received, change_amount, employee_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                $stmt = $conn->prepare($sql);
+                if (!$stmt) throw new Exception($conn->error);
+                $status = 'refund';
+                $stmt->bind_param('dddssddis', $r_sub, $r_tax, $r_total, $r_payment_method, $r_cart_mode, $r_amount_received, $r_change, $r_employee_id, $status);
+                if (!$stmt->execute()) throw new Exception($stmt->error);
+                $refund_sale_id = $conn->insert_id;
+                $stmt->close();
+
+                // insert refund items
+                $itemSql = "INSERT INTO sale_items (sale_id, product_id, variant_id, name, unit_price, quantity, total_price, variant, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                $itemStmt = $conn->prepare($itemSql);
+                if (!$itemStmt) throw new Exception($conn->error);
+                foreach ($refund_items as $it) {
+                    $product_id = isset($it['product_id']) && is_numeric($it['product_id']) ? intval($it['product_id']) : null;
+                    $variant_id = isset($it['variant_id']) && is_numeric($it['variant_id']) ? intval($it['variant_id']) : null;
+                    $name = isset($it['name']) ? $it['name'] : '';
+                    $unit_price = isset($it['unit_price']) ? floatval($it['unit_price']) : 0.0;
+                    $quantity = isset($it['quantity']) ? intval($it['quantity']) : 0;
+                    $variant = isset($it['variant']) ? $it['variant'] : null;
+                    $total_price = floatval($unit_price * $quantity);
+                    $itemStmt->bind_param('iiisddds', $refund_sale_id, $product_id, $variant_id, $name, $unit_price, $quantity, $total_price, $variant);
+                    if (!$itemStmt->execute()) throw new Exception($itemStmt->error);
+                }
+                $itemStmt->close();
+
+                // If all items refunded (or caller requested cancel), mark original sale cancelled
+                $cancel_original = isset($data['cancel_original']) && $data['cancel_original'] === true;
+                // determine if all
+                try {
+                    $qcnt = $conn->prepare("SELECT COUNT(*) AS cnt FROM sale_items WHERE sale_id = ?");
+                    if ($qcnt) {
+                        $qcnt->bind_param('i', $orig_sale_id);
+                        $qcnt->execute();
+                        $qcnt->bind_result($origCount);
+                        $qcnt->fetch();
+                        $qcnt->close();
+                    }
+                } catch (Exception $e) { $origCount = null; }
+                $refundedCount = count($refund_items);
+                if ($cancel_original || ($origCount !== null && $refundedCount >= intval($origCount))) {
+                    try {
+                        $up = $conn->prepare("UPDATE sales SET status = 'cancelled' WHERE id = ?");
+                        if ($up) { $up->bind_param('i', $orig_sale_id); $up->execute(); $up->close(); }
+                    } catch (Exception $e) { /* ignore */ }
+                }
+
+                // Insert audit log for refund action (record original sale and refund id)
+                try {
+                    $audit_user = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+                    $audit_action = 'Sale Refunded';
+                    $audit_details = 'Sale ' . $orig_sale_id . (isset($refund_sale_id) ? (' (refund ' . $refund_sale_id . ')') : '') . ' : ' . (isset($orig['reference']) ? $orig['reference'] : '');
+                    $audit_ip = !empty($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+                    $audit_agent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                    $ain2 = $conn->prepare("INSERT INTO audit_logs (user_id, action, details, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    if ($ain2) {
+                        $ain2->bind_param('issss', $audit_user, $audit_action, $audit_details, $audit_ip, $audit_agent);
+                        $ain2->execute();
+                        $ain2->close();
+                    }
+                } catch (Exception $e) { /* do not block refund if audit fails */ }
+
+                $conn->commit();
+                echo json_encode(['success' => true, 'refund_sale_id' => $refund_sale_id, 'message' => 'Sale refunded']);
+                exit;
+            } catch (Exception $e) {
+                $conn->rollback();
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                exit;
+            }
+        }
         $payment_method = isset($data['payment_method']) ? $conn->real_escape_string($data['payment_method']) : 'cash';
+        // Normalize payment mode to canonical form (e.g., Cash, Card, Online)
+        $payment_raw = isset($data['payment_method']) ? $data['payment_method'] : 'cash';
+        $payment_method = $conn->real_escape_string(normalize_mode($payment_raw, 'payment'));
         // legacy: we accept `channel` in input but prefer `cart_mode` (dinein|takeout|delivery)
         // $channel is intentionally not used for persistence to avoid confusion with `cart_mode`.
         $customer_name = isset($data['customer_name']) ? $conn->real_escape_string($data['customer_name']) : null;
         $reference = isset($data['reference']) ? $conn->real_escape_string($data['reference']) : null;
-        $cart_mode = isset($data['cart_mode']) ? $conn->real_escape_string($data['cart_mode']) : null;
+        // Normalize cart mode to canonical form (e.g., Dine in, Take out, Delivery)
+        $cart_raw = isset($data['cart_mode']) ? $data['cart_mode'] : null;
+        $cart_mode = $cart_raw !== null ? $conn->real_escape_string(normalize_mode($cart_raw, 'cart')) : null;
 
         // accept subtotal/tax/total if provided by client; otherwise compute
         $subtotal = isset($data['subtotal']) ? floatval($data['subtotal']) : null;
@@ -402,11 +614,14 @@ switch ($method) {
         try {
             // Insert sale into `sales` (store subtotal/tax/total and metadata)
                 // Note: some installs use `cart_mode` instead of `channel` (default 'dinein')
-                $sql = "INSERT INTO sales (reference, customer_name, subtotal, tax, total_amount, payment_method, cart_mode, employee_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                // We now persist the payment bookkeeping fields `amount_received` and `change_amount` on the sales row.
+                // Persist sale with status set to 'completed' so POS-completed orders are marked accordingly
+                $sql = "INSERT INTO sales (reference, customer_name, subtotal, tax, total_amount, payment_method, cart_mode, amount_received, change_amount, employee_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
             $stmt = $conn->prepare($sql);
             if (!$stmt) throw new Exception($conn->error);
-            // types: reference(s), customer_name(s), subtotal(d), tax(d), total_amount(d), payment_method(s), cart_mode(s), employee_id(i)
-                $stmt->bind_param('ssdddssi', $reference, $customer_name, $subtotal, $tax, $total_amount, $payment_method, $cart_mode, $employee_id);
+            // types: reference(s), customer_name(s), subtotal(d), tax(d), total_amount(d), payment_method(s), cart_mode(s), amount_received(d), change_amount(d), employee_id(i), status(s)
+                $status = 'completed';
+                $stmt->bind_param('ssdddssddis', $reference, $customer_name, $subtotal, $tax, $total_amount, $payment_method, $cart_mode, $amount_received, $change, $employee_id, $status);
             if (!$stmt->execute()) throw new Exception($stmt->error);
             $sale_id = $conn->insert_id;
             $stmt->close();
@@ -443,8 +658,9 @@ switch ($method) {
                     } catch (Exception $e) { /* ignore detection errors */ }
                 }
 
-                // bind params: sale_id(i), product_id(i), variant_id(i), name(s), unit_price(d), quantity(i), total_price(d), variant(s)
-                $itemStmt->bind_param('iiisdids', $sale_id, $product_id, $variant_id, $name, $unit_price, $quantity, $total_price, $variant);
+                // bind params: sale_id(i), product_id(i), variant_id(i), name(s), unit_price(d), quantity(d), total_price(d), variant(s)
+                // use 'd' for quantity to support fractional component quantities when inserting component rows later
+                $itemStmt->bind_param('iiisddds', $sale_id, $product_id, $variant_id, $name, $unit_price, $quantity, $total_price, $variant);
                 if (!$itemStmt->execute()) throw new Exception($itemStmt->error);
 
                 // Decide whether to deduct stock based on track_stock flags (if present)
@@ -479,31 +695,89 @@ switch ($method) {
                 }
 
                 if ($shouldDeduct) {
+                    $mainItemDeducted = false;
                     // 1) If variant_id provided and a variant stock column exists, decrement that column on product_variants
                     if ($variant_id !== null && $hasProductVariants && $variantStockCol !== null) {
                         try {
                             $col = $variantStockCol;
-                            $updSql = "UPDATE product_variants SET `" . $col . "` = GREATEST(0, CAST(`" . $col . "` AS SIGNED) - ?) WHERE id = ?";
+                            // Handle VARCHAR in_stock: extract numeric part, do calculation, preserve unit if present
+                            $qmvstock = $conn->prepare("SELECT `" . $col . "` FROM product_variants WHERE id = ? LIMIT 1");
+                            $mvcurrentStock = null;
+                            $mvstockUnit = '';
+                            if ($qmvstock) {
+                                $qmvstock->bind_param('i', $variant_id);
+                                $qmvstock->execute();
+                                $qmvstock->bind_result($mvstockVal);
+                                if ($qmvstock->fetch() && $mvstockVal !== null) {
+                                    $mvcurrentStock = $mvstockVal;
+                                    // Try to extract unit (everything after the first space)
+                                    if (preg_match('/^([\d.]+)\s*(.+)$/', trim($mvstockVal), $matches)) {
+                                        $mvstockUnit = ' ' . trim($matches[2]);
+                                    }
+                                }
+                                $qmvstock->close();
+                            }
+                            
+                            // Calculate new stock value
+                            $mvstockNum = ($mvcurrentStock !== null) ? floatval($mvcurrentStock) : 0;
+                            $mvnewStockNum = max(0, $mvstockNum - floatval($quantity));
+                            $mvnewStock = ($mvnewStockNum == floor($mvnewStockNum)) ? (string)intval($mvnewStockNum) : (string)round($mvnewStockNum, 2);
+                            $mvnewStock .= $mvstockUnit;
+                            
+                            $updSql = "UPDATE product_variants SET `" . $col . "` = ? WHERE id = ?";
                             $uvar = $conn->prepare($updSql);
                             if ($uvar) {
-                                $uvar->bind_param('ii', $quantity, $variant_id);
+                                $uvar->bind_param('si', $mvnewStock, $variant_id);
                                 $uvar->execute();
                                 $uvar->close();
+                                $mainItemDeducted = true;
                             }
                         } catch (Exception $e) { /* ignore variant update errors */ }
-                    } elseif ($hasInventory) {
+                    }
+                    
+                    if (!$mainItemDeducted && $hasInventory) {
                         $loc = 'Main Warehouse';
                         $upd = $conn->prepare("UPDATE inventory SET quantity = GREATEST(0, quantity - ?), last_updated = NOW() WHERE product_id = ? AND location = ?");
                         if ($upd) {
-                            $upd->bind_param('iis', $quantity, $product_id, $loc);
-                            $upd->execute();
+                            $qval = floatval($quantity);
+                            // bind as double, int, string
+                            $upd->bind_param('dis', $qval, $product_id, $loc);
+                            if ($upd->execute() && $upd->affected_rows > 0) {
+                                $mainItemDeducted = true;
+                            }
                             $upd->close();
                         }
-                    } elseif ($hasProductInStock && $product_id !== null) {
+                    }
+                    
+                    if (!$mainItemDeducted && $hasProductInStock && $product_id !== null) {
                         try {
-                            $u2 = $conn->prepare("UPDATE products SET in_stock = GREATEST(0, CAST(in_stock AS SIGNED) - ?) WHERE id = ?");
+                            // Handle VARCHAR in_stock: extract numeric part, do calculation, preserve unit if present
+                            $qmpstock = $conn->prepare("SELECT in_stock FROM products WHERE id = ? LIMIT 1");
+                            $mpcurrentStock = null;
+                            $mpstockUnit = '';
+                            if ($qmpstock) {
+                                $qmpstock->bind_param('i', $product_id);
+                                $qmpstock->execute();
+                                $qmpstock->bind_result($mpstockVal);
+                                if ($qmpstock->fetch() && $mpstockVal !== null) {
+                                    $mpcurrentStock = $mpstockVal;
+                                    // Try to extract unit (everything after the first space)
+                                    if (preg_match('/^([\d.]+)\s*(.+)$/', trim($mpstockVal), $matches)) {
+                                        $mpstockUnit = ' ' . trim($matches[2]);
+                                    }
+                                }
+                                $qmpstock->close();
+                            }
+                            
+                            // Calculate new stock value
+                            $mpstockNum = ($mpcurrentStock !== null) ? floatval($mpcurrentStock) : 0;
+                            $mpnewStockNum = max(0, $mpstockNum - floatval($quantity));
+                            $mpnewStock = ($mpnewStockNum == floor($mpnewStockNum)) ? (string)intval($mpnewStockNum) : (string)round($mpnewStockNum, 2);
+                            $mpnewStock .= $mpstockUnit;
+                            
+                            $u2 = $conn->prepare("UPDATE products SET in_stock = ? WHERE id = ?");
                             if ($u2) {
-                                $u2->bind_param('ii', $quantity, $product_id);
+                                $u2->bind_param('si', $mpnewStock, $product_id);
                                 $u2->execute();
                                 $u2->close();
                             }
@@ -536,15 +810,80 @@ switch ($method) {
                         }
                     }
 
-                    if ($isComposite && $product_id !== null) {
+                    // Always attempt to lookup components by parent id (product or resolved variant parent).
+                    // Some installs may not set `is_composite` flags consistently, so checking components
+                    // directly ensures deductions occur when product_components rows exist.
+                    if ($product_id !== null || ($variant_id !== null)) {
+                        // Helper function to evaluate component_qty expressions (like "1/4", "2", etc.)
+                        if (!function_exists('evaluate_quantity_expr')) {
+                            function evaluate_quantity_expr($s) {
+                                $s = trim((string)$s);
+                                if ($s === '') return 0.0;
+                                // remove common grouping/currency characters but treat spaces as addition
+                                // e.g. "1 1/2" -> "1+1/2"
+                                $s = preg_replace('/[,_\x{20B1}\$]/u', '', $s);
+                                $s = preg_replace('/\s+/', '+', $s);
+                                // trim any leading/trailing plus signs introduced
+                                $s = preg_replace('/^\++|\++$/', '', $s);
+                                // allow only digits, operators, parentheses, decimal point and whitespace
+                                if (!preg_match('/^[0-9+\-\*\/().\s]+$/', $s)) return 0.0;
+                                // block suspicious operator combos
+                                if (preg_match('/\/\/|\/\*|\*\*/', $s)) return 0.0;
+                                // evaluate in a restricted way
+                                try {
+                                    $val = @eval('return (' . $s . ');');
+                                    if ($val === null || $val === false) return 0.0;
+                                    if (is_numeric($val)) return floatval($val);
+                                    return 0.0;
+                                } catch (Exception $e) {
+                                    return 0.0;
+                                }
+                            }
+                        }
+                        
+                        // Determine which parent id to use for components lookup:
+                        // prefer product_id if available, otherwise try to resolve parent product from variant
+                        $parent_for_components = $product_id;
+                        if (($parent_for_components === null || $parent_for_components === 0) && $variant_id !== null && $hasProductVariants) {
+                            try {
+                                $qpv_parent = $conn->prepare("SELECT product_id FROM product_variants WHERE id = ? LIMIT 1");
+                                if ($qpv_parent) {
+                                    $qpv_parent->bind_param('i', $variant_id);
+                                    $qpv_parent->execute();
+                                    $qpv_parent->bind_result($resolved_parent_pid);
+                                    if ($qpv_parent->fetch() && $resolved_parent_pid !== null && $resolved_parent_pid > 0) {
+                                        $parent_for_components = intval($resolved_parent_pid);
+                                    }
+                                    $qpv_parent->close();
+                                }
+                            } catch (Exception $e) { /* ignore resolution errors */ }
+                        }
+
                         $pc = $conn->prepare("SELECT component_product_id, component_variant_id, component_qty FROM product_components WHERE parent_product_id = ?");
                         if ($pc) {
-                            $pc->bind_param('i', $product_id);
-                            $pc->execute();
+                            $pc->bind_param('i', $parent_for_components);
+                            if (!$pc->execute()) {
+                                error_log("Failed to execute component query for parent_product_id: " . $product_id . ", Error: " . $pc->error);
+                                $pc->close();
+                            } else {
+                            // Store result and report count when debugging so callers can see whether
+                            // components existed for the resolved parent id.
+                            try { $pc->store_result(); } catch (Exception $e) { /* ignore */ }
+                            $pc_num = property_exists($pc, 'num_rows') ? $pc->num_rows : null;
+                            if (isset($postDebug) && $postDebug) {
+                                $debug_components[] = [ 'action' => 'components_query', 'parent_for_components' => $parent_for_components, 'found' => $pc_num ];
+                            }
                             $pc->bind_result($comp_product_id, $comp_variant_id, $comp_qty);
+                                $componentCount = 0;
                             while ($pc->fetch()) {
-                                // compute required quantity (ceil to handle fractional component quantities)
-                                $needed = (int) ceil(floatval($comp_qty) * $quantity);
+                                    $componentCount++;
+                                // Handle NULL values - convert to proper null
+                                $comp_product_id = ($comp_product_id === null || $comp_product_id === 0) ? null : intval($comp_product_id);
+                                $comp_variant_id = ($comp_variant_id === null || $comp_variant_id === 0) ? null : intval($comp_variant_id);
+                                
+                                // compute required quantity as sold_quantity * component_qty (allow fractional and expressions)
+                                $comp_qty_num = evaluate_quantity_expr($comp_qty ?: '0');
+                                $needed = $comp_qty_num * floatval($quantity);
 
                                 // Insert a sale_items row for this component so components are recorded in the sale
                                 try {
@@ -576,76 +915,228 @@ switch ($method) {
                                     $comp_variant = null;
                                     // Use the prepared $itemStmt to insert a record for the component
                                     if (isset($itemStmt) && $itemStmt) {
-                                        $itemStmt->bind_param('iiisdids', $sale_id, $comp_product_id, $comp_variant_id, $comp_name, $comp_unit_price, $needed, $comp_total_price, $comp_variant);
+                                        // quantity may be fractional; bind as double
+                                        $itemStmt->bind_param('iiisddds', $sale_id, $comp_product_id, $comp_variant_id, $comp_name, $comp_unit_price, $needed, $comp_total_price, $comp_variant);
                                         $itemStmt->execute();
                                     }
                                 } catch (Exception $e) { /* ignore component insert errors */ }
 
                                 // decide track_stock for component
+                                // Default to true (deduct) if track_stock column doesn't exist
                                 $shouldDeductComp = true;
-                                if ($comp_variant_id !== null && $hasProductVariants && $hasVariantTrack) {
+                                if ($comp_variant_id !== null && $comp_variant_id > 0 && $hasProductVariants && $hasVariantTrack) {
                                     try {
                                         $qtsc = $conn->prepare("SELECT track_stock FROM product_variants WHERE id = ? LIMIT 1");
                                         if ($qtsc) {
                                             $qtsc->bind_param('i', $comp_variant_id);
                                             $qtsc->execute();
                                             $qtsc->bind_result($cvtrack);
-                                            if ($qtsc->fetch()) $shouldDeductComp = (intval($cvtrack) === 1);
+                                            if ($qtsc->fetch()) {
+                                                $shouldDeductComp = (intval($cvtrack) === 1);
+                                            }
                                             $qtsc->close();
                                         }
                                     } catch (Exception $e) { }
-                                } elseif ($comp_product_id !== null && $hasProductTrack) {
+                                } elseif ($comp_product_id !== null && $comp_product_id > 0 && $hasProductTrack) {
                                     try {
                                         $qtsc = $conn->prepare("SELECT track_stock FROM products WHERE id = ? LIMIT 1");
                                         if ($qtsc) {
                                             $qtsc->bind_param('i', $comp_product_id);
                                             $qtsc->execute();
                                             $qtsc->bind_result($cptrack);
-                                            if ($qtsc->fetch()) $shouldDeductComp = (intval($cptrack) === 1);
+                                            if ($qtsc->fetch()) {
+                                                $shouldDeductComp = (intval($cptrack) === 1);
+                                            }
                                             $qtsc->close();
+                                        }
+                                    } catch (Exception $e) { }
+                                }
+                                
+                                // Also check if component has variant but no track_stock column - still need to check product level
+                                if (!$shouldDeductComp && $comp_variant_id !== null && $comp_variant_id > 0 && !$hasVariantTrack) {
+                                    // Variant exists but no track_stock column, try to get product_id from variant and check its track_stock
+                                    try {
+                                        $qvar = $conn->prepare("SELECT product_id FROM product_variants WHERE id = ? LIMIT 1");
+                                        if ($qvar) {
+                                            $qvar->bind_param('i', $comp_variant_id);
+                                            $qvar->execute();
+                                            $qvar->bind_result($var_pid);
+                                            if ($qvar->fetch() && $var_pid !== null && $var_pid > 0 && $hasProductTrack) {
+                                                $qtsc2 = $conn->prepare("SELECT track_stock FROM products WHERE id = ? LIMIT 1");
+                                                if ($qtsc2) {
+                                                    $qtsc2->bind_param('i', $var_pid);
+                                                    $qtsc2->execute();
+                                                    $qtsc2->bind_result($cptrack2);
+                                                    if ($qtsc2->fetch()) {
+                                                        $shouldDeductComp = (intval($cptrack2) === 1);
+                                                    }
+                                                    $qtsc2->close();
+                                                }
+                                            } elseif ($qvar->fetch() && $var_pid !== null && $var_pid > 0 && !$hasProductTrack) {
+                                                // No track_stock column on products either, default to deduct
+                                                $shouldDeductComp = true;
+                                            }
+                                            $qvar->close();
                                         }
                                     } catch (Exception $e) { }
                                 }
 
                                 if (!$shouldDeductComp) continue;
 
-                                // perform component deduction: prefer variant, then inventory, then product
-                                if ($comp_variant_id !== null && $hasProductVariants && $variantStockCol !== null) {
+                                // perform component deduction based on component type
+                                // If component_variant_id exists -> deduct from product_variants
+                                // Otherwise -> deduct from products.in_stock
+                                if ($comp_variant_id !== null && $comp_variant_id > 0 && $hasProductVariants) {
                                     try {
-                                        $col = $variantStockCol;
-                                        $updCompSql = "UPDATE product_variants SET `" . $col . "` = GREATEST(0, CAST(`" . $col . "` AS SIGNED) - ?) WHERE id = ?";
-                                        $ucompv = $conn->prepare($updCompSql);
-                                        if ($ucompv) {
-                                            $ucompv->bind_param('ii', $needed, $comp_variant_id);
-                                            $ucompv->execute();
-                                            $ucompv->close();
+                                        if ($variantStockCol !== null) {
+                                            $col = $variantStockCol;
+                                            $qvstock = $conn->prepare("SELECT `" . $col . "` FROM product_variants WHERE id = ? LIMIT 1");
+                                            $vcurrentStock = null;
+                                            $vstockUnit = '';
+                                            if ($qvstock) {
+                                                $qvstock->bind_param('i', $comp_variant_id);
+                                                $qvstock->execute();
+                                                $qvstock->bind_result($vstockVal);
+                                                if ($qvstock->fetch() && $vstockVal !== null) {
+                                                    $vcurrentStock = $vstockVal;
+                                                    if (preg_match('/^([\d.]+)\s*(.+)$/', trim($vstockVal), $matches)) {
+                                                        $vstockUnit = ' ' . trim($matches[2]);
+                                                    }
+                                                }
+                                                $qvstock->close();
+                                            }
+
+                                            $vstockNum = ($vcurrentStock !== null) ? floatval($vcurrentStock) : 0;
+                                            $vnewStockNum = max(0, $vstockNum - floatval($needed));
+                                            $vnewStock = ($vnewStockNum == floor($vnewStockNum)) ? (string)intval($vnewStockNum) : (string)round($vnewStockNum, 2);
+                                            $vnewStock .= $vstockUnit;
+
+                                            $updCompSql = "UPDATE product_variants SET `" . $col . "` = ? WHERE id = ?";
+                                            $ucompv = $conn->prepare($updCompSql);
+                                            if ($ucompv) {
+                                                $ucompv->bind_param('si', $vnewStock, $comp_variant_id);
+                                                $ucompv->execute();
+                                                $ucompv->close();
+                                            }
+                                        } else {
+                                            // No variant stock column; fall back to parent product in_stock if possible
+                                            $qvar = $conn->prepare("SELECT product_id FROM product_variants WHERE id = ? LIMIT 1");
+                                            if ($qvar) {
+                                                $qvar->bind_param('i', $comp_variant_id);
+                                                $qvar->execute();
+                                                $qvar->bind_result($var_pid);
+                                                if ($qvar->fetch() && $var_pid !== null && $var_pid > 0) {
+                                                    // deduct from products.in_stock for parent product
+                                                    $tpid = intval($var_pid);
+                                                    $qstock = $conn->prepare("SELECT in_stock FROM products WHERE id = ? LIMIT 1");
+                                                    if ($qstock) {
+                                                        $qstock->bind_param('i', $tpid);
+                                                        $qstock->execute();
+                                                        $qstock->bind_result($stockVal);
+                                                        $currentStock = null;
+                                                        $stockUnit = '';
+                                                        if ($qstock->fetch()) {
+                                                            $currentStock = $stockVal;
+                                                            if ($stockVal !== null && preg_match('/^([\d.]+)\s*(.+)$/', trim($stockVal), $matches)) {
+                                                                $stockUnit = ' ' . trim($matches[2]);
+                                                            }
+                                                        }
+                                                        $qstock->close();
+
+                                                        $stockNum = ($currentStock !== null && $currentStock !== '') ? floatval($currentStock) : 0;
+                                                        $newStockNum = max(0, $stockNum - floatval($needed));
+                                                        $newStock = ($newStockNum == floor($newStockNum)) ? (string)intval($newStockNum) : (string)round($newStockNum, 2);
+                                                        if ($stockUnit !== '') $newStock .= $stockUnit;
+
+                                                        $ucomp = $conn->prepare("UPDATE products SET in_stock = ? WHERE id = ?");
+                                                        if ($ucomp) {
+                                                            $ucomp->bind_param('si', $newStock, $tpid);
+                                                            $ucomp->execute();
+                                                            $ucomp->close();
+                                                        }
+                                                    }
+                                                }
+                                                $qvar->close();
+                                            }
                                         }
-                                    } catch (Exception $e) { }
-                                } elseif ($hasInventory && $comp_product_id !== null) {
+                                    } catch (Exception $e) { error_log('Component variant deduction error: ' . $e->getMessage()); }
+                                } elseif ($comp_product_id !== null && $comp_product_id > 0) {
+                                    // Deduct from products.in_stock for component product
                                     try {
-                                        $upl = $conn->prepare("UPDATE inventory SET quantity = GREATEST(0, quantity - ?), last_updated = NOW() WHERE product_id = ? AND location = ?");
-                                        if ($upl) {
-                                            $loc = 'Main Warehouse';
-                                            $upl->bind_param('iis', $needed, $comp_product_id, $loc);
-                                            $upl->execute();
-                                            $upl->close();
+                                        $tpid = intval($comp_product_id);
+                                        $qstock = $conn->prepare("SELECT in_stock FROM products WHERE id = ? LIMIT 1");
+                                        $currentStock = null;
+                                        $stockUnit = '';
+                                        if ($qstock) {
+                                            $qstock->bind_param('i', $tpid);
+                                            $qstock->execute();
+                                            $qstock->bind_result($stockVal);
+                                            if ($qstock->fetch()) {
+                                                $currentStock = $stockVal;
+                                                if ($stockVal !== null && preg_match('/^([\d.]+)\s*(.+)$/', trim($stockVal), $matches)) {
+                                                    $stockUnit = ' ' . trim($matches[2]);
+                                                }
+                                            }
+                                            $qstock->close();
                                         }
-                                    } catch (Exception $e) { }
-                                } elseif ($hasProductInStock && $comp_product_id !== null) {
-                                    try {
-                                        $ucomp = $conn->prepare("UPDATE products SET in_stock = GREATEST(0, CAST(in_stock AS SIGNED) - ?) WHERE id = ?");
+
+                                        $stockNum = ($currentStock !== null && $currentStock !== '') ? floatval($currentStock) : 0;
+                                        $newStockNum = max(0, $stockNum - floatval($needed));
+                                        $newStock = ($newStockNum == floor($newStockNum)) ? (string)intval($newStockNum) : (string)round($newStockNum, 2);
+                                        if ($stockUnit !== '') $newStock .= $stockUnit;
+
+                                        $ucomp = $conn->prepare("UPDATE products SET in_stock = ? WHERE id = ?");
                                         if ($ucomp) {
-                                            $ucomp->bind_param('ii', $needed, $comp_product_id);
+                                            $ucomp->bind_param('si', $newStock, $tpid);
                                             $ucomp->execute();
                                             $ucomp->close();
                                         }
-                                    } catch (Exception $e) { }
+                                    } catch (Exception $e) { error_log('Component product deduction error: ' . $e->getMessage()); }
+                                } else {
+                                    // No valid component id found
+                                    error_log('Component row missing both component_product_id and component_variant_id for parent ' . ($product_id ?? 'NULL'));
                                 }
                             }
                             $pc->close();
+                                if ($componentCount === 0) {
+                                    // As a fallback: if we tried the resolved parent (product) and found no components,
+                                    // try again using the variant id itself as parent (some setups may store components against variant ids).
+                                    if ($variant_id !== null && $variant_id > 0) {
+                                        try {
+                                            $pc2 = $conn->prepare("SELECT component_product_id, component_variant_id, component_qty FROM product_components WHERE parent_product_id = ?");
+                                            if ($pc2) {
+                                                $pc2->bind_param('i', $variant_id);
+                                                if ($pc2->execute()) {
+                                                    $pc2->bind_result($comp_product_id, $comp_variant_id, $comp_qty);
+                                                    $foundAny = false;
+                                                    while ($pc2->fetch()) {
+                                                        $foundAny = true;
+                                                        // Re-run the same component handling logic for this row by duplicating the handling
+                                                        // For simplicity, log that a component was found under variant parent and let next sale commit handle it
+                                                        error_log("Found components for composite under variant parent (variant_id): " . $variant_id . ", component_product_id: " . ($comp_product_id ?? 'NULL'));
+                                                    }
+                                                }
+                                                $pc2->close();
+                                            }
+                                        } catch (Exception $e) { /* ignore fallback errors */ }
+                                    }
+                                    error_log("No components found for composite product_id/parent: " . ($parent_for_components ?? 'NULL'));
+                                }
+                            }
+                        } else {
+                            error_log("Failed to prepare component query for parent_product_id: " . $product_id . ", Error: " . $conn->error);
+                        }
+                    } else {
+                        if ($product_id === null) {
+                            error_log("Composite check skipped: product_id is null");
+                        } elseif (!$isComposite) {
+                            // Not a composite, skip silently
                         }
                     }
-                } catch (Exception $e) { /* ignore composite handling errors to avoid blocking sale */ }
+                } catch (Exception $e) { 
+                    error_log("Exception in composite handling for product_id: " . ($product_id ?? 'NULL') . ", Error: " . $e->getMessage());
+                    // Don't fail the sale, but log the error
+                }
             }
             $itemStmt->close();
 

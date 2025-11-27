@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 });
 
+// Load rows immediately on page load so the user sees data without clicking
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+	// small timeout to ensure elements exist
+	setTimeout(() => { inventoryPageState.page = 1; generateInventoryReport(); }, 50);
+} else {
+	document.addEventListener('DOMContentLoaded', () => { inventoryPageState.page = 1; generateInventoryReport(); });
+}
+
 // Pagination state
 let inventoryPageState = { page: 1, per_page: 20 };
 
@@ -43,6 +51,7 @@ function renderInventoryPager(pagination) {
 function generateInventoryReport() {
 	const startDate = document.getElementById('report-start-date').value;
 	const endDate = document.getElementById('report-end-date').value;
+	const stockFilter = document.getElementById('inventory-stock-filter') ? document.getElementById('inventory-stock-filter').value : 'all';
 	const tbody = document.getElementById('inventory-report-table-body');
 	tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ff9800">Loading...</td></tr>';
 
@@ -59,10 +68,12 @@ function generateInventoryReport() {
 		const params = new URLSearchParams();
 	if (startDate) params.append('start', startDate);
 	if (endDate) params.append('end', endDate);
+	if (stockFilter && stockFilter !== 'all') params.append('stock_filter', stockFilter);
 		params.append('page', inventoryPageState.page);
 		params.append('per_page', inventoryPageState.per_page);
 
-		fetch('inventoryreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
+		// Use absolute path so this fetch works when the script is included from other pages
+		fetch('/black_basket/pages/reports/inventoryreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
 			.then(async r => {
 				if (!r.ok) throw new Error('Network error: ' + r.status + ' ' + r.statusText);
 				const ct = r.headers.get('Content-Type') || '';
@@ -87,18 +98,33 @@ function generateInventoryReport() {
 				tbody.innerHTML = items.map(i => `
 					<tr>
 						<td>${i.name}</td>
-						<td>${i.category}</td>
-						<td>${currencySymbol}${Number(i.price).toFixed(2)}</td>
+						<td>${i.category ?? ''}</td>
+						<td>${currencySymbol}${Number(i.price || 0).toFixed(2)}</td>
 						<td>${i.quantity}</td>
-						<td>${i.status}</td>
+						<td>${i.status || ''}</td>
 					</tr>
 				`).join('');
 			}
 
-			document.getElementById('total-inventory-items').textContent = summary.totalItems;
-			document.getElementById('total-inventory-value').textContent = currencySymbol + Number(summary.totalValue).toFixed(2);
-			document.getElementById('low-stock-count').textContent = summary.lowStockCount;
-			document.getElementById('out-of-stock-count').textContent = summary.outOfStockCount;
+			// Summary keys: support both legacy and new names
+			const totalItems = summary.totalItems ?? summary.totalProducts ?? 0;
+			const totalValueNum = parseFloat(summary.totalValue ?? 0) || 0;
+			const lowStockCount = summary.lowStockCount ?? summary.lowStockCount ?? 0;
+			const outOfStockCount = summary.outOfStockCount ?? summary.outOfStockCount ?? 0;
+
+			const createdCurr = summary.productsCreatedInPeriod ?? null;
+			const createdPrev = summary.productsCreatedPreviousPeriod ?? null;
+			const createdChange = summary.productsCreatedChangePercent ?? null;
+
+			if (document.getElementById('total-inventory-items')) document.getElementById('total-inventory-items').textContent = totalItems;
+			if (document.getElementById('total-inventory-value')) document.getElementById('total-inventory-value').textContent = currencySymbol + Number(totalValueNum).toFixed(2);
+			if (document.getElementById('low-stock-count')) document.getElementById('low-stock-count').textContent = lowStockCount;
+			if (document.getElementById('out-of-stock-count')) document.getElementById('out-of-stock-count').textContent = outOfStockCount;
+
+			// Optional analytics placeholders if present
+			if (document.getElementById('products-created-curr')) document.getElementById('products-created-curr').textContent = createdCurr ?? 'N/A';
+			if (document.getElementById('products-created-prev')) document.getElementById('products-created-prev').textContent = createdPrev ?? 'N/A';
+			if (document.getElementById('products-created-change')) document.getElementById('products-created-change').textContent = (createdChange !== null) ? (Number(createdChange).toFixed(2) + '%') : 'N/A';
 			if (json.pagination) renderInventoryPager(json.pagination);
 		})
 		.catch(err => {

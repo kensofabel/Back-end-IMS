@@ -898,6 +898,18 @@
     height: 36px;
     padding: 6px;
 }
+/* See-all link: keep inline text, avoid fixed button sizing so it doesn't wrap */
+.see-all-link {
+    display: inline-block;
+    padding: 0 15px 15px;
+    color: #dbdbdb;
+    background: transparent;
+    border: none;
+    text-decoration: none;
+    font-weight: 600;
+    line-height: 1.1;
+}
+.see-all-link:hover { color: #fff; }
 .section-header-inline .header-actions .view-toggle-btn:hover {
     background: rgba(255,255,255,0.02);
     color: #dbdbdb;
@@ -1569,6 +1581,59 @@
     box-shadow: 0 0 0 3px rgba(255,152,0,0.12);
 }
 
+/* Transactions list (recent transactions shown below Payment) */
+.transactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding-top: 8px;
+}
+.transaction-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #151515;
+    border: 1px solid #262626;
+    margin-right: 10px;
+    color: #ffd18a;
+    font-size: 16px;
+}
+.transaction-item { align-items: center; }
+.transaction-item .transaction-left { display:flex; flex-direction:column; gap:4px; flex: 1 1 auto; text-align: left; }
+.transaction-item .txn-type { display:block; }
+.transaction-item .txn-meta { display:block; }
+.transactions-list::-webkit-scrollbar { width: 8px; }
+.transactions-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 8px; }
+.transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: #161616;
+    border: 1px solid #262626;
+    border-radius: 8px;
+}
+.transaction-left { display:flex; flex-direction:column; gap:4px; text-align: left; }
+.txn-type { font-weight:700; color:#ffd18a; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.txn-meta { color:#bfbfbf; font-size:0.88rem; text-align: left; }
+/* Keep inline sale id next to payment/type text the same color as the old meta line */
+.txn-type .txn-id {
+    color: #bfbfbf;
+    font-weight: normal;
+    margin-left: 6px;
+}
+
+.transaction-right { text-align:right; display:flex; flex-direction:column; gap:4px; align-items:flex-end; flex: 0 0 auto; }
+.txn-amount { font-weight:700; color:#ff9800; }
+.txn-time { color:#bfbfbf; font-size:0.82rem; }
+.transactions-list .transaction-item.empty { background: transparent; color: #bfbfbf; justify-content: center; }
+
 /* Make quick-amounts visually consistent with payment methods on small screens */
 @media (max-width: 480px) {
     #quick-amounts { grid-template-columns: repeat(4, 1fr); gap:6px; }
@@ -1598,5 +1663,58 @@
         width: calc(100% - 32px) !important;
         max-width: calc(100% - 32px) !important;
     }
+}
+
+/* Transactions Modal Styles */
+.transactions-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 12000;
+}
+.transactions-modal-overlay.visible { display: flex; }
+.transactions-modal {
+    background: #0f0f0f;
+    color: #fff;
+    width: 820px;
+    max-width: calc(100% - 40px);
+    max-height: 84vh;
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.transactions-modal-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #1e1e1e;
+}
+.transactions-modal-title { color: #ffd18a; font-weight:700; font-size:1.05rem; }
+.transactions-modal-body { padding: 12px; overflow: hidden; flex: 1 1 auto; }
+.transactions-modal .transactions-list { max-height: calc(84vh - 76px); overflow-y: auto; padding-top: 6px; }
+/* Reserve scrollbar gutter and add inner padding so rows don't hug the scrollbar */
+.transactions-modal .transactions-list {
+    scrollbar-gutter: stable both-edges;
+    padding-right: 12px; /* ensures a small gap between content and scrollbar */
+}
+.transactions-modal .transaction-item { padding-right: 12px; }
+
+/* When a modal is open, prevent the background page from scrolling */
+body.modal-open { overflow: hidden; }
+.transactions-modal .transaction-item { padding: 12px; }
+.transactions-modal .transaction-icon { width:40px; height:40px; min-width:40px; margin-right:12px; }
+.transactions-modal .transaction-left { max-width: 78%; }
+.transactions-modal .transaction-right { min-width: 100px; text-align: right; }
+.transactions-modal .txn-amount { font-size: 1.05rem; }
+.transactions-modal .txn-time { font-size: 0.82rem; color: #bfbfbf; }
+
+@media (max-width: 900px) {
+    .transactions-modal { width: calc(100% - 28px); max-height: 86vh; }
 }
 

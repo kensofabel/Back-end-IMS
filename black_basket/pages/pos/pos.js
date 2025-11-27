@@ -196,8 +196,48 @@ document.addEventListener('DOMContentLoaded', function () {
             saleMoreList.setAttribute('aria-hidden', 'true');
             switch (action) {
                 case 'clear':
-                    // Clear the current sale immediately without confirmation
-                    clearCart();
+                    // If this is a saved order (currentOrderId set) treat as "Void Order" and confirm deletion.
+                    if (typeof currentOrderId !== 'undefined' && currentOrderId) {
+                        showConfirmModal('Void saved order? This will permanently delete the saved order.', function() {
+                            // attempt server-side delete, then clear UI on success
+                            try {
+                                fetch('/black_basket/pages/pos/open_orders_api.php', {
+                                    method: 'POST',
+                                    credentials: 'same-origin',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'delete', order_id: currentOrderId })
+                                })
+                                .then(res => res.ok ? res.json() : res.text().then(t => Promise.reject(new Error(t || 'Network error'))))
+                                .then(json => {
+                                    if (json && json.success) {
+                                        showToast('Order voided', 'success');
+                                        try { clearCart(); } catch (e) {}
+                                        // refresh cached open orders when possible
+                                        try {
+                                            fetch('/black_basket/pages/pos/open_orders_api.php', { credentials: 'same-origin' })
+                                                .then(r => r.ok ? r.json() : Promise.reject())
+                                                .then(j => { if (j && j.success) { openOrdersCache = j.orders || []; } })
+                                                .catch(() => {});
+                                        } catch (e) {}
+                                    } else {
+                                        showToast('Could not void order: ' + (json && json.error ? json.error : 'Unknown'), 'error');
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error('Void order error', err);
+                                    showToast('Network error: could not void order', 'error');
+                                });
+                            } catch (e) {
+                                console.error('Void order exception', e);
+                                showToast('Could not void order', 'error');
+                            }
+                        }, function(){} , 'Void Order');
+                    } else {
+                        // Not a saved order: confirm clearing the current cart
+                        showConfirmModal('Clear current sale? This will empty the cart.', function() {
+                            try { clearCart(); } catch (e) {}
+                        }, function(){} , 'Clear Order');
+                    }
                     break;
                 case 'sync':
                     // Try to call a sync endpoint if available, otherwise show a temporary notice
@@ -275,7 +315,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     // Load the saved order into the current cart so split modal operates on the saved snapshot
                                     try {
                                         if (orderToLoad && Array.isArray(orderToLoad.items)) {
-                                            cart = orderToLoad.items.map(it => ({ product_id: it.product_id || null, name: it.name || '', unit_price: parseFloat(it.unit_price) || parseFloat(it.unitPrice) || parseFloat(it.price) || 0, quantity: parseInt(it.quantity) || 1, variant: it.variant || null }));
+                                            cart = orderToLoad.items.map(it => ({ product_id: it.product_id || null, variant_id: it.variant_id || null, name: it.name || '', unit_price: parseFloat(it.unit_price) || parseFloat(it.unitPrice) || parseFloat(it.price) || 0, quantity: parseInt(it.quantity) || 1, variant: it.variant || null }));
                                             updateCartDisplay();
 
                                             // Autofill the amount-received with the order total (programmatic)
@@ -423,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                                     // Load saved order into cart (so merge works on the saved snapshot)
                                                     try {
                                                         if (orderToLoad && Array.isArray(orderToLoad.items)) {
-                                                            cart = orderToLoad.items.map(it => ({ product_id: it.product_id || null, name: it.name || '', unit_price: parseFloat(it.unit_price) || parseFloat(it.unitPrice) || parseFloat(it.price) || 0, quantity: parseInt(it.quantity) || 1, variant: it.variant || null }));
+                                                            cart = orderToLoad.items.map(it => ({ product_id: it.product_id || null, variant_id: it.variant_id || null, name: it.name || '', unit_price: parseFloat(it.unit_price) || parseFloat(it.unitPrice) || parseFloat(it.price) || 0, quantity: parseInt(it.quantity) || 1, variant: it.variant || null }));
                                                             updateCartDisplay();
 
                                                             // Autofill the amount-received with the order total (programmatic)
@@ -468,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                                                     // Fetch updated saved orders and open the modal in merge mode with the new order preselected
                                                     try {
-                                                        fetch('open_orders_api.php', { credentials: 'same-origin' })
+                                                        fetch('/black_basket/pages/pos/open_orders_api.php', { credentials: 'same-origin' })
                                                             .then(r => r.ok ? r.json() : Promise.reject(new Error('Network error')))
                                                             .then(j => {
                                                                 if (j && j.success) {
@@ -696,7 +736,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Send favourite change to server; returns a Promise that resolves true on success
     function sendFavouriteToServer(productId, on) {
-        return fetch('favourites_api.php', {
+        return fetch('/black_basket/pages/pos/favourites_api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -725,13 +765,13 @@ document.addEventListener('DOMContentLoaded', function () {
         let url;
         if (category && category !== 'all') {
             if (String(category).toLowerCase() === 'favourites' || String(category).toLowerCase() === 'favourite') {
-                url = 'favourites_api.php';
+                url = '/black_basket/pages/pos/favourites_api.php';
             } else {
                 params.set('category', category);
-                url = `api.php?${params.toString()}`;
+                url = `/black_basket/pages/pos/api.php?${params.toString()}`;
             }
         } else {
-            url = params.toString() ? `api.php?${params.toString()}` : 'api.php';
+            url = params.toString() ? `/black_basket/pages/pos/api.php?${params.toString()}` : '/black_basket/pages/pos/api.php';
         }
         console.log('POS fetching products from:', url);
         fetch(url, { credentials: 'same-origin' })
@@ -1042,7 +1082,7 @@ document.addEventListener('DOMContentLoaded', function () {
             productCard.addEventListener('click', (e) => {
                 // Before adding, check for variants for this product
                 const productId = product.id;
-                const checkVariants = fetch('../inventory/variants_api.php?product_id=' + encodeURIComponent(productId), { credentials: 'same-origin' })
+                const checkVariants = fetch('/black_basket/pages/inventory/variants_api.php?product_id=' + encodeURIComponent(productId), { credentials: 'same-origin' })
                     .then(res => res.ok ? res.json() : Promise.resolve([]))
                     .catch(() => []);
 
@@ -1062,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         showPriceModal(productCard, { name: nameForCart }, (enteredPrice) => {
                                             if (typeof enteredPrice === 'number' && !isNaN(enteredPrice)) {
                                                 animateAddToCart(productCard, cartItems);
-                                                addToCart(selectedVariant.id || productId, product.name, enteredPrice, selectedVariant.name);
+                                                addToCart(productId, product.name, enteredPrice, selectedVariant.name, selectedVariant.id);
                                             }
                                         });
                                         return;
@@ -1075,13 +1115,13 @@ document.addEventListener('DOMContentLoaded', function () {
                                             showPriceModal(productCard, { name: nameForCart }, (enteredPrice) => {
                                                 if (typeof enteredPrice === 'number' && !isNaN(enteredPrice)) {
                                                     animateAddToCart(productCard, cartItems);
-                                                    addToCart(selectedVariant.id || productId, product.name, enteredPrice, selectedVariant.name);
+                                                    addToCart(productId, product.name, enteredPrice, selectedVariant.name, selectedVariant.id);
                                                 }
                                             });
                                         } else {
                                             const fallbackPrice = (selectedVariant && (selectedVariant.cost !== null && selectedVariant.cost !== undefined) && !isNaN(parseFloat(selectedVariant.cost))) ? parseFloat(selectedVariant.cost) : 0;
                                             animateAddToCart(productCard, cartItems);
-                                            addToCart(selectedVariant.id || productId, product.name, fallbackPrice, selectedVariant.name);
+                                            addToCart(productId, product.name, fallbackPrice, selectedVariant.name, selectedVariant.id);
                                         }
                                     } else {
                                         animateAddToCart(productCard, cartItems);
@@ -1139,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // If this product has variants, fetch them and update the card indicator
             (function(card, prod) {
-                fetch('../inventory/variants_api.php?product_id=' + encodeURIComponent(prod.id), { credentials: 'same-origin' })
+                fetch('/black_basket/pages/inventory/variants_api.php?product_id=' + encodeURIComponent(prod.id), { credentials: 'same-origin' })
                     .then(res => res.ok ? res.json() : [])
                     .catch(() => [])
                     .then(variants => {
@@ -1179,13 +1219,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Add product to cart
-    function addToCart(productId, productName, unitPrice, variantName) {
-        const existingItem = cart.find(item => item.product_id === productId && (item.variant || '') === (variantName || ''));
+    function addToCart(productId, productName, unitPrice, variantName, variantId = null) {
+        const existingItem = cart.find(item => item.product_id === productId && (item.variant_id || null) === (variantId || null) && (item.variant || '') === (variantName || ''));
         if (existingItem) {
             existingItem.quantity++;
         } else {
             cart.push({
                 product_id: productId,
+                variant_id: variantId || null,
                 name: productName,
                 unit_price: unitPrice,
                 quantity: 1,
@@ -1609,6 +1650,718 @@ document.addEventListener('DOMContentLoaded', function () {
         return overlay;
     }
 
+    // --- Transactions modal (See All) ---
+    function createTransactionsModal() {
+        const existing = document.getElementById('transactions-modal-overlay');
+        if (existing) return existing;
+        // If markup not present (older templates), create it dynamically
+        const overlay = document.createElement('div');
+        overlay.id = 'transactions-modal-overlay';
+        overlay.className = 'transactions-modal-overlay';
+        overlay.innerHTML = `
+            <div class="transactions-modal" role="dialog" aria-modal="true" aria-label="All transactions">
+                <div class="transactions-modal-header">
+                    <div class="transactions-modal-title">Transactions</div>
+                    <div class="transactions-modal-actions"><button id="transactions-modal-close" class="view-toggle-btn" aria-label="Close">×</button></div>
+                </div>
+                <div class="transactions-modal-body">
+                    <div id="transactions-modal-list" class="transactions-list"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        return overlay;
+    }
+
+    // Reusable helpers to perform "content-only" modal animations (match inventory.js behavior)
+    function resetContentOnlyAnimation(overlay, content) {
+        if (!overlay || !content) return;
+        try { overlay.classList.remove('fb-backdrop-in', 'fb-backdrop-out'); } catch(e) {}
+        try { content.classList.remove('fb-modal-in', 'fb-modal-out'); } catch(e) {}
+        try { content.classList.remove('modal-slide-in', 'modal-slide-left'); } catch(e) {}
+    }
+
+    function showOverlayContentWithTransition(overlay, content, onShown) {
+        if (!overlay || !content) return;
+        resetContentOnlyAnimation(overlay, content);
+        overlay.style.display = 'flex';
+        overlay.classList.add('visible');
+        try { document.body.classList.add('modal-open'); } catch(e) {}
+
+        try {
+            content.classList.remove('modal-slide-left');
+            // force reflow
+            void content.offsetWidth;
+            content.classList.add('modal-slide-in');
+            const handler = function() {
+                try { content.classList.remove('modal-slide-in'); content.removeEventListener('animationend', handler); } catch(e) {}
+                if (typeof onShown === 'function') onShown();
+            };
+            try { content.addEventListener('animationend', handler); } catch(e) {}
+        } catch (e) { if (typeof onShown === 'function') onShown(); }
+    }
+
+    function hideOverlayContentWithTransition(overlay, content, onHidden) {
+        if (!overlay || !content) {
+            if (overlay) { try { overlay.classList.remove('visible'); overlay.style.display = 'none'; } catch(e){} }
+            if (typeof onHidden === 'function') onHidden();
+            return;
+        }
+        try {
+            content.classList.remove('modal-slide-in');
+            // force reflow
+            void content.offsetWidth;
+            content.classList.add('modal-slide-left');
+        } catch (e) {}
+
+        let called = false;
+        const finish = function() {
+            if (called) return; called = true;
+            try { overlay.classList.remove('visible'); overlay.style.display = 'none'; } catch(e) {}
+            try { content.classList.remove('modal-slide-left'); } catch(e) {}
+            try { document.body.classList.remove('modal-open'); } catch(e) {}
+            if (typeof onHidden === 'function') onHidden();
+        };
+        const onEnd = function() { finish(); try { content.removeEventListener('animationend', onEnd); } catch(e) {} };
+        try { content.addEventListener('animationend', onEnd); } catch(e) {}
+        // fallback in case animationend doesn't fire
+        setTimeout(finish, 520);
+    }
+
+    function formatTxnDate(ts) {
+        if (!ts) return '';
+        try { return new Date(ts).toLocaleString([], { hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' }); } catch (e) { return String(ts); }
+    }
+
+    function mapPaymentIcon(method) {
+        if (!method) return 'fa-money-bill-wave';
+        const m = String(method).toLowerCase();
+        if (m.indexOf('card') !== -1) return 'fa-credit-card';
+        if (m.indexOf('cash') !== -1) return 'fa-money-bill-wave';
+        if (m.indexOf('online') !== -1 || m.indexOf('gpay') !== -1 || m.indexOf('stripe') !== -1 || m.indexOf('pay') !== -1) return 'fa-globe';
+        return 'fa-receipt';
+    }
+
+    function showTransactionsModal(limit) {
+        const overlay = createTransactionsModal();
+        const list = overlay.querySelector('#transactions-modal-list');
+        if (!list) return;
+        list.innerHTML = '<div style="color:#bfbfbf;padding:12px">Loading transactions…</div>';
+        // fetch recent transactions; use relative path
+        const l = typeof limit === 'number' ? limit : 100;
+        fetch(`/black_basket/pages/pos/transactions_api.php?limit=${encodeURIComponent(l)}`, { credentials: 'same-origin' })
+            .then(res => {
+                if (!res.ok) return res.text().then(t => Promise.reject(new Error('HTTP ' + res.status + ' - ' + t)));
+                return res.json();
+            })
+            .then(data => {
+                list.innerHTML = '';
+                if (!Array.isArray(data) || data.length === 0) {
+                    list.innerHTML = '<div class="transaction-item empty" style="display:block;color:#bfbfbf;padding:12px">No transactions found.</div>';
+                    return;
+                }
+                // Group transactions by recent time buckets (Today, Yesterday, Last week, Last month, Older by month)
+                function getGroupLabel(ts) {
+                    const d = new Date(ts);
+                    if (isNaN(d)) return 'Unknown';
+                    const now = new Date();
+                    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                    const diffDays = Math.floor((startOfToday - dateOnly) / 86400000);
+
+                    // Format date parts
+                    const fullDate = d.toLocaleString([], { day: 'numeric', month: 'long', year: 'numeric' });
+                    if (diffDays === 0) return `Today, ${fullDate}`;
+                    if (diffDays === 1) return `Yesterday, ${fullDate}`;
+
+                    // For all other days show weekday + full date (no aggregation)
+                    return d.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                }
+
+                function buildRow(sale) {
+                    const row = document.createElement('div');
+                    row.className = 'transaction-item';
+
+                    const leftWrap = document.createElement('div');
+                    leftWrap.style.display = 'flex';
+                    leftWrap.style.alignItems = 'center';
+                    leftWrap.style.gap = '8px';
+
+                    const icon = document.createElement('div');
+                    icon.className = 'transaction-icon';
+                    const ico = mapPaymentIcon(sale.payment_method || sale.payment);
+                    icon.innerHTML = `<i class="fa ${ico}"></i>`;
+
+                    const left = document.createElement('div');
+                    left.className = 'transaction-left';
+                    const typeText = (sale.payment_method || sale.type || 'Sale');
+                    const saleIdText = sale.id ? ('#' + sale.id) : '';
+                    const metaParts = [];
+                    if (sale.cart_mode) metaParts.push(String(sale.cart_mode));
+                    if (sale.employee_name) metaParts.push(String(sale.employee_name));
+                    left.innerHTML = `<div class="txn-type">${escapeHtml(typeText)}${saleIdText ? (' <span class="txn-id">' + escapeHtml(saleIdText) + '</span>') : ''}</div><div class="txn-meta">${escapeHtml(metaParts.join(' • '))}</div>`;
+
+                    // Show plain-text status indicator (no button styling) for refunded/cancelled transactions
+                    try {
+                        const st = (sale && sale.status) ? String(sale.status).toLowerCase() : '';
+                        if (st === 'cancelled' || st === 'canceled' || st === 'refund' || st === 'refunded') {
+                            const typeEl = left.querySelector('.txn-type');
+                            if (typeEl) {
+                                const span = document.createElement('span');
+                                span.className = 'txn-status';
+                                span.textContent = (st === 'cancelled' || st === 'canceled') ? 'Cancelled' : 'Refunded';
+                                span.style.marginLeft = '8px';
+                                span.style.fontWeight = '600';
+                                span.style.fontSize = '0.9rem';
+                                span.style.color = (st === 'cancelled' || st === 'canceled') ? '#ff6b6b' : '#ffd54a';
+                                span.style.verticalAlign = 'middle';
+                                typeEl.appendChild(span);
+                            }
+                        }
+                    } catch (e) { /* ignore status rendering errors */ }
+
+                    leftWrap.appendChild(icon);
+                    leftWrap.appendChild(left);
+
+                    const right = document.createElement('div');
+                    right.className = 'transaction-right';
+                    const amt = parseFloat(sale.total_amount || sale.total || sale.total_amount || 0) || 0;
+                    // format numeric date/time MM/DD/YYYY HH:MM (24h) with fallback
+                    let numericDateTime = '';
+                    try {
+                        const ts = sale.created_at || sale.created || sale.date_created;
+                        const dObj = new Date(ts);
+                        if (!isNaN(dObj)) {
+                            const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+                            const dd = String(dObj.getDate()).padStart(2, '0');
+                            const yyyy = dObj.getFullYear();
+                            const hh = String(dObj.getHours()).padStart(2, '0');
+                            const min = String(dObj.getMinutes()).padStart(2, '0');
+                            numericDateTime = `${mm}/${dd}/${yyyy} ${hh}:${min}`;
+                        }
+                    } catch (e) { /* ignore */ }
+                    right.innerHTML = `<div class="txn-amount">${currency}${amt.toFixed(2)}</div><div class="txn-time">${numericDateTime || formatTxnDate(sale.created_at || sale.created || sale.date_created)}</div>`;
+
+                    row.appendChild(leftWrap);
+                    row.appendChild(right);
+
+                    // make the row clickable to open a receipt
+                    try {
+                        row.style.cursor = 'pointer';
+                        row.setAttribute('role', 'button');
+                        row.addEventListener('click', () => {
+                            try { showTransactionReceipt(sale); } catch (e) { console.error('Failed to open receipt', e); }
+                        });
+                    } catch (e) {}
+
+                    return { row, ts: new Date(sale.created_at || sale.created || sale.date_created).getTime() || 0 };
+                }
+
+                // Build groups
+                const groupsMap = Object.create(null);
+                (Array.isArray(data) ? data : []).forEach(sale => {
+                    const ts = new Date(sale.created_at || sale.created || sale.date_created).getTime() || Date.now();
+                    const label = getGroupLabel(ts);
+                    if (!groupsMap[label]) groupsMap[label] = { label: label, items: [], maxTs: 0 };
+                    groupsMap[label].items.push(sale);
+                    if (ts > groupsMap[label].maxTs) groupsMap[label].maxTs = ts;
+                });
+
+                // Convert groups to array and sort by most recent activity
+                const groups = Object.keys(groupsMap).map(k => groupsMap[k]).sort((a,b) => b.maxTs - a.maxTs);
+
+                groups.forEach(g => {
+                    // divider
+                    const divider = document.createElement('div');
+                    divider.className = 'open-orders-group-divider';
+                    divider.textContent = g.label;
+                    list.appendChild(divider);
+
+                    // sort items inside group by time desc
+                    g.items.sort((x,y) => {
+                        const tx = new Date(y.created_at || y.created || y.date_created).getTime() || 0;
+                        const sx = new Date(x.created_at || x.created || x.date_created).getTime() || 0;
+                        return tx - sx;
+                    }).forEach(sale => {
+                        const built = buildRow(sale);
+                        list.appendChild(built.row);
+                    });
+                });
+            })
+            .catch(err => {
+                list.innerHTML = `<div style="color:#ff6b6b;padding:12px">Could not load transactions: ${escapeHtml(String(err && err.message ? err.message : err))}</div>`;
+            });
+
+        // show overlay with slide-in animation for content (match inventory behavior)
+        const txContent = overlay.querySelector('.transactions-modal');
+        try {
+            showOverlayContentWithTransition(overlay, txContent);
+        } catch (e) { console.warn('showTransactionsModal animation failed', e); }
+
+        // wire close handlers to animate panel out first (use helper)
+        const closeBtn = overlay.querySelector('#transactions-modal-close');
+        const triggerClose = () => { hideOverlayContentWithTransition(overlay, txContent); };
+
+        if (closeBtn) closeBtn.addEventListener('click', triggerClose);
+        overlay.addEventListener('click', (ev) => { if (ev.target === overlay) triggerClose(); });
+        const onKey = (ev) => { if (ev.key === 'Escape' && overlay.classList.contains('visible')) triggerClose(); };
+        document.addEventListener('keydown', onKey);
+        // remove key listener and ensure body class cleared when closed
+        const obs = new MutationObserver(() => {
+            if (!overlay.classList.contains('visible')) {
+                try { document.removeEventListener('keydown', onKey); } catch (e) {}
+                try { obs.disconnect(); } catch (e) {}
+                try { document.body.classList.remove('modal-open'); } catch (e) {}
+            }
+        });
+        obs.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // wire See All link to open modal (clean binding)
+    try {
+        const seeAll = document.getElementById('see-all-transactions');
+        if (seeAll) {
+            seeAll.addEventListener('click', (ev) => { ev.preventDefault(); showTransactionsModal(200); });
+        }
+    } catch (e) { /* ignore wiring errors */ }
+
+    // --- Receipt slide-in modal ---
+    function createReceiptOverlay() {
+        let existing = document.getElementById('transaction-receipt-overlay');
+        if (existing) return existing;
+        const overlay = document.createElement('div');
+        overlay.id = 'transaction-receipt-overlay';
+        overlay.className = 'confirm-modal-overlay';
+        overlay.style.display = 'none';
+        // Make sure receipt overlays appear above other modals (transactions modal uses z-index:12000)
+        try { overlay.style.zIndex = 13000; } catch (e) {}
+        overlay.innerHTML = `
+            <div class="confirm-modal receipt-panel" role="dialog" aria-modal="true" style="width:420px; max-width:95vw;">
+                <div class="confirm-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #1e1e1e;">
+                    <div class="confirm-modal-title" style="color:#ffd18a;font-weight:700">Receipt</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button id="receipt-refund" class="view-toggle-btn" title="Refund" aria-label="Refund">Refund</button>
+                        <button id="receipt-close" class="view-toggle-btn" aria-label="Close receipt">×</button>
+                    </div>
+                </div>
+                <div class="confirm-modal-body" id="receipt-body" style="padding:12px; overflow:auto; max-height:80vh;">
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        return overlay;
+    }
+
+    function formatCurrency(v) { try { return currency + (parseFloat(v)||0).toFixed(2); } catch(e){ return currency + '0.00'; } }
+
+    function showTransactionReceipt(sale) {
+        const overlay = createReceiptOverlay();
+        const body = overlay.querySelector('#receipt-body');
+        const content = overlay.querySelector('.confirm-modal');
+        if (!body || !content) return;
+
+        // If transactions modal is open, slide it out so it doesn't cover receipt
+        const txOverlay = document.getElementById('transactions-modal-overlay');
+        const txContent = txOverlay ? txOverlay.querySelector('.transactions-modal') : null;
+        let restoreTxOnClose = false;
+        if (txOverlay && txOverlay.classList.contains('visible') && txContent) {
+            try {
+                // Immediately hide transactions overlay (no slide animation) and mark to restore
+                try { txContent.classList.remove('modal-slide-in', 'modal-slide-left'); } catch (e) {}
+                try { txOverlay.classList.remove('visible'); txOverlay.style.display = 'none'; } catch (e) {}
+                restoreTxOnClose = true;
+            } catch (e) { console.warn('hide tx modal failed', e); }
+        }
+
+        // Build receipt HTML
+        const rows = [];
+        // Compute total early so we can show a large centered total at the top
+        const total = parseFloat(sale.total_amount||sale.total||0)||0;
+        // Large centered total replaces the previous top sale id/date
+        rows.push(`<div style="display:flex;justify-content:center;margin-bottom:4px;"><div style="font-size:1.6rem;font-weight:700;color:#ff9800">${formatCurrency(total)}</div></div>`);
+        // Small centered label under the big total for indication
+        rows.push(`<div style="text-align:center;color:#bfbfbf;font-size:0.9rem;margin-bottom:8px;">Total</div>`);
+        // Divider immediately below the Total label
+        rows.push('<div style="width:100%;height:1px;background:rgba(255,255,255,0.06);margin:6px 0 8px 0;"></div>');
+        // Employee / meta info (kept near the top, left-aligned)
+        try {
+            const fullName = escapeHtml(String(sale.employee_name||sale.employee||''));
+            const refVal = sale.reference || sale.ref || sale.reference_id || null;
+            if (fullName) rows.push(`<div style="margin-bottom:4px;color:#bfbfbf">Full Name: ${fullName}</div>`);
+            if (refVal) rows.push(`<div style="margin-bottom:8px;color:#bfbfbf">Reference: ${escapeHtml(String(refVal))}</div>`);
+        } catch (e) {
+            rows.push(`<div style="margin-bottom:8px;color:#bfbfbf">${escapeHtml(String(sale.employee_name||sale.employee||''))}</div>`);
+        }
+        // Insert cart mode (dine-in / take-out) with dividers before the items list
+        try {
+            const cartModeVal = sale.cart_mode || sale.cartMode || sale.mode || sale.order_type || sale.orderType || null;
+            if (cartModeVal) {
+                rows.push('<div style="width:100%;height:1px;background:rgba(255,255,255,0.04);margin:8px 0;"></div>');
+                rows.push('<div style="color:#bfbfbf;margin:6px 0;">' + 'Cart mode: ' + escapeHtml(String(cartModeVal)) + '</div>');
+                rows.push('<div style="width:100%;height:1px;background:rgba(255,255,255,0.04);margin:8px 0;"></div>');
+            }
+        } catch (e) { /* ignore cart mode rendering errors */ }
+
+        if (Array.isArray(sale.items) && sale.items.length) {
+            sale.items.forEach(it => {
+                const name = escapeHtml(it.name || it.product_name || '');
+                const variant = it.variant ? (' — ' + escapeHtml(it.variant)) : '';
+                const qty = parseInt(it.quantity||it.qty||0)||0;
+                const unit = parseFloat(it.unit_price||it.price||0)||0;
+                // Remove per-item horizontal divider; keep compact spacing
+                rows.push(`<div style="display:flex;justify-content:space-between;padding:6px 0;"><div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}${variant}</div><div style="margin-left:12px;color:#ffb347">${qty} × ${formatCurrency(unit)}</div></div>`);
+            });
+            // single thin divider after last item (before subtotal)
+            rows.push('<div style="width:100%;height:1px;background:rgba(255,255,255,0.02);margin:8px 0;"></div>');
+        } else {
+            rows.push('<div style="color:#bfbfbf;padding:12px 0">No items recorded for this sale.</div>');
+        }
+        rows.push('</div>');
+
+        // Compute subtotal and tax for display (prefer server-provided values; otherwise compute from items)
+        let subtotal = 0;
+        try {
+            if (typeof sale.subtotal !== 'undefined' && sale.subtotal !== null) subtotal = parseFloat(sale.subtotal) || 0;
+            else if (typeof sale.sub_total !== 'undefined' && sale.sub_total !== null) subtotal = parseFloat(sale.sub_total) || 0;
+            else if (Array.isArray(sale.items)) {
+                subtotal = sale.items.reduce((s, it) => s + ((parseFloat(it.unit_price || it.price || 0) || 0) * (parseInt(it.quantity || it.qty || 0) || 0)), 0);
+            } else {
+                subtotal = 0;
+            }
+        } catch (e) { subtotal = 0; }
+
+        let taxVal = 0;
+        try {
+            if (typeof sale.tax !== 'undefined' && sale.tax !== null) taxVal = parseFloat(sale.tax) || 0;
+            else if (typeof sale.tax_amount !== 'undefined' && sale.tax_amount !== null) taxVal = parseFloat(sale.tax_amount) || 0;
+            else taxVal = subtotal * taxRate;
+        } catch (e) { taxVal = subtotal * taxRate; }
+
+        // Subtotal and Tax rows
+        rows.push(`<div style="display:flex;justify-content:space-between;padding-top:8px;"><div style="color:#bfbfbf">Subtotal</div><div style="color:#bfbfbf">${formatCurrency(subtotal)}</div></div>`);
+        rows.push(`<div style="display:flex;justify-content:space-between;padding-top:6px;padding-bottom:6px;"><div style="color:#bfbfbf">Tax</div><div style="color:#bfbfbf">${formatCurrency(taxVal)}</div></div>`);
+
+        // totals
+        rows.push(`<div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid rgba(255,255,255,0.04);"><strong>Total</strong><strong style="color:#ff9800">${formatCurrency(total)}</strong></div>`);
+
+        // show payment method (left) and amount received (right) beneath the total
+        try {
+            const pmRaw = sale.payment_method || sale.payment || sale.method || '';
+            const pmLabel = pmRaw ? String(pmRaw).replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+
+            // Prefer explicit amount_received fields; fallback to other names
+            const amtReceivedVal = (typeof sale.amount_received !== 'undefined' && sale.amount_received !== null) ? sale.amount_received
+                : (typeof sale.amountReceived !== 'undefined' && sale.amountReceived !== null) ? sale.amountReceived
+                : (typeof sale.paid !== 'undefined' && sale.paid !== null) ? sale.paid
+                : (typeof sale.paid_amount !== 'undefined' && sale.paid_amount !== null) ? sale.paid_amount
+                : (typeof sale.amount !== 'undefined' && sale.amount !== null) ? sale.amount
+                : null;
+
+            const changeVal = (typeof sale.change !== 'undefined' && sale.change !== null) ? sale.change
+                : (typeof sale.change_amount !== 'undefined' && sale.change_amount !== null) ? sale.change_amount
+                : (typeof sale.changeAmount !== 'undefined' && sale.changeAmount !== null) ? sale.changeAmount
+                : null;
+
+            const amtReceived = amtReceivedVal === null ? null : (parseFloat(amtReceivedVal) || 0);
+            const changeAmt = changeVal === null ? null : (parseFloat(changeVal) || 0);
+
+            // Payment row: left = payment method, right = amount received (if provided)
+            if (pmLabel || amtReceived !== null) {
+                const rightText = amtReceived !== null ? formatCurrency(amtReceived) : '';
+                rows.push(`<div style="display:flex;justify-content:space-between;padding-top:6px;color:#bfbfbf"><div>${escapeHtml(pmLabel)}</div><div>${rightText}</div></div>`);
+            }
+
+            // If change exists and is non-zero, show Change line below (left: Change, right: change amount)
+            if (changeAmt !== null && !isNaN(changeAmt) && Number(changeAmt) !== 0) {
+                rows.push(`<div style="display:flex;justify-content:space-between;padding-top:6px;padding-bottom:6px;"><div style="color:#bfbfbf">Change</div><div style="color:#bfbfbf">${formatCurrency(changeAmt)}</div></div>`);
+            }
+        } catch (e) { /* ignore payment rendering errors */ }
+
+        // divider below totals
+        rows.push('<div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:8px;margin-bottom:8px;"></div>');
+
+        // At the bottom show sale id (left) and date/time (right, numeric MM/DD/YYYY HH:MM)
+        try {
+            const tsBottom = sale.created_at || sale.created || sale.date_created;
+            let numericDate = '';
+            try {
+                const dObj = new Date(tsBottom);
+                if (!isNaN(dObj)) {
+                    const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+                    const dd = String(dObj.getDate()).padStart(2, '0');
+                    const yyyy = dObj.getFullYear();
+                    const hh = String(dObj.getHours()).padStart(2, '0');
+                    const min = String(dObj.getMinutes()).padStart(2, '0');
+                    numericDate = `${mm}/${dd}/${yyyy} ${hh}:${min}`;
+                }
+            } catch (e) { /* ignore formatting errors */ }
+            rows.push(`<div style="display:flex;justify-content:space-between;margin-top:8px;color:#bfbfbf"><div>#${sale.id || ''}</div><div style="text-align:right">${numericDate || formatTxnDate(tsBottom)}</div></div>`);
+        } catch (e) {
+            rows.push(`<div style="margin-top:8px;color:#bfbfbf">#${sale.id || ''} · ${formatTxnDate(sale.created_at||sale.created||sale.date_created)}</div>`);
+        }
+
+        body.innerHTML = rows.join('');
+
+        // Update header title to show sale id and show receipt immediately (no slide animation)
+        try {
+            const titleEl = overlay.querySelector('.confirm-modal-title');
+            if (titleEl) titleEl.textContent = `Sale #${sale.id || ''}`;
+        } catch (e) {}
+        try { overlay.style.display = 'flex'; overlay.classList.add('visible'); document.body.classList.add('modal-open'); } catch (e) {}
+
+        // close handlers: hide receipt immediately and optionally restore transactions modal (no animation)
+        const closeReceipt = () => {
+            try { content.classList.remove('modal-slide-in', 'modal-slide-left'); } catch (e) {}
+            try { overlay.classList.remove('visible'); overlay.style.display = 'none'; document.body.classList.remove('modal-open'); } catch (e) {}
+            if (restoreTxOnClose && txOverlay && txContent) {
+                try { txContent.classList.remove('modal-slide-in', 'modal-slide-left'); txOverlay.style.display = 'flex'; txOverlay.classList.add('visible'); document.body.classList.add('modal-open'); } catch (e) { console.warn('restore tx modal failed', e); }
+            }
+        };
+
+        const closeBtn = overlay.querySelector('#receipt-close');
+        if (closeBtn) closeBtn.onclick = closeReceipt;
+        // Wire refund button to open a refund-items modal (checkbox list, select-all,
+        // dynamic button: "Refund <amount>" or "Cancel <amount>" when all selected)
+        try {
+            const refundBtn = overlay.querySelector('#receipt-refund');
+            if (refundBtn) {
+                // adjust refund button appearance based on sale status
+                try {
+                    // Remove any previous inline background/color so we start clean
+                    refundBtn.style.removeProperty('background');
+                    refundBtn.style.removeProperty('color');
+                } catch (e) {}
+                try {
+                    const st = (sale && sale.status) ? String(sale.status).toLowerCase() : '';
+                    if (st === 'cancelled' || st === 'canceled') {
+                        // Render as plain text (no button styling) for cancelled sales
+                        refundBtn.textContent = 'Cancelled';
+                        try { refundBtn.classList.remove('view-toggle-btn'); } catch (e) {}
+                        try {
+                            refundBtn.style.background = 'transparent';
+                            refundBtn.style.border = 'none';
+                            refundBtn.style.padding = '0';
+                            refundBtn.style.margin = '0';
+                            refundBtn.style.color = '#ff6b6b';
+                            refundBtn.style.cursor = 'default';
+                        } catch (e) {}
+                        refundBtn.disabled = true;
+                        try { refundBtn.setAttribute('aria-disabled', 'true'); } catch (e) {}
+                    } else if (st === 'refund' || st === 'refunded') {
+                        // Render as plain text (no button styling) for refunded sales
+                        refundBtn.textContent = 'Refunded';
+                        try { refundBtn.classList.remove('view-toggle-btn'); } catch (e) {}
+                        try {
+                            refundBtn.style.background = 'transparent';
+                            refundBtn.style.border = 'none';
+                            refundBtn.style.padding = '0';
+                            refundBtn.style.margin = '0';
+                            refundBtn.style.color = '#ffd54a';
+                            refundBtn.style.cursor = 'default';
+                        } catch (e) {}
+                        refundBtn.disabled = true;
+                        try { refundBtn.setAttribute('aria-disabled', 'true'); } catch (e) {}
+                    } else {
+                        // Active refund button: ensure it has standard button styling
+                        refundBtn.textContent = 'Refund';
+                        try { refundBtn.classList.add('view-toggle-btn'); } catch (e) {}
+                        refundBtn.disabled = false;
+                        try { refundBtn.removeAttribute('aria-disabled'); refundBtn.style.cursor = ''; } catch (e) {}
+                    }
+                } catch (e) { /* ignore styling errors */ }
+
+                // only wire click handler when refunds are allowed
+                if (!refundBtn.disabled) {
+                    refundBtn.addEventListener('click', () => {
+                        try { console.log('[POS] refund button clicked');
+                    // remove existing refund overlay if present
+                    try { const ex = document.getElementById('refund-overlay'); if (ex) ex.remove(); } catch (e) {}
+
+                    const ro = document.createElement('div');
+                    ro.id = 'refund-overlay';
+                    ro.className = 'confirm-modal-overlay';
+                    // header + body + footer
+                    ro.innerHTML = `
+                        <div class="confirm-modal" role="dialog" aria-modal="true" style="width:420px; max-width:95vw;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #1e1e1e;">
+                                <div style="font-weight:700;color:#ffd18a">Refund items</div>
+                                <button id="refund-close" class="view-toggle-btn" aria-label="Close refund">×</button>
+                            </div>
+                            <div class="confirm-modal-body" style="padding:12px; overflow:auto; max-height:60vh;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                    <label class="table-checkbox" style="display:flex;align-items:center;gap:8px;">
+                                        <input type="checkbox" id="refund-select-all" />
+                                        <span class="checkmark"></span>
+                                        <span style="color:#bfbfbf">Select all</span>
+                                    </label>
+                                    <div id="refund-total" style="font-weight:700;color:#ff9800">${currency}0.00</div>
+                                </div>
+                                <div id="refund-items-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                            </div>
+                            <div style="padding:12px;border-top:1px solid #1e1e1e;display:flex;justify-content:flex-end;gap:8px;">
+                                <button id="refund-action-btn" class="confirm-btn primary" disabled>Refund ${currency}0.00</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(ro);
+                    try { ro.style.display = 'flex'; ro.classList.add('visible'); ro.style.zIndex = 14000; const inner = ro.querySelector('.confirm-modal'); if (inner) inner.style.zIndex = 14010; document.body.classList.add('modal-open'); } catch (e) {}
+
+                    const listEl = ro.querySelector('#refund-items-list');
+                    const selectAllEl = ro.querySelector('#refund-select-all');
+                    const totalEl = ro.querySelector('#refund-total');
+                    const actionBtn = ro.querySelector('#refund-action-btn');
+
+                    // populate items as rows with checkbox on left
+                    const items = Array.isArray(sale.items) ? sale.items : [];
+                    items.forEach((it, idx) => {
+                        const row = document.createElement('div');
+                        row.style.display = 'flex';
+                        row.style.alignItems = 'center';
+                        row.style.justifyContent = 'space-between';
+                        row.style.padding = '8px';
+                        row.style.border = '1px solid rgba(255,255,255,0.03)';
+                        row.style.borderRadius = '6px';
+
+                        const left = document.createElement('label');
+                        left.className = 'table-checkbox';
+                        left.style.display = 'flex';
+                        left.style.alignItems = 'center';
+                        left.style.gap = '8px';
+
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.className = 'refund-item-cb';
+                        cb.setAttribute('data-idx', String(idx));
+                        left.appendChild(cb);
+
+                        const mark = document.createElement('span');
+                        mark.className = 'checkmark';
+                        left.appendChild(mark);
+
+                        const title = document.createElement('div');
+                        title.style.overflow = 'hidden';
+                        title.style.textOverflow = 'ellipsis';
+                        title.style.whiteSpace = 'nowrap';
+                        title.textContent = it.name || (it.product_id ? ('Item ' + it.product_id) : 'Item');
+                        left.appendChild(title);
+
+                        const right = document.createElement('div');
+                        const qty = parseInt(it.quantity || 0, 10) || 0;
+                        const price = parseFloat(it.unit_price || it.price || 0) || 0;
+                        right.textContent = `${currency}${price.toFixed(2)} x ${qty}`;
+
+                        row.appendChild(left);
+                        row.appendChild(right);
+                        listEl.appendChild(row);
+                    });
+
+                    function computeCheckedTotal() {
+                        const checked = Array.from(ro.querySelectorAll('.refund-item-cb:checked'));
+                        let sum = 0;
+                        checked.forEach(cb => {
+                            const i = parseInt(cb.getAttribute('data-idx'), 10);
+                            const it = items[i];
+                            if (!it) return;
+                            const qty = parseInt(it.quantity || 0, 10) || 0;
+                            const price = parseFloat(it.unit_price || it.price || 0) || 0;
+                            sum += (qty * price);
+                        });
+                        return sum;
+                    }
+
+                    function updateRefundUI() {
+                        const total = computeCheckedTotal();
+                        totalEl.textContent = `${currency}${total.toFixed(2)}`;
+                        const any = total > 0;
+                        // determine if all are selected
+                        const all = items.length > 0 && ro.querySelectorAll('.refund-item-cb').length === ro.querySelectorAll('.refund-item-cb:checked').length;
+                        if (actionBtn) {
+                            actionBtn.disabled = !any;
+                            const verb = all ? 'Cancel' : 'Refund';
+                            actionBtn.textContent = `${verb} ${currency}${total.toFixed(2)}`;
+                        }
+                    }
+
+                    // wire checkbox events
+                    ro.addEventListener('change', (ev) => {
+                        if (ev.target && ev.target.classList && ev.target.classList.contains('refund-item-cb')) {
+                            try { selectAllEl.checked = (ro.querySelectorAll('.refund-item-cb').length === ro.querySelectorAll('.refund-item-cb:checked').length); } catch (e) {}
+                            updateRefundUI();
+                        }
+                    });
+
+                    if (selectAllEl) {
+                        selectAllEl.addEventListener('change', (e) => {
+                            const checked = !!selectAllEl.checked;
+                            ro.querySelectorAll('.refund-item-cb').forEach(cb => { cb.checked = checked; });
+                            updateRefundUI();
+                        });
+                    }
+
+                    // action button: placeholder behavior (server refund implementation needed)
+                    if (actionBtn) {
+                        actionBtn.addEventListener('click', () => {
+                            const total = computeCheckedTotal();
+                            if (total <= 0) return;
+                            const checkedEls = Array.from(ro.querySelectorAll('.refund-item-cb:checked'));
+                            const checkedItems = checkedEls.map(cb => {
+                                const idx = parseInt(cb.getAttribute('data-idx'), 10);
+                                const it = items[idx];
+                                return {
+                                    product_id: it && it.product_id ? it.product_id : null,
+                                    variant_id: it && it.variant_id ? it.variant_id : null,
+                                    unit_price: parseFloat(it.unit_price || it.price || 0) || 0,
+                                    quantity: parseInt(it.quantity || 0, 10) || 0,
+                                    name: it && it.name ? it.name : ''
+                                };
+                            });
+                            const all = items.length > 0 && checkedItems.length === items.length;
+                            const verb = all ? 'Cancel' : 'Refund';
+                            showConfirmModal(`${verb} selected items for ${currency}${total.toFixed(2)}?`, async () => {
+                                try {
+                                    const payload = { action: 'refund', original_sale_id: sale.id, items: checkedItems, cancel_original: all };
+                                    const resp = await fetch('/black_basket/pages/pos/api.php', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        credentials: 'same-origin',
+                                        body: JSON.stringify(payload)
+                                    });
+                                    const j = await resp.json();
+                                    if (resp.ok && j && j.success) {
+                                        showToast(j.message || 'Refund processed', 'success');
+                                        try { ro.classList.remove('visible'); ro.style.display = 'none'; document.body.classList.remove('modal-open'); ro.remove(); } catch (e) {}
+                                        try { overlay.classList.remove('visible'); overlay.style.display = 'none'; document.body.classList.remove('modal-open'); } catch (e) {}
+                                        // Optionally refresh UI or mark original sale cancelled
+                                    } else {
+                                        showToast((j && (j.error || j.message)) || 'Refund failed', 'error');
+                                    }
+                                } catch (err) {
+                                    console.error('[POS] refund API error', err);
+                                    showToast('Network error: could not process refund', 'error');
+                                }
+                            }, function() {}, `${verb} items`);
+                        });
+                    }
+
+                    // close handling
+                    const closeBtnR = ro.querySelector('#refund-close');
+                    if (closeBtnR) closeBtnR.addEventListener('click', () => { try { ro.classList.remove('visible'); ro.style.display = 'none'; document.body.classList.remove('modal-open'); ro.remove(); } catch (e) {} });
+                    ro.addEventListener('click', (ev) => { if (ev.target === ro) try { ro.classList.remove('visible'); ro.style.display = 'none'; document.body.classList.remove('modal-open'); ro.remove(); } catch (e) {} });
+                    document.addEventListener('keydown', function onKey(e) { if (e.key === 'Escape') { try { ro.classList.remove('visible'); ro.style.display = 'none'; document.body.classList.remove('modal-open'); ro.remove(); } catch (e) {} document.removeEventListener('keydown', onKey); } });
+
+                    // initial update
+                    updateRefundUI();
+                    } catch (err) {
+                        console.error('[POS] refund click handler error', err);
+                        try { showToast('Error opening refund dialog', 'error'); } catch (e) {}
+                    }
+                });
+            }
+        }
+        } catch (e) { /* ignore refund wiring errors */ }
+        overlay.addEventListener('click', (ev) => { if (ev.target === overlay) { closeReceipt(); } });
+    }
+
     // --- Split Order modal (multi-column support) ---
     // Accepts optional savedMeta: { id, ref, created_at, updated_at }
     function createSplitModal(initialItems, savedMeta) {
@@ -2023,7 +2776,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showToast('Order split saved', 'success');
                 overlay.classList.remove('visible');
 
-                try { fetch('open_orders_api.php', { credentials: 'same-origin' }).then(r=>r.ok?r.json():Promise.reject()).then(j=>{ if (j && j.success) { openOrdersCache = j.orders || []; } }); } catch (e) {}
+                try { fetch('/black_basket/pages/pos/open_orders_api.php', { credentials: 'same-origin' }).then(r=>r.ok?r.json():Promise.reject()).then(j=>{ if (j && j.success) { openOrdersCache = j.orders || []; } }); } catch (e) {}
             } catch (err) {
                 showToast('Split failed: ' + (err && err.message ? err.message : err), 'error');
             }
@@ -2370,6 +3123,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (clearLi) {
                     clearLi.classList.toggle('disabled', cnt === 0);
                     clearLi.setAttribute('aria-disabled', cnt === 0 ? 'true' : 'false');
+                    try {
+                        const lbl = clearLi.querySelector('span');
+                        if (lbl) lbl.textContent = (typeof currentOrderId !== 'undefined' && currentOrderId) ? 'Void Order' : 'Clear order';
+                    } catch (e) { /* ignore label update errors */ }
                 }
                 if (mergeLi) {
                     mergeLi.classList.toggle('disabled', cnt === 0);
@@ -2886,7 +3643,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Fetch categories from inventory API and populate the category list
         function fetchCategories() {
             // inventory api sits one folder up (pages/inventory/api.php)
-            fetch('../inventory/api.php?categories=1', { credentials: 'same-origin' })
+            fetch('/black_basket/pages/inventory/api.php?categories=1', { credentials: 'same-origin' })
                 .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to load categories')))
                 .then(data => {
                     if (!Array.isArray(data)) return;
@@ -3153,7 +3910,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // prepare payload. include optional metadata for server logging/receipt
         const saleData = {
-            items: cart.map(i => ({ product_id: i.product_id || null, unit_price: parseFloat(i.unit_price) || 0, quantity: parseInt(i.quantity) || 0, name: i.name || '', variant: i.variant || null })),
+            items: cart.map(i => ({ 
+                product_id: i.product_id || null, 
+                variant_id: i.variant_id || null,
+                unit_price: parseFloat(i.unit_price) || 0, 
+                quantity: parseInt(i.quantity) || 0, 
+                name: i.name || '', 
+                variant: i.variant || null 
+            })),
             payment_method: selectedPaymentMethod,
             channel: 'in-store',
             subtotal: subtotal,
@@ -3168,7 +3932,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // disable button while processing
         try { completeSaleBtn.disabled = true; completeSaleBtn.classList.add('disabled'); } catch (e) {}
 
-        fetch('api.php', {
+        fetch('/black_basket/pages/pos/api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -3270,7 +4034,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
             // If cart empty -> open list of saved orders
-            fetch('open_orders_api.php', { credentials: 'same-origin' })
+            fetch('/black_basket/pages/pos/open_orders_api.php', { credentials: 'same-origin' })
                 .then(res => res.ok ? res.json() : Promise.reject(new Error('Network error')))
                 .then(json => {
                     if (json && json.success) {
@@ -3489,7 +4253,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         (async function doDeletes() {
                             for (let id of selected) {
                                 try {
-                                    const res = await fetch('open_orders_api.php', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', order_id: id }) });
+                                    const res = await fetch('/black_basket/pages/pos/open_orders_api.php', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', order_id: id }) });
                                     if (!res.ok) throw new Error('Delete failed');
                                     const j = await res.json();
                                     if (!j || !j.success) throw new Error(j && j.error ? j.error : 'Delete failed');
@@ -3498,7 +4262,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 }
                             }
                             // refresh list
-                            fetch('open_orders_api.php', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : Promise.reject()).then(j => { if (j && j.success) { openOrdersCache = j.orders || []; renderOpenOrdersList(openOrdersCache); if (selectAll) selectAll.checked = false; } });
+                            fetch('/black_basket/pages/pos/open_orders_api.php', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : Promise.reject()).then(j => { if (j && j.success) { openOrdersCache = j.orders || []; renderOpenOrdersList(openOrdersCache); if (selectAll) selectAll.checked = false; } });
                         })();
                     }, function(){}, title);
                 });
@@ -3533,7 +4297,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             const sources = selected.filter(id => String(id) !== String(targetId));
                             if (sources.length === 0) return;
                             // perform merge via API
-                            const res = await fetch('open_orders_api.php', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'merge', target_id: targetId, order_ids: sources }) });
+                            const res = await fetch('/black_basket/pages/pos/open_orders_api.php', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'merge', target_id: targetId, order_ids: sources }) });
                             if (!res.ok) throw new Error('Merge failed');
                             const j = await res.json();
                             if (!j || !j.success) throw new Error(j && j.error ? j.error : 'Merge failed');
@@ -3547,7 +4311,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             try { const mo = document.getElementById('merge-order-overlay'); if (mo) { mo.parentNode && mo.parentNode.removeChild(mo); } } catch (e) {}
                             try { clearCart(); } catch (e) {}
                             // refresh list of open orders in background WITHOUT reopening the modal
-                            fetch('open_orders_api.php', { credentials: 'same-origin' })
+                            fetch('/black_basket/pages/pos/open_orders_api.php', { credentials: 'same-origin' })
                                 .then(r => r.ok ? r.json() : Promise.reject())
                                 .then(j => {
                                     if (j && j.success) {
@@ -3845,13 +4609,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // normal behavior: load the order into the cart
                 const id = o.id;
-                fetch(`open_orders_api.php?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+                fetch(`/black_basket/pages/pos/open_orders_api.php?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
                     .then(res => res.ok ? res.json() : Promise.reject(new Error('Network error')))
                     .then(json => {
                         if (json && json.success) {
                             const order = json.order || json.orders && json.orders[0];
                             if (order && order.items) {
-                                cart = order.items.map(it => ({ product_id: it.product_id || null, name: it.name || '', unit_price: parseFloat(it.unit_price) || 0, quantity: parseInt(it.quantity) || 1, variant: it.variant || null }));
+                                cart = order.items.map(it => ({ product_id: it.product_id || null, variant_id: it.variant_id || null, name: it.name || '', unit_price: parseFloat(it.unit_price) || 0, quantity: parseInt(it.quantity) || 1, variant: it.variant || null }));
                                 updateCartDisplay();
                                         // Autofill the amount-received with the order total (programmatic)
                                         try {
@@ -3874,6 +4638,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                             currentOrderRef = order.reference || order.ref || null;
                                             // ensure title is editable
                                             enableTitleEditing();
+                                            // Refresh cart display so UI (e.g. sale-more label) reflects loaded order
+                                            try { updateCartDisplay(); } catch (e) { /* ignore UI refresh errors */ }
                                             // restore cart mode from saved order (do not persist as default)
                                             try {
                                                 if (order.cart_mode) {
@@ -3922,5 +4688,94 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initial load
     // Initial load (respect currentCategory)
-    loadSettings().then(() => { fetchProducts('', currentCategory); try { updateCartDisplay(); } catch(e) { /* ignore */ } try { updateAmountClearVisibility(); } catch(e) {} });
+    // Fetch settings, products and recent transactions on load
+    loadSettings().then(() => {
+        fetchProducts('', currentCategory);
+        try { updateCartDisplay(); } catch(e) { /* ignore */ }
+        try { updateAmountClearVisibility(); } catch(e) {}
+        try { fetchTransactions(); } catch(e) { /* ignore */ }
+    });
+
+    // Fetch recent sales and render into the transactions list
+    function fetchTransactions(limit = 6) {
+        const listEl = document.getElementById('transactions-list');
+        if (!listEl) return;
+        listEl.innerHTML = '<div style="color:#bfbfbf;padding:8px;">Loading recent transactions...</div>';
+        fetch('/black_basket/pages/pos/transactions_api.php?limit=' + encodeURIComponent(limit), { credentials: 'same-origin' })
+            .then(async res => {
+                if (!res.ok) {
+                    // try to extract JSON error message when available
+                    const ct = res.headers.get('Content-Type') || '';
+                    let errText = `HTTP ${res.status}`;
+                    try {
+                        if (ct.indexOf('application/json') !== -1) {
+                            const j = await res.json();
+                            if (j && j.error) errText = j.error + (j.details ? (': ' + j.details) : '');
+                        } else {
+                            const t = await res.text();
+                            if (t) errText = t;
+                        }
+                    } catch (e) { /* ignore parse errors */ }
+                    return Promise.reject(new Error(errText));
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (!Array.isArray(data) || data.length === 0) {
+                    listEl.innerHTML = '<div class="transaction-item empty">No recent transactions.</div>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                data.forEach(txn => {
+                    const item = document.createElement('div');
+                    item.className = 'transaction-item';
+                    const left = document.createElement('div'); left.className = 'transaction-left';
+                    const right = document.createElement('div'); right.className = 'transaction-right';
+
+                    // payment method icon (cash/card/online)
+                    const iconDiv = document.createElement('div');
+                    iconDiv.className = 'transaction-icon';
+                    const iconI = document.createElement('i');
+                    // choose icon class based on payment method
+                    const pm = (txn.payment_method || '').toString().toLowerCase();
+                    let iconClass = 'fa-money-bill-wave';
+                    if (pm.indexOf('card') !== -1 || pm.indexOf('credit') !== -1) iconClass = 'fa-credit-card';
+                    else if (pm.indexOf('online') !== -1 || pm.indexOf('pay') !== -1 || pm.indexOf('gcash') !== -1 || pm.indexOf('paypal') !== -1) iconClass = 'fa-globe';
+                    else if (pm.indexOf('cash') !== -1) iconClass = 'fa-money-bill-wave';
+                    iconI.className = 'fa ' + iconClass;
+                    iconDiv.appendChild(iconI);
+
+                    const type = document.createElement('div'); type.className = 'txn-type';
+                    type.textContent = txn.payment_method ? (txn.payment_method.charAt(0).toUpperCase() + txn.payment_method.slice(1)) : 'Sale';
+                    const meta = document.createElement('div'); meta.className = 'txn-meta';
+                    const ref = txn.reference || ('#' + (txn.id || ''));
+                    const modeLabel = txn.cart_mode ? (' • ' + txn.cart_mode) : '';
+                    meta.textContent = ref + modeLabel;
+
+                    const amount = document.createElement('div'); amount.className = 'txn-amount';
+                    amount.textContent = (txn.total_amount !== undefined && txn.total_amount !== null) ? ('₱' + parseFloat(txn.total_amount).toFixed(2)) : '₱0.00';
+                    const time = document.createElement('div'); time.className = 'txn-time';
+                    try { time.textContent = new Date(txn.created_at).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch(e) { time.textContent = txn.created_at || ''; }
+
+                    left.appendChild(type); left.appendChild(meta);
+                    right.appendChild(amount); right.appendChild(time);
+
+                    // structure: icon, left (type/meta), right (amount/time)
+                    item.appendChild(iconDiv);
+                    item.appendChild(left);
+                    item.appendChild(right);
+
+                    // clicking a transaction could open a detailed view later
+                    item.addEventListener('click', () => {
+                        // preserve existing behavior: nothing for now
+                    });
+
+                    listEl.appendChild(item);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load transactions', err);
+                listEl.innerHTML = `<div class="transaction-item empty">Could not load transactions. ${String(err && err.message ? err.message : '')}</div>`;
+            });
+    }
 });

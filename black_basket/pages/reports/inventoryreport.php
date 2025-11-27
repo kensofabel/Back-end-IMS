@@ -27,6 +27,12 @@ if (!isset($_SESSION['user_id'])) {
             <div class="section-header">
                 <h2>Inventory Report</h2>
                 <div class="report-filters">
+                    <select id="inventory-stock-filter" style="margin-right:8px">
+                        <option value="all">All</option>
+                        <option value="in">In Stock</option>
+                        <option value="low">Low Stock</option>
+                        <option value="negative">Negative Stock</option>
+                    </select>
                     <input type="date" id="report-start-date">
                     <input type="date" id="report-end-date">
                     <button class="btn btn-secondary" id="reset-inventory-report">

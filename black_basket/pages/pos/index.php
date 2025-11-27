@@ -77,6 +77,43 @@ session_start();
                             <!-- Products will be loaded here -->
                         </div>
                     </div>
+                
+                    <!-- Transactions / Transaction History (moved below products) -->
+                    <div class="pos-section" id="transactions-section">
+                        <div class="section-header-inline">
+                            <h3>Transactions</h3>
+                            <div class="header-actions" style="margin-right: -12px;">
+                                <a href="#" id="see-all-transactions" class="see-all-link" title="See all transactions" aria-label="See all transactions">See all</a>
+                            </div>
+                        </div>
+
+                        <div class="transactions-list" id="transactions-list" aria-live="polite">
+                            <!-- Example recent transactions (placeholders) -->
+                            <div class="transaction-item">
+                                <div class="transaction-left">
+                                    <div class="txn-type">Sale</div>
+                                    <div class="txn-meta">#T00123 • Dine in</div>
+                                </div>
+                                <div class="transaction-right">
+                                    <div class="txn-amount">₱250.00</div>
+                                    <div class="txn-time">10:42 AM</div>
+                                </div>
+                            </div>
+                            <div class="transaction-item">
+                                <div class="transaction-left">
+                                    <div class="txn-type">Refund</div>
+                                    <div class="txn-meta">#T00122 • Take out</div>
+                                </div>
+                                <div class="transaction-right">
+                                    <div class="txn-amount">-₱50.00</div>
+                                    <div class="txn-time">9:58 AM</div>
+                                </div>
+                            </div>
+                            <div class="transaction-item empty" id="transactions-empty" style="display:none;">
+                                No recent transactions.
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Cart and Checkout -->
@@ -159,11 +196,28 @@ session_start();
                         <button id="complete-sale-btn" class="complete-sale-btn">Complete Order</button>
                         <button id="open-orders-btn" class="open-orders-btn">Saved Orders</button>
                     </div>
+
+                    </div>
                 </div>
-            </div>
         </section>
     </div>
 
     <script src="pos.js"></script>
+    <!-- Transactions modal (hidden by default) -->
+    <div id="transactions-modal-overlay" class="transactions-modal-overlay">
+        <div class="transactions-modal" role="dialog" aria-modal="true" aria-label="All transactions">
+            <div class="transactions-modal-header">
+                <div class="transactions-modal-title">Transactions</div>
+                <div class="transactions-modal-actions">
+                    <button id="transactions-modal-close" class="view-toggle-btn" title="Close transactions" aria-label="Close transactions">×</button>
+                </div>
+            </div>
+            <div class="transactions-modal-body">
+                <div id="transactions-modal-list" class="transactions-list">
+                    <!-- populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -1717,6 +1717,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </script>
 <script>
+// Open Add Item modal if navigation requested it (via query param, hash, or custom event)
+document.addEventListener('DOMContentLoaded', function() {
+    function tryOpenAddModal() {
+        try {
+            var params = new URLSearchParams(window.location.search);
+            var shouldOpen = params.get('open_add') === '1' || params.get('open_create') === '1' || window.location.hash === '#add-product' || window.location.hash === '#add-product-form';
+            if (shouldOpen) {
+                var btn = document.getElementById('addProductBtn') || document.getElementById('emptyAddItemBtn');
+                if (btn) {
+                    try { btn.click(); } catch (e) { console.warn('click addProductBtn failed', e); }
+                }
+                // Remove the query params from the URL so reloading/back doesn't re-open unintentionally
+                try {
+                    if (history.replaceState) {
+                        var url = new URL(window.location.href);
+                        url.searchParams.delete('open_add');
+                        url.searchParams.delete('open_create');
+                        history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        } catch (e) { console.warn('tryOpenAddModal error', e); }
+    }
+
+    // Attempt on load
+    tryOpenAddModal();
+
+    // Listen for explicit cross-page requests
+    window.addEventListener('openInventoryAdd', function() {
+        var btn = document.getElementById('addProductBtn') || document.getElementById('emptyAddItemBtn');
+        if (btn) {
+            try { btn.click(); } catch (e) { console.warn('openInventoryAdd click failed', e); }
+        }
+    });
+});
+</script>
+<script>
 // Wire import/download/empty-state actions
 document.addEventListener('DOMContentLoaded', function() {
     try {

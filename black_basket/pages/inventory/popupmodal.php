@@ -1,4 +1,3 @@
-<head>
 <style>
         input.input-box:-webkit-autofill,
         input.input-box:-webkit-autofill:focus,
@@ -920,8 +919,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const componentsBody = document.getElementById('createComponentsBody');
     const totalCostEl = document.getElementById('createTotalCost');
     // Compute absolute path for variants API so fetch works regardless of include path
-    <?php $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'); $variantsPath = $base . '/variants_api.php'; ?>
-    const variantsApiPath = '<?php echo $variantsPath; ?>';
+    <?php $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'); ?>
+    const variantsApiPath = (window.inventoryFetchBase || '<?php echo $base; ?>') + '/variants_api.php';
 
         function formatCurrency(n) {
             // Basic formatting — keep existing currency symbol used elsewhere
@@ -935,8 +934,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (expr === null || typeof expr === 'undefined') return 0;
                 var s = String(expr).trim();
                 if (s === '') return 0;
-                s = s.replace(/[,_\s\u20B1\$]/g, '');
-                s = s.replace(/[^0-9+\-*/().\s]/g, '');
+                s = s.replace(/[,_\u20B1\$]/g, '');
+                s = s.replace(/\s+/g, '+');
+                s = s.replace(/[^0-9+\-*/().]/g, '');
                 if (s === '') return 0;
                 if (/[a-zA-Z]|\/\/|\/\*|\*\*/.test(s)) return 0;
                 var val = Function('"use strict"; return (' + s + ')')();
@@ -1261,10 +1261,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Primary attempt (relative). Use a dedicated search endpoint so we don't call the main api.php
                 <?php $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'); $searchPath = $base . '/search_api.php'; ?>
-                const fallbackUrl = '<?php echo $searchPath; ?>';
+                const fallbackUrl = (window.inventoryFetchBase || '<?php echo $base; ?>') + '/search_api.php';
 
-                // Try the relative path first, then fallback to the PHP-derived absolute path
-                return fetchAndParse('search_api.php')
+                // Try the inventory-prefixed path first (works when modal embedded), then fallback to PHP-derived absolute path
+                return fetchAndParse((window.inventoryFetchBase || '<?php echo $base; ?>') + '/search_api.php')
                     .catch(err => {
                         // If server returned HTML (err.responseText starts with '<'), log snippet and retry fallback
                         try {
@@ -1869,9 +1869,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Append file
                         fd.append('image_file', fileInputEl.files[0]);
 
-                        return fetch('api.php', { method: 'POST', body: fd });
+                        return fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/api.php', { method: 'POST', body: fd });
                     } else {
-                        return fetch('api.php', {
+                        return fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/api.php', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -1928,7 +1928,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                             // 2) fetch next SKU and set it in the inline form (if present)
                             setTimeout(function() {
-                                fetch('get_next_sku.php')
+                                fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/get_next_sku.php')
                                     .then(function(resp) { return resp.json(); })
                                     .then(function(skuData) {
                                         if (skuData && skuData.next_sku) {

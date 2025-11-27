@@ -27,8 +27,8 @@ try {
 
 	$whereSql = count($where) ? ('AND ' . implode(' AND ', $where)) : '';
 
-	// total count
-	$countSql = "SELECT COUNT(*) AS c FROM products p LEFT JOIN inventory i ON p.id = i.product_id WHERE 1=1 $whereSql";
+	// total count (from products)
+	$countSql = "SELECT COUNT(*) AS c FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE 1=1 $whereSql";
 	$countStmt = $conn->prepare($countSql);
 	if ($countStmt === false) throw new Exception('Prepare failed');
 	if (count($params)) {
@@ -38,19 +38,23 @@ try {
 	$countRes = $countStmt->get_result();
 	$totalCount = ($countRes && ($r = $countRes->fetch_assoc())) ? (int)$r['c'] : 0;
 
-	// Join products with inventory (paged)
-	$sql = "SELECT p.id, p.name, p.category, p.unit_price, IFNULL(i.quantity,0) AS quantity FROM products p LEFT JOIN inventory i ON p.id = i.product_id WHERE 1=1 $whereSql ORDER BY p.name LIMIT ? OFFSET ?";
+	// Fetch products (use products.in_stock and products.price)
+	// in_stock may contain strings like "34 0" so extract leading numeric part
+	$sql = "SELECT p.id, p.name, c.name AS category, ";
+	$sql .= "CAST(NULLIF(p.price,'') AS DECIMAL(12,2)) AS unit_price, ";
+	$sql .= "COALESCE(CAST(SUBSTRING_INDEX(p.in_stock,' ',1) AS DECIMAL(12,2)),0) AS quantity ";
+	$sql .= "FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE 1=1 $whereSql ORDER BY p.name LIMIT ? OFFSET ?";
+
 	$stmt = $conn->prepare($sql);
 	if ($stmt === false) throw new Exception('Prepare failed');
-	if (count($params)) {
-		$allParams = array_merge($params, [$per_page, $offset]);
-		$refs = [];
-		foreach ($allParams as $k => $v) { $refs[$k] = &$allParams[$k]; }
-		array_unshift($refs, $types . 'ii');
-		call_user_func_array([$stmt, 'bind_param'], $refs);
-	} else {
-		$stmt->bind_param('ii', $per_page, $offset);
-	}
+	// bind params and pagination
+	$bindTypes = $types . 'ii';
+	$allParams = array_merge($params, [$per_page, $offset]);
+	$refs = [];
+	foreach ($allParams as $k => $v) { $refs[$k] = &$allParams[$k]; }
+	array_unshift($refs, $bindTypes);
+	call_user_func_array([$stmt, 'bind_param'], $refs);
+
 	$stmt->execute();
 	$res = $stmt->get_result();
 

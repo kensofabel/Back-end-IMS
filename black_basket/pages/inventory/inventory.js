@@ -44,10 +44,14 @@ window.evaluateQuantityExpression = function(expr) {
         if (expr === null || typeof expr === 'undefined') return 0;
         var s = String(expr).trim();
         if (s === '') return 0;
-        // Remove common currency symbols and commas
-        s = s.replace(/[,_\s\u20B1\$]/g, '');
-        // Allow only digits, operators, parentheses, decimal point and whitespace
-        s = s.replace(/[^0-9+\-*/().\s]/g, '');
+        // Remove common grouping/currency characters but treat spaces as addition
+        // e.g. "1 1/2" -> "1+1/2"
+        s = s.replace(/[,_\u20B1\$]/g, '');
+        s = s.replace(/\s+/g, '+');
+        // Trim any leading/trailing plus signs introduced
+        s = s.replace(/^\++|\++$/g, '');
+        // Allow only digits, operators, parentheses, decimal point and plus
+        s = s.replace(/[^0-9+\-*/().]/g, '');
         if (s === '') return 0;
         // Reject obviously dangerous tokens
         if (/[a-zA-Z]|\/\/|\/\*|\*\*/.test(s)) return 0;
@@ -291,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     skuInput.style.borderBottomColor = '#dc3545';
                 }
             });
-            fetch('get_next_sku.php')
+            fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/get_next_sku.php')
                 .then(res => res.json())
                 .then(data => {
                     if (data.next_sku) {
@@ -408,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         const timeoutMs = 8000;
                         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-                        fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(adjustPayload), signal: controller.signal })
+                        fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/api.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(adjustPayload), signal: controller.signal })
                         .then(response => {
                             clearTimeout(timeoutId);
                             if (!response.ok) {
@@ -798,7 +802,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Fetch categories from backend
         let existingCategories = [];
         function fetchCategories() {
-            fetch('api.php?categories=1')
+            fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/api.php?categories=1')
                 .then(res => res.json())
                 .then(data => {
                     if (Array.isArray(data)) {
@@ -1416,7 +1420,7 @@ function checkSkuUniquenessBorderOnly(inputEl) {
         inputEl.style.borderBottomColor = '';
         return;
     }
-    fetch('api.php?find=sku:' + encodeURIComponent(sku))
+    fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/api.php?find=sku:' + encodeURIComponent(sku))
         .then(res => res.json())
         .then(data => {
             if (data && data.found) {
@@ -1483,7 +1487,7 @@ function removeSkuErrorBorderOnly(inputEl) {
                     }
                 }
                 // Fallback: fetch next available SKU from backend
-                fetch('get_next_sku.php')
+                fetch((window.inventoryFetchBase || '/black_basket/pages/inventory') + '/get_next_sku.php')
                     .then(function(resp) { return resp.json(); })
                     .then(function(data) {
                         if (data && data.next_sku) {
@@ -1977,17 +1981,23 @@ function removeSkuErrorBorderOnly(inputEl) {
         const node = inlineTpl.content.firstElementChild.cloneNode(true);
         inlineAddItemsMount.appendChild(node);
         if (baseAddFlow) baseAddFlow.classList.add('slide-out-left');
-        requestAnimationFrame(() => {
-            node.classList.add('show');
-        });
 
-        // Focus name after inline panel transition completes
-        setTimeout(() => {
+        // Animate the inline panel using the same content-only slide animation
+        // used by the Add Items popup modal. Apply animation only to the
+        // inner `.modal-content` (if present) so the backdrop stays static.
+        const nodeContent = node.querySelector('.modal-content') || node.querySelector('.panel-content') || node;
+        nodeContent.classList.remove('modal-slide-in', 'modal-slide-left');
+        nodeContent.style.display = '';
+        void nodeContent.offsetWidth; // force reflow
+        nodeContent.classList.add('modal-slide-in');
+        nodeContent.addEventListener('animationend', function handler() {
+            nodeContent.classList.remove('modal-slide-in');
+            nodeContent.removeEventListener('animationend', handler);
             try {
                 const inlineName = node.querySelector('#inlineItemName') || document.getElementById('inlineItemName');
-                if (inlineName) inlineName.focus();
+                if (inlineName) try { inlineName.focus(); } catch (e) {}
             } catch (e) { /* ignore */ }
-        }, 420); // closeInlineAddItemsPanel uses 400ms for removal
+        });
 
         // Close button handler
         const backBtn = node.querySelector('#backInlineAddItems');
@@ -2104,17 +2114,21 @@ function removeSkuErrorBorderOnly(inputEl) {
     function closeInlineAddItemsPanel() {
         const panel = document.getElementById('inlineAddItemsPanel');
         if (!panel) return;
-        panel.classList.remove('show');
-        // Wait for CSS transition
-        setTimeout(() => {
-            panel.remove();
-            if (baseAddFlow) baseAddFlow.classList.remove('slide-out-left');
+        // Use content-only slide-out animation and remove on animationend
+        const panelContent = panel.querySelector('.modal-content') || panel.querySelector('.panel-content') || panel;
+        panelContent.classList.remove('modal-slide-in');
+        panelContent.classList.add('modal-slide-left');
+        panelContent.addEventListener('animationend', function handler() {
+            try { panel.remove(); } catch (e) {}
+            try { if (baseAddFlow) baseAddFlow.classList.remove('slide-out-left'); } catch (e) {}
+            try { panelContent.classList.remove('modal-slide-left'); } catch (e) {}
+            panelContent.removeEventListener('animationend', handler);
             // Restore Add Items header when inline panel closed
             try {
                 const header = document.querySelector('#addItemsTabPanel .modal-title');
                 if (header) header.textContent = 'Add new item';
             } catch (e) {}
-        }, 400);
+        });
     }
     
     // Debug: Check if elements exist

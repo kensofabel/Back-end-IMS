@@ -51,6 +51,10 @@ if (!isset($_SESSION['user_id'])) {
                     <h3 id="card-payments">0</h3>
                     <p>Card Payments</p>
                 </div>
+                <div class="summary-card">
+                    <h3 id="online-payments">0</h3>
+                    <p>Online Payments</p>
+                </div>
             </div>
             <div class="sales-report-table-container">
                 <table class="sales-report-table">

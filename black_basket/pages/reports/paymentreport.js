@@ -40,6 +40,13 @@ function renderPaymentPager(pagination) {
 	document.getElementById('payment-next').onclick = () => { paymentPageState.page = Math.min(totalPages, page + 1); generatePaymentReport(); };
 }
 
+// Auto-load rows on page load so the payment table is visible immediately
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+	setTimeout(() => { paymentPageState.page = 1; generatePaymentReport(); }, 50);
+} else {
+	document.addEventListener('DOMContentLoaded', () => { paymentPageState.page = 1; generatePaymentReport(); });
+}
+
 function generatePaymentReport() {
 	const startDate = document.getElementById('report-start-date').value;
 	const endDate = document.getElementById('report-end-date').value;
@@ -62,7 +69,8 @@ function generatePaymentReport() {
 		params.append('page', paymentPageState.page);
 		params.append('per_page', paymentPageState.per_page);
 
-		fetch('paymentreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
+		// Use absolute path so this script works when included from other pages
+		fetch('/black_basket/pages/reports/paymentreport_api.php?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' })
 		.then(async r => {
 			if (!r.ok) throw new Error('Network error: ' + r.status + ' ' + r.statusText);
 			const ct = r.headers.get('Content-Type') || '';
@@ -85,21 +93,52 @@ function generatePaymentReport() {
 			if (!payments || payments.length === 0) {
 				tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:.8">No payments found</td></tr>';
 			} else {
-				tbody.innerHTML = payments.map(p => `
+				tbody.innerHTML = payments.map(p => {
+					const raw = (p.raw_status || String(p.status || '')).toLowerCase();
+					let style = '';
+					if (raw === 'cancelled' || raw === 'canceled') style = 'color:#f44336';
+					else if (raw.indexOf('refund') !== -1 || raw === 'refunded') style = 'color:#ff9800';
+					return `
 					<tr>
 						<td>PAY${p.id}</td>
 						<td>${p.date}</td>
 						<td>${currencySymbol}${Number(p.amount).toFixed(2)}</td>
 						<td>${p.method}</td>
-						<td>${p.status}</td>
+						<td style="${style}">${p.status}</td>
 					</tr>
-				`).join('');
+				`}).join('');
 			}
 
-			document.getElementById('total-payments').textContent = summary.totalPayments;
-			document.getElementById('total-payment-amount').textContent = currencySymbol + Number(summary.totalAmount).toFixed(2);
-			document.getElementById('cash-payments').textContent = summary.cashPayments;
-			document.getElementById('card-payments').textContent = summary.cardPayments;
+		// Summary: support both legacy keys and new byMethod breakdown
+		if (document.getElementById('total-payments')) document.getElementById('total-payments').textContent = summary.totalPayments ?? summary.totalPayments ?? 0;
+		if (document.getElementById('total-payment-amount')) document.getElementById('total-payment-amount').textContent = currencySymbol + Number(summary.totalAmount ?? 0).toFixed(2);
+
+		// By method breakdown (new API) or legacy cash/card fields
+		const byMethod = summary.byMethod ?? {};
+		if (Object.keys(byMethod).length) {
+			if (document.getElementById('cash-payments')) document.getElementById('cash-payments').textContent = byMethod['cash'] ? byMethod['cash'].count : (summary.cashPayments ?? 0);
+			if (document.getElementById('card-payments')) document.getElementById('card-payments').textContent = byMethod['card'] ? byMethod['card'].count : (summary.cardPayments ?? 0);
+			if (document.getElementById('online-payments')) {
+				// Prefer an explicit 'online' method bucket, otherwise sum common online methods
+				if (byMethod['online']) {
+					document.getElementById('online-payments').textContent = byMethod['online'].count;
+				} else {
+					let onlineCount = 0;
+					['gcash','gpay','paypal','stripe','paymaya','ewallet','online'].forEach(k => { if (byMethod[k]) onlineCount += byMethod[k].count; });
+					// Fallback to API-provided summary.onlinePayments if available
+					if (onlineCount === 0 && (summary.onlinePayments || summary.onlinePayments === 0)) onlineCount = summary.onlinePayments;
+					document.getElementById('online-payments').textContent = onlineCount;
+				}
+			}
+		} else {
+			if (document.getElementById('cash-payments')) document.getElementById('cash-payments').textContent = summary.cashPayments ?? 0;
+			if (document.getElementById('card-payments')) document.getElementById('card-payments').textContent = summary.cardPayments ?? 0;
+			if (document.getElementById('online-payments')) document.getElementById('online-payments').textContent = summary.onlinePayments ?? 0;
+		}
+
+		// Optional analytics placeholders: change percents
+		if (document.getElementById('payments-change')) document.getElementById('payments-change').textContent = (summary.payments_change_percent !== null && summary.payments_change_percent !== undefined) ? Number(summary.payments_change_percent).toFixed(2) + '%' : 'N/A';
+		if (document.getElementById('amount-change')) document.getElementById('amount-change').textContent = (summary.amount_change_percent !== null && summary.amount_change_percent !== undefined) ? Number(summary.amount_change_percent).toFixed(2) + '%' : 'N/A';
 			if (json.pagination) renderPaymentPager(json.pagination);
 		})
 		.catch(err => {

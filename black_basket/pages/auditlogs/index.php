@@ -4,10 +4,6 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: /black_basket/index.php');
     exit();
 }
-include '../../config/db.php';
-// Ensure only owners or users with Audit Logs Access (permission id=12) can view
-require_once __DIR__ . '/../../partials/check_permission.php';
-require_permission(12);
 
 include '../../config/db.php';
 
@@ -76,6 +72,7 @@ $result = $conn->query($sql);
                                         <th>Timestamp</th>
                                         <th>User</th>
                                         <th>Action</th>
+                                        <th>Details</th>
                                         <th>IP Address</th>
                                     </tr>
                                 </thead>
