@@ -135,9 +135,14 @@ if ($userRow) {
         'role' => $roleName
     ];
 }
-// Audit: update employee
+// Audit: update employee (include employee name when available for clarity)
 $actor = intval($_SESSION['user_id'] ?? 0);
-@log_audit($conn, $actor, "Update Employee #{$id}");
+$employeeNameForLog = $respUser['full_name'] ?? '';
+if ($employeeNameForLog) {
+    @log_audit($conn, $actor, "Update Employee #{$id} ({$employeeNameForLog})");
+} else {
+    @log_audit($conn, $actor, "Update Employee #{$id}");
+}
 
 echo json_encode(['success' => true, 'user' => $respUser]);
 exit;

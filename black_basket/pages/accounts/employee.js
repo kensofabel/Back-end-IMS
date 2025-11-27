@@ -1,56 +1,16 @@
 // --- Status toggle for employees ---
 console.log('employee.js loaded (v2)');
+// Ensure we capture the server-generated CSRF token once DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        window._bb_csrf_token = (document.querySelector('input[name="csrf_token"]') || {}).value || '';
+    } catch (e) {
+        window._bb_csrf_token = '';
+    }
+});
 // Show the missing-actual-state toast only once per page load
 window._bb_actualStateMissingNotified = window._bb_actualStateMissingNotified || false;
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-            badge.addEventListener('click', async function(e) {
-            const empId = this.getAttribute('data-employee-id');
-            if (!empId) return;
-            const badgeEl = this;
-            // Ensure actual state is set before toggling lock/unlock. Prompt user if missing.
-            let actualState = (badgeEl.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
-            if (!actualState || actualState === 'offline' || actualState === 'unknown') {
-                const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
-                if (!chosen) {
-                    try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {}
-                    return;
-                }
-                actualState = chosen;
-                badgeEl.setAttribute('data-actual-state', actualState);
-            }
-            fetch('toggle_employee_status.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + encodeURIComponent(empId) + '&actual_state=' + encodeURIComponent(actualState)
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    const newStatus = data.new_status;
-                    badgeEl.setAttribute('data-status', newStatus);
-                    const icon = badgeEl.querySelector('i');
-                    const text = badgeEl.querySelector('.status-text');
-                    // Map server 'active'/'inactive' to Unlocked/Locked UI labels
-                    if (newStatus === 'active') {
-                        badgeEl.classList.add('status-active');
-                        badgeEl.classList.remove('status-inactive');
-                        if (icon) { icon.classList.add('fa-check-circle'); icon.classList.remove('fa-times-circle'); }
-                        if (text) text.textContent = 'Unlocked';
-                    } else {
-                        badgeEl.classList.remove('status-active');
-                        badgeEl.classList.add('status-inactive');
-                        if (icon) { icon.classList.remove('fa-check-circle'); icon.classList.add('fa-times-circle'); }
-                        if (text) text.textContent = 'Locked';
-                    }
-                } else {
-                    showToast('error', data.message || 'Failed to toggle lock');
-                }
-            })
-            .catch(() => showToast('error', 'Failed to toggle lock'));
-        });
-    });
-});
+// handlers are attached dynamically via attachDynamicRowHandlers()
 // Helper for employee row cells — use .editable-cell to avoid relying on child index (checkbox column may be present)
 function getEditableCellText(row, idx) {
     if (!row) return '';
@@ -477,16 +437,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         actualState = chosen;
                         badgeEl.setAttribute('data-actual-state', actualState);
                     }
+                    const desiredStatus = (actualState === 'online') ? 'active' : 'inactive';
                     fetch('toggle_employee_status.php', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'id=' + encodeURIComponent(empId) + '&actual_state=' + encodeURIComponent(actualState)
+                        body: 'id=' + encodeURIComponent(empId)
+                            + '&actual_state=' + encodeURIComponent(actualState)
+                            + '&desired_status=' + encodeURIComponent(desiredStatus)
                     })
                 .then(r => r.json())
                 .then(data => {
-                    if (data.success) {
+                        if (data.success) {
                         const newStatus = data.new_status;
                         badgeEl.setAttribute('data-status', newStatus);
+                        if (data.actual_state) badgeEl.setAttribute('data-actual-state', data.actual_state);
                         const icon = badgeEl.querySelector('i');
                         const text = badgeEl.querySelector('.status-text');
                         if (newStatus === 'active') {
@@ -661,6 +626,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(setCellTooltips, 200);
     // Ensure employee checkbox handlers are attached (handles existing rows)
     attachEmployeeSelectHandlers();
+    // Attach dynamic row handlers for any existing rows so click handlers are installed once
+    if (typeof attachDynamicRowHandlers === 'function') attachDynamicRowHandlers();
 });
 // Consolidated accounts JS (moved from assets/js/content.js + page inline handlers)
 // This file is loaded by pages in pages/accounts/*.php
@@ -1578,41 +1545,15 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     });
 
-    // Status badge toggle handler
-    document.querySelectorAll('.status-badge-edit').forEach(function(badge) {
-        badge.onclick = async function() {
-            var icon = badge.querySelector('i');
-            var text = badge.querySelector('.status-text');
-            if (!icon || !text) return;
-            // Local toggle fallback: ensure actual_state exists and prompt user if missing
-            var actualState = (badge.getAttribute('data-actual-state') || '').toString().trim().toLowerCase();
-            if (!actualState || actualState === 'offline' || actualState === 'unknown') {
-                const chosen = await showActualStatePicker('Actual state is not set for this employee. Choose actual state before toggling.', 'Set actual state');
-                if (!chosen) { try { showToast('info', 'Toggling cancelled; actual state not set.'); } catch (e) {} ; return; }
-                badge.setAttribute('data-actual-state', chosen);
-            }
-            if (icon.classList.contains('fa-check-circle')) {
-                icon.classList.remove('fa-check-circle');
-                icon.classList.add('fa-times-circle');
-                badge.classList.remove('status-active');
-                badge.classList.add('status-inactive');
-                text.innerText = 'Locked';
-            } else {
-                icon.classList.remove('fa-times-circle');
-                icon.classList.add('fa-check-circle');
-                badge.classList.remove('status-inactive');
-                badge.classList.add('status-active');
-                text.innerText = 'Unlocked';
-            }
-        };
-    });
+    // Note: status-badge click handlers are attached elsewhere to perform server-backed updates.
+    // The inline/local-only toggle was removed to avoid flipping UI state before server confirmation.
 
     // Delete button handler: attempt server-side delete, fallback to client removal if server unavailable
     function attemptDeleteEmployee(empId, row) {
                 return fetch('delete_employee.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `employee_id=${encodeURIComponent(empId)}`
+            body: `employee_id=${encodeURIComponent(empId)}&csrf_token=${encodeURIComponent(window._bb_csrf_token)}`
         }).then(resp => {
             if (!resp.ok) {
                 // server returned error (403 or other), bubble up
@@ -1665,7 +1606,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const resp = await fetch('pages/accounts/delete_employee.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `employee_id=${encodeURIComponent(empId)}`
+                    body: `employee_id=${encodeURIComponent(empId)}&csrf_token=${encodeURIComponent(window._bb_csrf_token)}`
                 });
                 if (!resp.ok) throw new Error('Network response not ok');
                 const data = await resp.json().catch(()=>({ success: false }));
@@ -1874,7 +1815,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     fetch('create_employee.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent((document.getElementById('employee-password')||{}).value||'')}&role=${encodeURIComponent(role)}&phone=${encodeURIComponent((document.getElementById('employee-phone')||{}).value||'')}&pos_pin=${encodeURIComponent((document.getElementById('employee-pos-pin')||{}).value||'')}`
+                        body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent((document.getElementById('employee-password')||{}).value||'')}&role=${encodeURIComponent(role)}&phone=${encodeURIComponent((document.getElementById('employee-phone')||{}).value||'')}&pos_pin=${encodeURIComponent((document.getElementById('employee-pos-pin')||{}).value||'')}&csrf_token=${encodeURIComponent(window._bb_csrf_token)}`
                     }).then(r => r.json()).then(data => {
                         console.debug('create_employee response', data);
                         if (data && data.success) {
@@ -1950,7 +1891,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('update_employee.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}&phone=${encodeURIComponent(phone)}&pos_pin=${encodeURIComponent(posPin)}`
+                body: `id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}&phone=${encodeURIComponent(phone)}&pos_pin=${encodeURIComponent(posPin)}&csrf_token=${encodeURIComponent(window._bb_csrf_token)}`
             }).then(r => r.json()).then(data => {
                 console.debug('update_employee response', data);
                 if (data && data.success) {
