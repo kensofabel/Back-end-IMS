@@ -127,7 +127,7 @@ function nav_has_perm($permId, $userPermissions) {
             <?php endif; ?>
         </nav>
         <?php if (empty($user_id) || nav_has_perm(6, $userPermissions) || nav_has_perm(1, $userPermissions)): ?>
-        <a href="../inventory/index.php?open_add=1" id="navAddProduct" class="nav-item">
+        <a href="#add-product-form" class="nav-item" onclick="showSection('add-product')">
             <i class="fas fa-plus-circle"></i> Add Product
         </a>
         <?php endif; ?>
@@ -148,29 +148,5 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
         });
     });
-});
-// Wire Add Product nav item: if already on Inventory page, open the Add modal instead
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        var navAdd = document.getElementById('navAddProduct');
-        if (!navAdd) return;
-        navAdd.addEventListener('click', function(e) {
-            // Detect whether the current page is the inventory index (several path variants)
-            var path = (window.location.pathname || '').toLowerCase();
-            var isInventory = path.indexOf('/pages/inventory/index.php') !== -1 || path.indexOf('/inventory/index.php') !== -1 || path.indexOf('/pages/inventory') !== -1 || path.indexOf('/inventory') !== -1;
-            if (isInventory) {
-                // prevent navigation and try to open the modal by clicking the existing button
-                e.preventDefault();
-                var addBtn = document.getElementById('addProductBtn') || document.getElementById('emptyAddItemBtn');
-                if (addBtn) {
-                    try { addBtn.click(); } catch (err) { /* ignore */ }
-                    return;
-                }
-                // If the button isn't present yet, dispatch a custom event that inventory page can listen for
-                try { window.dispatchEvent(new CustomEvent('openInventoryAdd')); } catch (err) { /* ignore */ }
-            }
-            // otherwise let the default navigation to inventory with ?open_add=1 happen
-        });
-    } catch (e) { console.warn('navAdd wiring failed', e); }
 });
 </script>   
