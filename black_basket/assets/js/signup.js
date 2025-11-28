@@ -78,15 +78,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function showSignupError(message) {
-        const errorDiv = document.querySelector('.error-message');
-        if (errorDiv) {
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            errorDiv.classList.add('shake');
-            setTimeout(() => {
-                errorDiv.classList.remove('shake');
-            }, 500);
+        let errorDiv = document.querySelector('.error-message');
+        if (!errorDiv) {
+            // create a simple error container near the form if missing
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.style.color = '#e74c3c';
+            errorDiv.style.textAlign = 'center';
+            errorDiv.style.marginBottom = '15px';
+            const form = document.getElementById('signupForm');
+            if (form && form.parentNode) form.parentNode.insertBefore(errorDiv, form);
         }
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        errorDiv.classList.add('shake');
+        setTimeout(() => {
+            errorDiv.classList.remove('shake');
+        }, 500);
     }
 
     function setSignupLoading(isLoading) {
