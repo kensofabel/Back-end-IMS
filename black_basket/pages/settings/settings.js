@@ -10,11 +10,6 @@ function resetSettings() {
     }
 }
 
-// Change Password button
-function handleChangePassword() {
-    alert('Change Password dialog coming soon!');
-}
-
 // View Login History button
 function handleViewLoginHistory() {
     alert('Login History feature coming soon!');
@@ -38,26 +33,36 @@ function handleSaveSettings() {
         taxRate: document.getElementById('tax-rate')?.value || ''
         // Add more fields as needed
     };
-    return fetch('save_settings.php', {
+    const endpoint = '/black_basket/pages/settings/save_settings.php';
+    return fetch(endpoint, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
-    .then(res => res.json())
-    .then(res => {
-        if (res.success) {
-            alert(res.message || 'Settings saved!');
-            // Optionally update UI, e.g., last saved time
-            const lastSaved = document.getElementById('last-saved-time');
-            if (lastSaved) {
-                lastSaved.textContent = 'Last saved: ' + new Date().toLocaleString();
-            }
-            // Refresh input fields from server to reflect saved values
-            fetch('get_settings.php', { credentials: 'same-origin', cache: 'no-store' })
-                .then(r => r.ok ? r.json() : Promise.reject())
-                .then(json => {
-                    if (!json || !json.success) return;
-                    const d = json.data || {};
+    .then(async res => {
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch (e) { /* non-json */ }
+        if (!res.ok) {
+            const msg = json && json.message ? json.message : `Server error (${res.status})`;
+            throw new Error(msg + (text && !json ? ` — ${text}` : ''));
+        }
+        if (!json) throw new Error('Invalid server response');
+        if (!json.success) throw new Error(json.message || 'Failed to save settings');
+
+        // success
+        alert(json.message || 'Settings saved!');
+        const lastSaved = document.getElementById('last-saved-time');
+        if (lastSaved) lastSaved.textContent = 'Last saved: ' + new Date().toLocaleString();
+
+        // Refresh input fields from server to reflect saved values
+        try {
+            const r = await fetch('/black_basket/pages/settings/get_settings.php', { credentials: 'same-origin', cache: 'no-store' });
+            if (r.ok) {
+                const j = await r.json();
+                if (j && j.success) {
+                    const d = j.data || {};
                     const map = [
                         ['business-name', d.businessName],
                         ['business-type', d.businessType],
@@ -73,28 +78,19 @@ function handleSaveSettings() {
                         el.value = (val ?? '').toString();
                     });
                     try { updateStatsFromInputs(); } catch (_) {}
-                })
-                .catch(() => {});
-        } else {
-            alert(res.message || 'Failed to save settings.');
+                }
+            }
+        } catch (e) {
+            // ignore but don't block success
         }
     })
-    .catch(() => alert('Error saving settings.'));
+    .catch(err => {
+        alert('Error saving settings: ' + (err && err.message ? err.message : 'Unknown error'));
+        console.error('Save settings error:', err);
+    });
 }
 
-// Tab switching logic
-function showSettingsTab(tabName) {
-    document.querySelectorAll('.settings-tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    const tab = document.getElementById(`${tabName}-tab`);
-    const btn = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
-    if (tab) tab.classList.add('active');
-    if (btn) btn.classList.add('active');
-}
+// Tab switching removed: unified All Settings view (no per-tab JS needed)
 
 // Card expand/collapse logic
 function toggleCardExpansion(btn) {
@@ -147,7 +143,7 @@ function showSettingsHelp() {
 // Auto-save toggle (optional, for UI feedback)
 document.addEventListener('DOMContentLoaded', function() {
     // Prefill inputs from server settings, then compute stats
-    fetch('get_settings.php', { credentials: 'same-origin', cache: 'no-store' })
+    fetch('/black_basket/pages/settings/get_settings.php', { credentials: 'same-origin', cache: 'no-store' })
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(json => {
             if (!json || !json.success) return;
@@ -171,16 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(() => {});
     // Load stats on page load (after possible prefill)
     fetchSettingsStats();
-    // Tab switching
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-            this.classList.add('active');
-            const tabName = this.getAttribute('data-tab');
-            document.querySelectorAll('.settings-tab').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(tabName + '-tab').classList.add('active');
-        });
-    });
+    // Tab switching handlers removed (single unified view)
 
     // Card expand/collapse (if any)
     document.querySelectorAll('.card-expand-btn').forEach(btn => {
@@ -197,29 +184,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Change Password button
-    document.querySelectorAll('.modern-btn').forEach(btn => {
-        if (btn.textContent.includes('Change')) {
-            btn.addEventListener('click', handleChangePassword);
-        }
-        if (btn.textContent.includes('View')) {
-            btn.addEventListener('click', handleViewLoginHistory);
-        }
-        if (btn.textContent.includes('Connect')) {
-            btn.addEventListener('click', function() {
-                const service = this.closest('.integration-item')?.querySelector('h4')?.textContent || 'Integration';
-                handleConnectIntegration(service);
-            });
-        }
+    // Tab switching: show/hide cards by data-cats attribute
+    function switchTab(tab) {
+        // update active tab button
+        document.querySelectorAll('.nav-tab').forEach(btn => {
+            if (btn.dataset.tab === tab) btn.classList.add('active'); else btn.classList.remove('active');
+        });
+        // show/hide cards
+        document.querySelectorAll('.setting-card').forEach(card => {
+            const cats = (card.getAttribute('data-cats') || '').split(/\s+/).filter(Boolean);
+            if (tab === 'all' || cats.includes(tab)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tab = this.dataset.tab || 'general';
+            switchTab(tab);
+        });
     });
 
-    // Save Settings button
+    // Initialize to selected tab (first .nav-tab.active or default to 'general')
+    const initial = document.querySelector('.nav-tab.active')?.dataset.tab || 'general';
+    switchTab(initial);
+
+    
+    // Save Settings button (show spinner and disable while saving)
     const saveBtn = document.getElementById('save-settings-btn');
     if (saveBtn) {
         saveBtn.addEventListener('click', async function() {
-            await handleSaveSettings();
-            // Refresh stats after saving
-            fetchSettingsStats();
+            const btn = this;
+            const originalHtml = btn.innerHTML;
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                await handleSaveSettings();
+                // Refresh stats after saving
+                fetchSettingsStats();
+            } catch (e) {
+                // swallow — handleSaveSettings already alerts
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         });
     }
 
@@ -255,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Fetch and update settings stats
 function fetchSettingsStats() {
-    fetch('get_settings_stats.php', { cache: 'no-store' })
+    fetch('/black_basket/pages/settings/get_settings_stats.php', { cache: 'no-store' })
         .then(r => r.json())
         .then(data => {
             if (!data || !data.success) return;
@@ -305,4 +316,35 @@ function updateStatsFromInputs() {
     if (pendingEl) pendingEl.textContent = pending;
     if (secureEl) secureEl.textContent = `${securePercent}%`;
     if (secureLabel) secureLabel.textContent = securePercent >= 80 ? 'Secure' : 'Needs Attention';
+
+    // Business Profile card completion: if all business fields are filled mark COMPLETE
+    try {
+        const bpFields = [
+            'business-name',
+            'business-type',
+            'business-address',
+            'business-phone',
+            'business-email'
+        ];
+        const bpComplete = bpFields.every(id => {
+            const el = document.getElementById(id);
+            if (!el) return false;
+            return (el.value ?? '').toString().trim() !== '';
+        });
+
+        const badge = document.querySelector('.setting-card.featured .card-status .status-badge');
+        if (badge) {
+            if (bpComplete) {
+                badge.classList.remove('incomplete');
+                badge.classList.add('complete');
+                badge.textContent = 'COMPLETE';
+            } else {
+                badge.classList.remove('complete');
+                badge.classList.add('incomplete');
+                badge.textContent = 'INCOMPLETE';
+            }
+        }
+    } catch (e) {
+        // ignore errors — non-critical UI enhancement
+    }
 }

@@ -31,7 +31,7 @@ if (!isset($_SESSION['user_id'])) {
                             <div class="hero-text">
                                 <h1 class="hero-title">
                                     <i class="fas fa-cogs"></i>
-                                    Settings
+                                    General Settings
                                 </h1>
                                 <p class="hero-subtitle">Customize your Black Basket experience and manage your store preferences</p>
                             </div>
@@ -76,18 +76,15 @@ if (!isset($_SESSION['user_id'])) {
                         </div>
                     </div>
 
-                    <!-- Navigation Tabs -->
+                    <!-- Settings Navigation (Tabs) -->
                     <div class="settings-navigation">
-                        <nav class="nav-tabs">
-                            <button class="nav-tab active" data-tab="general">
-                                <i class="fas fa-store"></i>
-                                <span>General</span>
-                            </button>
-                            <button class="nav-tab" data-tab="notifications">
-                                <i class="fas fa-bell"></i>
-                                <span>Notifications</span>
-                            </button>
-                        </nav>
+                        <div class="nav-tabs" role="tablist" aria-label="Settings sections">
+                            <button class="nav-tab active" data-tab="general"> <i class="fas fa-cog"></i> General</button>
+                            <button class="nav-tab" data-tab="notifications"> <i class="fas fa-bell"></i> Notifications</button>
+                            <button class="nav-tab" data-tab="payments"> <i class="fas fa-coins"></i> Payments</button>
+                            <button class="nav-tab" data-tab="preferences"> <i class="fas fa-sliders-h"></i> Preferences</button>
+                            <button class="nav-tab" data-tab="advanced"> <i class="fas fa-code"></i> Advanced</button>
+                        </div>
                     </div>
 
                     <!-- Settings Content -->
@@ -97,7 +94,7 @@ if (!isset($_SESSION['user_id'])) {
                             <div class="settings-grid">
                                 
                                 <!-- Business Profile Card -->
-                                <div class="setting-card featured">
+                                <div class="setting-card featured" data-cats="general notifications payments preferences advanced">
                                     <div class="card-header">
                                         <div class="card-icon">
                                             <i class="fas fa-building"></i>
@@ -160,7 +157,7 @@ if (!isset($_SESSION['user_id'])) {
 
 
                                 <!-- Currency & Tax Card -->
-                                <div class="setting-card">
+                                <div class="setting-card" data-cats="general notifications payments preferences advanced">
                                     <div class="card-header">
                                         <div class="card-icon">
                                             <i class="fas fa-peso-sign"></i>
@@ -193,170 +190,72 @@ if (!isset($_SESSION['user_id'])) {
                                                 <input type="number" id="tax-rate" placeholder="8.25" step="0.01" min="0" max="100" class="modern-input">
                                             </div>
                                             <div class="input-group full-width">
-                                                <label>
-                                                    <i class="fas fa-credit-card"></i>
-                                                    Payment Methods
-                                                </label>
-                                                <div class="payment-methods">
-                                                    <label class="modern-checkbox">
-                                                        <input type="checkbox" checked>
-                                                        <span class="checkbox-mark"></span>
-                                                        <i class="fas fa-money-bill-wave"></i>
-                                                        Cash
-                                                    </label>
-                                                    <label class="modern-checkbox">
-                                                        <input type="checkbox" checked>
-                                                        <span class="checkbox-mark"></span>
-                                                        <i class="fas fa-credit-card"></i>
-                                                        Credit/Debit Card
-                                                    </label>
-                                                    <label class="modern-checkbox">
-                                                        <input type="checkbox">
-                                                        <span class="checkbox-mark"></span>
-                                                        <i class="fab fa-paypal"></i>
-                                                        Digital Wallet
-                                                    </label>
-                                                    <label class="modern-checkbox">
-                                                        <input type="checkbox">
-                                                        <span class="checkbox-mark"></span>
-                                                        <i class="fas fa-handshake"></i>
-                                                        Store Credit
-                                                    </label>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Preferences Card -->
-                                <div class="setting-card">
-                                    <div class="card-header">
-                                        <div class="card-icon">
-                                            <i class="fas fa-sliders-h"></i>
-                                        </div>
-                                        <div class="card-title">
-                                            <h3>Preferences</h3>
-                                            <p>Interface and system preferences</p>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-grid">
-                                            <div class="input-group">
-                                                <label for="language">
-                                                    <i class="fas fa-globe"></i>
-                                                    Language
-                                                </label>
-                                                <select id="language" class="modern-select">
-                                                    <option value="en">English</option>
-                                                    <option value="es">Spanish</option>
-                                                    <option value="fr">French</option>
-                                                    <option value="de">German</option>
-                                                </select>
+                                <div class="settings-grid">
+                                    <div class="setting-card" data-cats="general notifications payments preferences advanced">
+                                        <div class="card-header">
+                                            <div class="card-icon">
+                                                <i class="fas fa-bell"></i>
                                             </div>
-                                            <div class="input-group">
-                                                <label for="timezone">
-                                                    <i class="fas fa-clock"></i>
-                                                    Time Zone
-                                                </label>
-                                                <select id="timezone" class="modern-select">
-                                                    <option value="UTC-8">Pacific Time (UTC-8)</option>
-                                                    <option value="UTC-5">Eastern Time (UTC-5)</option>
-                                                    <option value="UTC+0">GMT (UTC+0)</option>
-                                                    <option value="UTC+1">Central European (UTC+1)</option>
-                                                </select>
-                                            </div>
-                                            <div class="input-group">
-                                                <label for="date-format">
-                                                    <i class="fas fa-calendar-alt"></i>
-                                                    Date Format
-                                                </label>
-                                                <select id="date-format" class="modern-select">
-                                                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                                                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                                                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                                                </select>
-                                            </div>
-                                            <div class="input-group">
-                                                <label for="theme">
-                                                    <i class="fas fa-palette"></i>
-                                                    Theme
-                                                </label>
-                                                <select id="theme" class="modern-select">
-                                                    <option value="dark">Dark Theme</option>
-                                                    <option value="light">Light Theme</option>
-                                                    <option value="auto">Auto (System)</option>
-                                                </select>
+                                            <div class="card-title">
+                                                <h3>Notification Preferences</h3>
+                                                <p>Choose what notifications you want to receive</p>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-
-
-                        <!-- Notifications Tab -->
-                        <div class="settings-tab" id="notifications-tab">
-                            <div class="settings-grid">
-                                <div class="setting-card">
-                                    <div class="card-header">
-                                        <div class="card-icon">
-                                            <i class="fas fa-bell"></i>
-                                        </div>
-                                        <div class="card-title">
-                                            <h3>Notification Preferences</h3>
-                                            <p>Choose what notifications you want to receive</p>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="notification-groups">
-                                            <div class="notification-group">
-                                                <h4><i class="fas fa-shopping-cart"></i> Sales & Orders</h4>
-                                                <div class="notification-items">
-                                                    <div class="notification-item">
-                                                        <div class="notification-info">
-                                                            <span>New sales</span>
-                                                            <small>Get notified when a sale is made</small>
+                                        <div class="card-body">
+                                            <div class="notification-groups">
+                                                <div class="notification-group">
+                                                    <h4><i class="fas fa-shopping-cart"></i> Sales & Orders</h4>
+                                                    <div class="notification-items">
+                                                        <div class="notification-item">
+                                                            <div class="notification-info">
+                                                                <span>New sales</span>
+                                                                <small>Get notified when a sale is made</small>
+                                                            </div>
+                                                            <div class="toggle-switch">
+                                                                <input type="checkbox" id="sales-new" checked>
+                                                                <label for="sales-new"></label>
+                                                            </div>
                                                         </div>
-                                                        <div class="toggle-switch">
-                                                            <input type="checkbox" id="sales-new" checked>
-                                                            <label for="sales-new"></label>
-                                                        </div>
-                                                    </div>
-                                                    <div class="notification-item">
-                                                        <div class="notification-info">
-                                                            <span>Large transactions</span>
-                                                            <small>Sales over $100</small>
-                                                        </div>
-                                                        <div class="toggle-switch">
-                                                            <input type="checkbox" id="sales-large">
-                                                            <label for="sales-large"></label>
+                                                        <div class="notification-item">
+                                                            <div class="notification-info">
+                                                                <span>Large transactions</span>
+                                                                <small>Sales over $100</small>
+                                                            </div>
+                                                            <div class="toggle-switch">
+                                                                <input type="checkbox" id="sales-large">
+                                                                <label for="sales-large"></label>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            
-                                            <div class="notification-group">
-                                                <h4><i class="fas fa-boxes"></i> Inventory</h4>
-                                                <div class="notification-items">
-                                                    <div class="notification-item">
-                                                        <div class="notification-info">
-                                                            <span>Low stock alerts</span>
-                                                            <small>When items are running low</small>
+                                                
+                                                <div class="notification-group">
+                                                    <h4><i class="fas fa-boxes"></i> Inventory</h4>
+                                                    <div class="notification-items">
+                                                        <div class="notification-item">
+                                                            <div class="notification-info">
+                                                                <span>Low stock alerts</span>
+                                                                <small>When items are running low</small>
+                                                            </div>
+                                                            <div class="toggle-switch">
+                                                                <input type="checkbox" id="inventory-low" checked>
+                                                                <label for="inventory-low"></label>
+                                                            </div>
                                                         </div>
-                                                        <div class="toggle-switch">
-                                                            <input type="checkbox" id="inventory-low" checked>
-                                                            <label for="inventory-low"></label>
-                                                        </div>
-                                                    </div>
-                                                    <div class="notification-item">
-                                                        <div class="notification-info">
-                                                            <span>Out of stock</span>
-                                                            <small>When items are completely out</small>
-                                                        </div>
-                                                        <div class="toggle-switch">
-                                                            <input type="checkbox" id="inventory-out" checked>
-                                                            <label for="inventory-out"></label>
+                                                        <div class="notification-item">
+                                                            <div class="notification-info">
+                                                                <span>Out of stock</span>
+                                                                <small>When items are completely out</small>
+                                                            </div>
+                                                            <div class="toggle-switch">
+                                                                <input type="checkbox" id="inventory-out" checked>
+                                                                <label for="inventory-out"></label>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -364,46 +263,8 @@ if (!isset($_SESSION['user_id'])) {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
 
-
-                        <!-- Advanced Tab -->
-                        <div class="settings-tab" id="advanced-tab">
-                            <div class="settings-grid">
-                                <div class="setting-card">
-                                    <div class="card-header">
-                                        <div class="card-icon">
-                                            <i class="fas fa-code"></i>
-                                        </div>
-                                        <div class="card-title">
-                                            <h3>Advanced Settings</h3>
-                                            <p>System configuration and developer options</p>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="advanced-options">
-                                            <div class="option-item">
-                                                <label>Debug Mode</label>
-                                                <div class="toggle-switch">
-                                                    <input type="checkbox" id="debug-mode">
-                                                    <label for="debug-mode"></label>
-                                                </div>
-                                            </div>
-                                            <div class="option-item">
-                                                <label>Auto Backup</label>
-                                                <div class="toggle-switch">
-                                                    <input type="checkbox" id="auto-backup" checked>
-                                                    <label for="auto-backup"></label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+                                
                     <!-- Save Actions -->
                     <div class="save-section">
                         <div class="save-container">

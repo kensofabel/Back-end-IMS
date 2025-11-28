@@ -37,6 +37,15 @@ if ($res) {
     }
 }
 
+// Apply the same frontend defaults so stats match what users see when inputs
+// are prefilled (e.g., `get_settings.php` returns 'PHP' for currency).
+if (!isset($kv['currency']) || trim((string)($kv['currency'] ?? '')) === '') {
+    $kv['currency'] = 'PHP';
+}
+if (!isset($kv['tax_rate']) || trim((string)($kv['tax_rate'] ?? '')) === '') {
+    $kv['tax_rate'] = '0';
+}
+
 $total = count($requiredKeys);
 $completed = 0;
 foreach ($requiredKeys as $key) {

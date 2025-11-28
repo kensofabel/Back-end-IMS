@@ -26,21 +26,18 @@ $keys = [
     'business_phone',
     'business_email',
     'currency',
-    'tax_rate'
+    'tax_rate',
+    'payment_methods',
+    'language',
+    'timezone',
+    'date_format',
+    'theme'
 ];
 
-// Fetch values
-$placeholders = implode(',', array_fill(0, count($keys), '?'));
-$stmt = $conn->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ($placeholders)");
-if ($stmt) {
-    // Bind dynamic params
-    $types = str_repeat('s', count($keys));
-    $stmt->bind_param($types, ...$keys);
-    $stmt->execute();
-    $res = $stmt->get_result();
-} else {
-    $res = false;
-}
+// Fetch values (use a simple IN list since keys are static)
+$in = "'" . implode("','", $keys) . "'";
+$sql = "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ($in)";
+$res = $conn->query($sql);
 
 $kv = array_fill_keys($keys, '');
 if ($res) {
@@ -57,7 +54,12 @@ $data = [
     'businessPhone'  => $kv['business_phone'],
     'businessEmail'  => $kv['business_email'],
     'currency'       => $kv['currency'] !== '' ? $kv['currency'] : 'PHP',
-    'taxRate'        => $kv['tax_rate']
+    'taxRate'        => $kv['tax_rate'] !== '' ? $kv['tax_rate'] : '0',
+    'paymentMethods' => $kv['payment_methods'] !== '' ? json_decode($kv['payment_methods'], true) : ['cash' => 1, 'card' => 1],
+    'language'       => $kv['language'] !== '' ? $kv['language'] : 'English',
+    'timezone'       => $kv['timezone'] !== '' ? $kv['timezone'] : 'UTC',
+    'dateFormat'     => $kv['date_format'] !== '' ? $kv['date_format'] : 'MM/DD/YYYY',
+    'theme'          => $kv['theme'] !== '' ? $kv['theme'] : 'dark'
 ];
 
 echo json_encode(['success' => true, 'data' => $data]);

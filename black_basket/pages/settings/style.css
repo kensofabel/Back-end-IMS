@@ -231,12 +231,29 @@ body {
     margin-bottom: 2rem;
 }
 
-.settings-tab {
-    display: none;
+.settings-tab { display: block; }
+
+/* Center all cards and show single-column layout for unified General Settings */
+.settings-container .settings-grid {
+    grid-template-columns: 1fr;
+    max-width: 920px;
+    margin: 0 auto;
+    gap: 2.25rem;
 }
 
-.settings-tab.active {
-    display: block;
+/* Override centering on wide screens so the grid fills the content column */
+@media (min-width: 1200px) {
+    .settings-container .settings-grid {
+        max-width: none;
+        margin: 0;
+        width: 100%;
+    }
+}
+
+/* Reduce left sticky nav column behavior when tabs removed */
+@media (min-width: 1200px) {
+    .modern-settings { grid-template-columns: 1fr; }
+    .settings-navigation { display: none; }
 }
 
 /* Settings Grid */
@@ -1010,11 +1027,14 @@ body {
 @media (min-width: 1200px) {
     .modern-settings {
         display: grid;
-        grid-template-columns: 280px 1fr;
+        /* narrower left nav to reduce left gutter */
+        grid-template-columns: 200px 1fr;
         grid-auto-rows: min-content;
         gap: 2rem;
     }
 
+    /* Keep hero, quick-stats and save section spanning full width
+       to preserve the header appearance. */
     .settings-hero,
     .quick-stats,
     .save-section {
@@ -1046,6 +1066,11 @@ body {
         width: 100%;
     }
 }
+
+/* Removed explicit left offset so header remains unchanged.
+   If you want inner header content aligned with cards without
+   changing the header background, I can add an inner wrapper
+   instead. */
 
 /* Section separation */
 .settings-container {
@@ -1105,6 +1130,19 @@ body {
 /* Grids: more flexible columns */
 .settings-grid {
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+/* Three-column layout for the main settings cards on wide screens */
+@media (min-width: 992px) {
+    .settings-tab .settings-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2.25rem;
+        align-items: start;
+    }
+
+    .settings-tab .setting-card {
+        align-self: start; /* keep cards top aligned when heights differ */
+    }
 }
 
 /* Stat items polish */
@@ -1337,4 +1375,39 @@ body {
 }
 .settings-container {
     border-bottom: none !important;
+}
+
+/* Medium screens: tighten spacing and use two columns to avoid cramped cards */
+@media (min-width: 768px) and (max-width: 991px) {
+    .settings-tab .settings-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem; /* reduce gutter so cards fit comfortably */
+        align-items: start;
+    }
+
+    .settings-tab .setting-card {
+        padding: 0.9rem 1rem; /* slightly smaller padding */
+        border-radius: 14px;
+    }
+
+    .card-header {
+        padding: 0.5rem 0;
+        gap: 0.6rem;
+    }
+
+    .card-title h3 {
+        font-size: 1.05rem;
+    }
+
+    .hero-content {
+        gap: 1rem;
+    }
+
+    .search-container {
+        min-width: 220px;
+    }
+
+    .save-container {
+        gap: 1rem;
+    }
 }
