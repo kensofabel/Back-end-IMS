@@ -1,8 +1,24 @@
 <?php
 file_put_contents('signup_debug.log', print_r($_POST, true), FILE_APPEND);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// Small helper to append debug messages with timestamp
+function log_signup_debug($msg) {
+	$ts = date('[Y-m-d H:i:s] ');
+	file_put_contents('signup_debug.log', $ts . $msg . PHP_EOL, FILE_APPEND);
+}
+
+// If this is an AJAX request we must not emit PHP warnings/notices
+// because the client expects a clean JSON response. Disable display
+// of errors for AJAX to avoid corrupting the JSON payload.
+$is_ajax = isset($_POST['ajax']) || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+if ($is_ajax) {
+	ini_set('display_errors', 0);
+	ini_set('display_startup_errors', 0);
+	error_reporting(0);
+} else {
+	ini_set('display_errors', 1);
+	ini_set('display_startup_errors', 1);
+	error_reporting(E_ALL);
+}
 session_start();
 require_once 'config/db.php';
 require_once 'scripts/create_default_category.php'; // Include the default category creation
@@ -11,26 +27,42 @@ $signupError = '';
 
 // Handle AJAX or normal POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	log_signup_debug('POST handler start');
 	$username = trim($_POST['username'] ?? '');
 	$email = trim($_POST['email'] ?? '');
 	$password = $_POST['password'] ?? '';
 	$business_name = trim($_POST['business_name'] ?? '');
 	$full_name = trim($_POST['full_name'] ?? '');
+	log_signup_debug('Inputs: username=' . $username . ' email=' . $email . ' business=' . $business_name);
 	// Basic validation
 	if (!$full_name || !$username || !$email || !$password || !$business_name) {
+		log_signup_debug('Validation failed: missing field');
 		$signupError = 'All fields are required.';
 		if (isset($_POST['ajax'])) {
+			log_signup_debug('Returning JSON: missing fields');
 			header('Content-Type: application/json');
 			echo json_encode(['success' => false, 'reason' => $signupError]);
 			exit;
 		}
 	} else {
+		log_signup_debug('Validation passed');
 		// Check if username or email already exists
 		$stmt = $conn->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
+		log_signup_debug('Prepared dup check statement');
+		if (!$stmt) {
+			log_signup_debug('Prepare failed (dup check): ' . ($conn->error ?? 'unknown'));
+			$signupError = 'Registration failed. Please try again.';
+			if (isset($_POST['ajax'])) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'reason' => $signupError]); exit; }
+		}
 		$stmt->bind_param('ss', $username, $email);
-		$stmt->execute();
+		if (!$stmt->execute()) {
+			log_signup_debug('Execute failed (dup check): ' . ($stmt->error ?? $conn->error ?? 'unknown'));
+			$signupError = 'Registration failed. Please try again.';
+			if (isset($_POST['ajax'])) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'reason' => $signupError]); exit; }
+		}
 		$stmt->store_result();
 		if ($stmt->num_rows > 0) {
+			log_signup_debug('Duplicate found');
 			$signupError = 'Username or email already exists.';
 			if (isset($_POST['ajax'])) {
 				header('Content-Type: application/json');
@@ -38,11 +70,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				exit;
 			}
 		} else {
+			log_signup_debug('No duplicate, proceed to insert');
 			// Hash password
 			$hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 			$stmt = $conn->prepare('INSERT INTO users (owner_id, username, full_name, email, password, business_name, status) VALUES (NULL, ?, ?, ?, ?, ?, "active")');
+			if (!$stmt) {
+				log_signup_debug('Prepare failed (insert user): ' . ($conn->error ?? 'unknown'));
+				$signupError = 'Registration failed. Please try again.';
+				if (isset($_POST['ajax'])) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'reason' => $signupError]); exit; }
+			}
 			$stmt->bind_param('sssss', $username, $full_name, $email, $hashedPassword, $business_name);
+			log_signup_debug('About to execute insert');
 			if ($stmt->execute()) {
+				log_signup_debug('Insert executed successfully, new id=' . $stmt->insert_id);
 				// Auto-login: fetch the new user and set session
 				$user_id = $stmt->insert_id;
 				// Create default category for this user
@@ -142,12 +182,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 					exit;
 				}
 			} else {
+				log_signup_debug('Execute failed (insert user): ' . ($stmt->error ?? $conn->error ?? 'unknown'));
 				$signupError = 'Registration failed. Please try again.';
-				if (isset($_POST['ajax'])) {
-					header('Content-Type: application/json');
-					echo json_encode(['success' => false, 'reason' => $signupError]);
-					exit;
-				}
+				if (isset($_POST['ajax'])) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'reason' => $signupError]); exit; }
 			}
 		}
 		$stmt->close();
@@ -170,10 +207,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			<div class="login-header">
 				<img class="logo" src="assets/images/indexlogo.webp" alt="Black Basket Logo">
 			</div>
+			<!-- Persistent error container for client-side JS to target -->
+			<div class="error-message" style="color: #e74c3c; text-align: center; margin-bottom: 15px; display:none;"></div>
 			<?php if ($signupSuccess): ?>
 				<div class="success-message" style="color: #27ae60; text-align: center; margin-bottom: 15px;">Registration successful! You can now <a href="index.php">sign in</a>.</div>
 			<?php elseif ($signupError): ?>
-				<div class="error-message" style="color: #e74c3c; text-align: center; margin-bottom: 15px;"> <?= htmlspecialchars($signupError) ?> </div>
+				<div class="error-message" style="color: #e74c3c; text-align: center; margin-bottom: 15px; display:block;"> <?= htmlspecialchars($signupError) ?> </div>
 			<?php endif; ?>
 			<form id="signupForm" class="login-form" method="POST">
 				<div class="form-group">
